@@ -56,8 +56,7 @@ def parse_json_response(response_text: str) -> Dict[str, Any]:
             return {"data": parsed_data}
     except Exception as e:
         st.warning(f"JSON解析失败: {str(e)}")
-    formatted_text = f"""无法解析为JSON格式的响应:\n\n{response_text}"""
-    return {"raw_text": response_text, "formatted_text": formatted_text}
+    return {"raw_text": response_text, "formatted_text": response_text}
 
 
 def validate_essay_length(essay_content: str, min_words: int = 150, max_words: int = 300) -> Tuple[bool, str]:
@@ -333,11 +332,10 @@ def calculate_estimated_study_time(target_score: float, current_level: float) ->
 # 跨版本共享工具（app_web.py + main.py 共用）
 # ============================================================
 
-SHARED_SECRET = "ielts_cross_login_secret_2024"
-
-
 def cross_login_token(user_id):
-    return hmac.new(SHARED_SECRET.encode(), user_id.encode(), hashlib.sha256).hexdigest()[:16]
+    secret = os.getenv("FLASK_SECRET_KEY", "ielts_cross_login_secret_2024")
+    return hmac.new(secret.encode(), user_id.encode(), hashlib.sha256).hexdigest()[:16]
+
 
 
 def verify_cross_token(user_id, token):
@@ -589,8 +587,9 @@ def load_user_ai_config(user_id):
     return _load_user_ai_config(user_id)
 
 
-def save_user_ai_config(user_id, config):
-    return _save_user_ai_config(user_id, config)
+def save_user_ai_config(user_id, provider=None, api_key=None, model=None, base_url=None):
+    return _save_user_ai_config(user_id, provider, api_key, model, base_url)
+
 
 
 def load_user_api_key(user_id):

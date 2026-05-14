@@ -276,14 +276,18 @@ def _render_speaking_part1():
             for i, q in enumerate(question_data["questions"]):
                 with st.expander(f"问题 {i + 1}: {q.get('question', '')}"):
                     _speak_button(q.get("question", ""), f"part1_question_speak_{i}", "🔊 朗读题目")
-                    if "model_answer" in q:
-                        st.write("**标准回答:**")
-                        _speak_button(q["model_answer"], f"part1_answer_speak_{i}", "🔊 朗读参考答案")
-                        st.write(q["model_answer"])
-
                     if "keywords" in q:
-                        st.write("**关键词:**")
-                        st.write(", ".join(q["keywords"]))
+                        with st.expander("🔑 关键词提示"):
+                            st.write(", ".join(q["keywords"]))
+                    if "tips" in q:
+                        with st.expander("💡 回答技巧"):
+                            for tip in q["tips"]:
+                                st.markdown(f"- {tip}")
+
+                    if "model_answer" in q:
+                        with st.expander("📖 参考答案"):
+                            _speak_button(q["model_answer"], f"part1_answer_speak_{i}", "🔊 朗读参考答案")
+                            st.write(q["model_answer"])
 
                     # 用户回答区域
                     user_response = st.text_area(
@@ -308,6 +312,36 @@ def _render_speaking_part1():
 
                     if feedback_key in st.session_state and st.session_state[feedback_key]:
                         _display_speaking_feedback(st.session_state[feedback_key])
+
+                    with st.expander("🔑 根据关键词生成完整答案"):
+                        keyword_input = st.text_area(
+                            f"关键词 {i + 1}",
+                            placeholder="例如：weekends, coffee shop, relax, friends",
+                            key=f"part1_keywords_{i}"
+                        )
+                        answer_key = f"part1_keyword_answer_{i}"
+                        if keyword_input and st.button(f"生成完整答案 {i + 1}", key=f"part1_keyword_btn_{i}"):
+                            with st.spinner("正在根据关键词生成答案..."):
+                                result = st.session_state.tongyi_agent.generate_answer_from_keywords(
+                                    question=q["question"],
+                                    keywords=keyword_input,
+                                    part="Part 1"
+                                )
+                                st.session_state[answer_key] = parse_json_response(result)
+                                save_user_progress(
+                                    st.session_state.user_profile.get("user_id", "default_user"),
+                                    "关键词生成答案",
+                                    {
+                                        "mode": "keyword_answer",
+                                        "question": q["question"],
+                                        "keywords": keyword_input,
+                                        "result": result,
+                                        "result_data": st.session_state[answer_key],
+                                        "timestamp": datetime.now().isoformat(),
+                                    },
+                                )
+                        if answer_key in st.session_state:
+                            _display_record_result_data(st.session_state[answer_key])
 
 
 # 口语Part 2界面函数
@@ -335,36 +369,47 @@ def _render_speaking_part2():
                         topic=topic,
                         cue_card_type=cue_card_type
                     )
+                    # Part 2 输出是 Markdown 格式，直接存储原始结果
                     parsed_result = parse_json_response(result)
                     
-                    # 验证结果格式
-                    if isinstance(parsed_result, dict):
+                    # 检查是否是 JSON 格式（结构化数据）还是 Markdown 格式
+                    if isinstance(parsed_result, dict) and "answer" in parsed_result and len(parsed_result) == 1:
+                        # 这是 Markdown 格式输出，直接使用原始文本
+                        st.session_state.current_speaking_question = {
+                            "cue_card": result,
+                            "raw_response": result
+                        }
+                    elif isinstance(parsed_result, dict):
                         st.session_state.current_speaking_question = parsed_result
-                        st.session_state.latest_part2_question = parsed_result
-                        st.session_state.latest_part2_topic = _extract_part2_topic_for_discussion(parsed_result)
-                        st.session_state.question_generated = True
-                        st.session_state.showing_answer = False  # 重置答案显示状态
-                        
-                        # 确保refresh_trigger存在
-                        if 'refresh_trigger' not in st.session_state:
-                            st.session_state.refresh_trigger = 0
-                        st.session_state.refresh_trigger += 1  # 触发刷新
-                        save_user_progress(
-                            st.session_state.user_profile.get("user_id", "default_user"),
-                            "口语Part 2题目生成",
-                            {
-                                "mode": "part2",
-                                "topic": topic,
-                                "cue_type": cue_card_type,
-                                "result_data": parsed_result,
-                                "timestamp": datetime.now().isoformat(),
-                            },
-                        )
-                        
-                        st.success("题目卡生成成功！请查看下方题目卡")
                     else:
-                        st.error("生成的题目卡格式不正确，请重试")
-                        st.session_state.question_generated = False
+                        st.session_state.current_speaking_question = {
+                            "cue_card": result,
+                            "raw_response": result
+                        }
+                    
+                    st.session_state.latest_part2_question = st.session_state.current_speaking_question
+                    st.session_state.latest_part2_topic = _extract_part2_topic_for_discussion(st.session_state.current_speaking_question)
+                    st.session_state.question_generated = True
+                    st.session_state.showing_answer = False  # 重置答案显示状态
+                    
+                    # 确保refresh_trigger存在
+                    if 'refresh_trigger' not in st.session_state:
+                        st.session_state.refresh_trigger = 0
+                    st.session_state.refresh_trigger += 1  # 触发刷新
+                    save_user_progress(
+                        st.session_state.user_profile.get("user_id", "default_user"),
+                        "口语Part 2题目生成",
+                        {
+                            "mode": "part2",
+                            "topic": topic,
+                            "cue_type": cue_card_type,
+                            "result_data": st.session_state.current_speaking_question,
+                            "timestamp": datetime.now().isoformat(),
+                        },
+                    )
+                    
+                    st.success("题目卡生成成功！请查看下方题目卡")
+
                 except Exception as e:
                     st.error(f"生成题目卡时出错: {str(e)}")
                     st.session_state.question_generated = False
@@ -551,40 +596,34 @@ def _render_speaking_part2():
                     if "improvement_tips" in kw_data:
                         st.write("**改进建议：**", kw_data["improvement_tips"])
 
-            # 添加参考答案按钮
-            show_model_answer = st.button("📝 显示高分参考答案", key="show_model_answer")
-            
-            # 显示标准答案
-            if show_model_answer or ("model_answer" in question_data and "showing_answer" in st.session_state and st.session_state.showing_answer):
-                st.session_state.showing_answer = True
-                with st.expander("🌟 高分参考答案", expanded=True):
-                    if "model_answer" in question_data:
-                        model = question_data["model_answer"]
-                        if isinstance(model, str):
-                            # 如果是纯文本格式
-                            st.write(model)
-                        else:
-                            # 如果是结构化格式
-                            if "introduction" in model:
-                                st.write("**开头介绍:**")
-                                st.write(model["introduction"])
-                            if "main_points" in model:
-                                st.write("**主要要点:**")
-                                for point in model["main_points"]:
-                                    st.write(f"• {point}")
-                            if "details" in model:
-                                st.write("**详细描述:**")
-                                for detail in model["details"]:
-                                    st.write(f"• {detail}")
+            if "model_answer" in question_data:
+                with st.expander("🌟 高分参考答案"):
+                    model = question_data["model_answer"]
+                    if isinstance(model, str):
+                        _speak_button(model, f"part2_answer_speak_{abs(hash(model))}", "🔊 朗读参考答案")
+                        st.write(model)
                     else:
-                        # 如果没有预先生成的参考答案，尝试生成一个
-                        with st.spinner("正在生成高分参考答案..."):
-                            try:
-                                # 确保agents.py中添加了生成参考答案的方法
-                                # 这里先显示一个提示
-                                st.info("参考答案生成功能开发中，请稍后再试...")
-                            except Exception as e:
-                                st.error(f"生成参考答案时出错: {str(e)}")
+                        answer_parts = []
+                        if "introduction" in model:
+                            st.write("**开头介绍:**")
+                            st.write(model["introduction"])
+                            answer_parts.append(str(model["introduction"]))
+                        if "main_points" in model:
+                            st.write("**主要要点:**")
+                            for point in model["main_points"]:
+                                st.write(f"• {point}")
+                            answer_parts.extend(str(point) for point in model["main_points"])
+                        if "details" in model:
+                            st.write("**详细描述:**")
+                            for detail in model["details"]:
+                                st.write(f"• {detail}")
+                            answer_parts.extend(str(detail) for detail in model["details"])
+                        if "conclusion" in model:
+                            st.write("**结尾:**")
+                            st.write(model["conclusion"])
+                            answer_parts.append(str(model["conclusion"]))
+                        if answer_parts:
+                            _speak_button(" ".join(answer_parts), f"part2_answer_speak_{abs(hash(' '.join(answer_parts)))}", "🔊 朗读参考答案")
 
 
 # 口语Part 3界面函数
@@ -688,16 +727,8 @@ def _render_speaking_part3():
                         st.write(f"**考察目的:** {q['purpose']}")
 
                     # 添加参考答案按钮
-                    show_answer_key = f"show_answer_{i}"
-                    if show_answer_key not in st.session_state:
-                        st.session_state[show_answer_key] = False
-                    
-                    if st.button("📝 显示高分参考答案", key=f"part3_show_answer_{i}"):
-                        st.session_state[show_answer_key] = True
-                    
-                    # 显示参考答案
-                    if st.session_state[show_answer_key] and "model_response" in q:
-                        with st.expander("🌟 高分参考答案", expanded=True):
+                    if "model_response" in q:
+                        with st.expander("🌟 高分参考答案"):
                             _speak_button(q["model_response"], f"part3_answer_speak_{i}", "🔊 朗读参考答案")
                             st.write(q["model_response"])
 
@@ -727,6 +758,36 @@ def _render_speaking_part3():
                     fb_key = f"part3_feedback_result_{i}"
                     if fb_key in st.session_state and st.session_state[fb_key]:
                         _display_speaking_feedback(st.session_state[fb_key])
+
+                    with st.expander("🔑 根据关键词生成完整答案"):
+                        keyword_input = st.text_area(
+                            f"关键词 {i + 1}",
+                            placeholder="例如：technology, communication, efficiency, drawbacks",
+                            key=f"part3_keywords_{i}"
+                        )
+                        answer_key = f"part3_keyword_answer_{i}"
+                        if keyword_input and st.button(f"生成完整答案 {i + 1}", key=f"part3_keyword_btn_{i}"):
+                            with st.spinner("正在根据关键词生成答案..."):
+                                result = st.session_state.tongyi_agent.generate_answer_from_keywords(
+                                    question=q["question"],
+                                    keywords=keyword_input,
+                                    part="Part 3"
+                                )
+                                st.session_state[answer_key] = parse_json_response(result)
+                                save_user_progress(
+                                    st.session_state.user_profile.get("user_id", "default_user"),
+                                    "关键词生成答案",
+                                    {
+                                        "mode": "keyword_answer",
+                                        "question": q["question"],
+                                        "keywords": keyword_input,
+                                        "result": result,
+                                        "result_data": st.session_state[answer_key],
+                                        "timestamp": datetime.now().isoformat(),
+                                    },
+                                )
+                        if answer_key in st.session_state:
+                            _display_record_result_data(st.session_state[answer_key])
 
 
 def _render_writing_task1():
@@ -1245,6 +1306,8 @@ def _display_record_result_data(result_data):
         "analytical_angles": "分析角度",
         "critical_thinking_tips": "批判性思维建议",
         "extended_vocabulary": "扩展词汇",
+        "advanced_vocabulary": "高级词汇",
+        "useful_phrases": "可套用短语",
         "strengths": "优点",
         "improvements": "改进建议",
     }.items():
@@ -1263,13 +1326,20 @@ def _display_record_result_data(result_data):
         "suggested_corrections": "修改建议",
         "corrected_essay": "修正后作文",
         "model_essay": "参考范文",
+        "full_answer": "完整答案",
+        "answer_structure": "答案结构",
+        "improvement_tips": "改进建议",
         "formatted_text": "内容",
     }.items():
         value = result_data.get(key)
         if value:
             with st.expander(label):
-                if key == "formatted_text":
-                    st.markdown(value)
+                if key == "full_answer":
+                    _speak_button(value, f"record_full_answer_{abs(hash(value))}", "🔊 朗读答案")
+                    st.write(value)
+                elif key == "formatted_text":
+                    cleaned = str(value).replace("无法解析为JSON格式的响应:\n\n", "")
+                    st.markdown(cleaned)
                 else:
                     st.write(value)
 

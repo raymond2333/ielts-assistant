@@ -32,55 +32,72 @@
       </section>
       {% if result_data and result_data.get('unifying_theme') %}
       <section class="panel result-panel">
-        <h2>核心主题</h2>
-        <p><strong>🇨🇳</strong> {{ result_data.get('unifying_theme', '') }}</p>
-        {% if result_data.get('unifying_theme_en') %}<p><strong>🇬🇧</strong> {{ result_data.get('unifying_theme_en', '') }}</p>{% endif %}
+        <details class="result-accordion" open>
+          <summary>🎯 核心主题</summary>
+          <div class="result-body">
+            <p><strong>🇨🇳</strong> {{ result_data.get('unifying_theme', '') }}</p>
+            {% if result_data.get('unifying_theme_en') %}<p><strong>🇬🇧</strong> {{ result_data.get('unifying_theme_en', '') }}</p>{% endif %}
+          </div>
+        </details>
 
         {% if result_data.get('linked_responses') %}
-        <h2>话题串联方案</h2>
-        {% for item in result_data.linked_responses %}
-        <div class="theme-card">
-          <h3>{{ item.get('topic', '') }}</h3>
-          {% if item.get('topic_en') %}<p><em>{{ item.get('topic_en', '') }}</em></p>{% endif %}
-          <details>
-            <summary>查看中英文方案</summary>
-            <div class="result-body">
-              {% if item.get('adapted_response') %}<p><strong>🇨🇳 中文方案：</strong>{{ item.get('adapted_response', '') }}</p>{% endif %}
-              {% if item.get('adapted_response_en') %}<p><strong>🇬🇧 English Response：</strong>{{ item.get('adapted_response_en', '') }}</p>{% endif %}
+        <details class="result-accordion" open>
+          <summary>🔗 话题串联方案</summary>
+          <div class="result-body">
+            {% for item in result_data.linked_responses %}
+            <div class="theme-card">
+              <h3>{{ item.get('topic', '') }}</h3>
+              {% if item.get('topic_en') %}<p><em>{{ item.get('topic_en', '') }}</em></p>{% endif %}
+              <details class="result-accordion nested-answer">
+                <summary>查看中英文方案</summary>
+                <div class="result-body">
+                  {% if item.get('adapted_response') %}<p><strong>🇨🇳 中文方案：</strong>{{ item.get('adapted_response', '') }}</p>{% endif %}
+                  {% if item.get('adapted_response_en') %}<p><strong>🇬🇧 English Response：</strong>{{ item.get('adapted_response_en', '') }}</p>{% endif %}
+                </div>
+              </details>
+              {% if item.get('key_elements') %}
+              <p class="tag-row"><strong>关键元素：</strong>
+                {% for el in item.key_elements %}<span class="tag">{{ el }}</span>{% endfor %}
+              </p>
+              {% endif %}
+              {% if item.get('transition_phrases') %}
+              <p class="tag-row"><strong>过渡短语：</strong>
+                {% for ph in item.transition_phrases %}<span class="tag tag-accent">{{ ph }}</span>{% endfor %}
+              </p>
+              {% endif %}
             </div>
-          </details>
-          {% if item.get('key_elements') %}
-          <p class="tag-row"><strong>关键元素：</strong>
-            {% for el in item.key_elements %}<span class="tag">{{ el }}</span>{% endfor %}
-          </p>
-          {% endif %}
-          {% if item.get('transition_phrases') %}
-          <p class="tag-row"><strong>过渡短语：</strong>
-            {% for ph in item.transition_phrases %}<span class="tag tag-accent">{{ ph }}</span>{% endfor %}
-          </p>
-          {% endif %}
-        </div>
-        {% endfor %}
+            {% endfor %}
+          </div>
+        </details>
         {% endif %}
 
         {% if result_data.get('versatile_vocabulary') or result_data.get('versatile_vocabulary_en') %}
-        <h2>通用词汇</h2>
-        <div class="two-col">
-          {% if result_data.get('versatile_vocabulary') %}<div><p class="eyebrow">🇨🇳</p>{% for v in result_data.versatile_vocabulary %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
-          {% if result_data.get('versatile_vocabulary_en') %}<div><p class="eyebrow">🇬🇧</p>{% for v in result_data.versatile_vocabulary_en %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
-        </div>
+        <details class="result-accordion">
+          <summary>📚 通用词汇</summary>
+          <div class="result-body">
+            <div class="two-col">
+              {% if result_data.get('versatile_vocabulary') %}<div><p class="eyebrow">🇨🇳</p>{% for v in result_data.versatile_vocabulary %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
+              {% if result_data.get('versatile_vocabulary_en') %}<div><p class="eyebrow">🇬🇧</p>{% for v in result_data.versatile_vocabulary_en %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
+            </div>
+          </div>
+        </details>
         {% endif %}
 
         {% if result_data.get('practice_strategy') %}
-        <h2>练习策略</h2>
-        <p>{{ result_data.get('practice_strategy', '') }}</p>
+        <details class="result-accordion">
+          <summary>📋 练习策略</summary>
+          <div class="result-body"><p>{{ result_data.get('practice_strategy', '') }}</p></div>
+        </details>
         {% endif %}
 
         {% if result_data.get('study_plan') %}
-        <h2>学习计划</h2>
-        <p>{{ result_data.get('study_plan', '') }}</p>
+        <details class="result-accordion">
+          <summary>📅 学习计划</summary>
+          <div class="result-body"><p>{{ result_data.get('study_plan', '') }}</p></div>
+        </details>
         {% endif %}
       </section>
+
       {% elif result %}
       <section class="panel result-panel">
         <h2>AI 输出</h2>

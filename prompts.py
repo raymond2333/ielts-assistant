@@ -16,185 +16,131 @@ OUTPUT_RULES = """输出要求：
 # ============================================================
 # 口语 Part 1
 # ============================================================
-SPEAKING_PART1_PROMPT = f"""你是雅思口语考官，请生成 Part 1 的题目和标准回答。
+SPEAKING_PART1_PROMPT = """你是雅思口语考官，请生成 Part 1 的题目和标准回答。
 
-话题：{{topic}}
-难度：{{difficulty}}
+话题：{topic}
+难度：{difficulty}
 
-请按以下格式输出：
-# Part 1 练习
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "questions": [
+    {{
+      "question": "问题1",
+      "model_answer": "自然、符合雅思 Part 1 的英文参考答案",
+      "keywords": ["关键词1", "关键词2"],
+      "tips": ["回答技巧1", "回答技巧2"]
+    }}
+  ],
+  "common_themes": ["相关主题1", "相关主题2"],
+  "preparation_advice": "备考建议"
+}}
 
-## 问题 1
-**题目：** 问题内容
-**参考答案：** 标准回答
-**关键词：** 关键词1、关键词2
-**答题技巧：** 技巧1；技巧2
-
-（接下来重复 问题 2、问题 3……）
-
-## 相关主题
-- 主题1
-- 主题2
-
-## 备考建议
-备考建议内容
-
-{OUTPUT_RULES}"""
+要求：
+- 生成 4 道题，每道题相互独立
+- 参考答案不要写在题目里，只放在 model_answer 字段
+- keywords 和 tips 必须是数组
+- 只输出 JSON"""
 
 # ============================================================
 # 口语 Part 2
 # ============================================================
-SPEAKING_PART2_PROMPT = f"""你是雅思口语考官，请生成 Part 2 的题目卡和标准回答。
+SPEAKING_PART2_PROMPT = """你是雅思口语考官，请生成 Part 2 的题目卡和标准回答。
 
-话题：{{topic}}
-题目卡类型：{{cue_card_type}}
+话题：{topic}
+题目卡类型：{cue_card_type}
 
-请按以下格式输出：
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "cue_card": "# IELTS SPEAKING - PART 2\\n\\n## CUE CARD\\n\\n**Describe [具体话题描述]**\\n\\nYou should say:\\n- 提示点1\\n- 提示点2\\n- 提示点3\\n- 提示点4\\n\\n**You will have to talk about the topic for 1 to 2 minutes.**\\n**You have one minute to think about what you are going to say.**\\n**You can make some notes to help you if you wish.**",
+  "model_answer": {{
+    "introduction": "开头介绍",
+    "main_points": ["要点1", "要点2", "要点3"],
+    "details": ["详细描述1", "详细描述2"],
+    "conclusion": "结尾总结"
+  }},
+  "vocabulary_highlight": ["高级词汇1", "高级词汇2"],
+  "grammar_structures": ["语法结构1", "语法结构2"],
+  "fluency_tips": ["流利度建议1", "流利度建议2"]
+}}
 
-# IELTS SPEAKING - PART 2
-
-## CUE CARD
-
-**Describe [具体话题描述]**
-
-You should say:
-- 提示点1
-- 提示点2
-- 提示点3
-- 提示点4
-
-**You will have to talk about the topic for 1 to 2 minutes.**
-**You have one minute to think about what you are going to say.**
-**You can make some notes to help you if you wish.**
-
-## 参考答案
-
-**Introduction:** 开头介绍
-
-**Main Points:**
-- 要点1
-- 要点2
-- 要点3
-
-**Details:**
-- 详细描述1
-- 详细描述2
-
-**Conclusion:** 结尾总结
-
-## 词汇亮点
-- 高级词汇1
-- 高级词汇2
-
-## 语法结构
-- 语法结构1
-- 语法结构2
-
-## 流利度建议
-- 建议1
-- 建议2
-
-{OUTPUT_RULES}"""
+要求：
+- 题目卡只放在 cue_card 字段
+- 参考答案只放在 model_answer 字段
+- 只输出 JSON"""
 
 # ============================================================
 # 口语 Part 3
 # ============================================================
-SPEAKING_PART3_PROMPT = f"""你是雅思口语考官，请基于 Part 2 话题生成 Part 3 的讨论题目。
+SPEAKING_PART3_PROMPT = """你是雅思口语考官，请基于 Part 2 话题生成 Part 3 的讨论题目。
 
-Part 2 话题：{{part2_topic}}
-讨论类型：{{discussion_type}}
+Part 2 话题：{part2_topic}
+讨论类型：{discussion_type}
 
-请按以下格式输出：
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "discussion_questions": [
+    {{
+      "question": "讨论问题1",
+      "purpose": "考察能力点",
+      "model_response": "自然、符合雅思 Part 3 深度的英文参考回答",
+      "depth_required": "需要达到的回答深度"
+    }}
+  ],
+  "analytical_angles": ["分析角度1", "分析角度2"],
+  "critical_thinking_tips": ["批判性思维建议1", "建议2"],
+  "extended_vocabulary": ["扩展词汇1", "扩展词汇2"]
+}}
 
-# Part 3 讨论
-
-## 问题 1
-**题目：** 讨论问题1
-**考察目的：** 考察能力点
-**参考答案：** 标准回答
-**深度要求：** 需要达到的深度
-
-（重复问题 2、问题 3……）
-
-## 分析角度
-- 角度1
-- 角度2
-
-## 批判性思维建议
-- 建议1
-- 建议2
-
-## 扩展词汇
-- 词汇1
-- 词汇2
-
-{OUTPUT_RULES}"""
+要求：
+- 生成 4 道讨论题，每道题相互独立
+- 参考答案不要写在题目里，只放在 model_response 字段
+- 只输出 JSON"""
 
 # ============================================================
 # 口语反馈
 # ============================================================
-SPEAKING_FEEDBACK_PROMPT = f"""你是专业的雅思口语考官，请对以下口语回答进行专业评分和反馈。
+SPEAKING_FEEDBACK_PROMPT = """你是专业的雅思口语考官，请对以下口语回答进行专业评分和反馈。
 
-考试部分：{{part}}
-题目：{{question}}
-考生回答：{{user_response}}
-目标分数：{{target_score}}
+考试部分：{part}
+题目：{question}
+考生回答：{user_response}
+目标分数：{target_score}
 
-请按以下格式输出：
-
-# 口语反馈
-
-## 总体评分：X 分
-
-## 流利度与连贯性（评分：X）
-**优点：** 优点描述
-**待改进：** 待改进点
-**建议：** 改进建议
-
-## 词汇资源（评分：X）
-**分析：** 词汇分析
-**推荐词汇：** 词汇1、词汇2
-
-## 语法多样性与准确性（评分：X）
-**分析：** 语法分析
-**常见错误：** 错误1；错误2
-
-## 发音（评分：X）
-**分析：** 发音分析
-**改进：** 改进建议
-
-## 优化回答示例
-优化后的回答
-
-## 练习建议
-- 建议1
-- 建议2
-
-{OUTPUT_RULES}"""
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "overall_score": 6.5,
+  "breakdown": {{
+    "fluency_coherence": {{"score": 6.5, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
+    "lexical_resource": {{"score": 6.5, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
+    "grammatical_range_accuracy": {{"score": 6.5, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
+    "pronunciation": {{"score": 6.5, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
+  }},
+  "improved_response": "优化后的回答示例",
+  "practice_recommendations": ["练习建议1", "练习建议2"]
+}}"""
 
 # ============================================================
 # 口语反馈（直接模式，用于 Streamlit 简洁输出）
 # ============================================================
-SPEAKING_FEEDBACK_SIMPLE_PROMPT = f"""你是专业的雅思口语考官，请对以下口语回答进行专业评分和反馈。
+SPEAKING_FEEDBACK_SIMPLE_PROMPT = """你是专业的雅思口语考官，请对以下口语回答进行专业评分和反馈。
 
-考试部分：{{part}}
-题目：{{question}}
-考生回答：{{user_response}}
-目标分数：{{target_score}}
+考试部分：{part}
+题目：{question}
+考生回答：{user_response}
+目标分数：{target_score}
 
-请按以下格式输出：
-
-# 口语反馈
-
-## 总体评分：X 分
-
-**优点：** 优点描述
-**待改进：** 待改进点
-
-## 优化回答示例
-优化后的回答
-
-{OUTPUT_RULES}"""
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "overall_score": 6.5,
+  "breakdown": {{
+    "fluency_coherence": {{"score": 6.5, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
+    "lexical_resource": {{"score": 6.5, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
+    "grammatical_range_accuracy": {{"score": 6.5, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
+    "pronunciation": {{"score": 6.5, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
+  }},
+  "improved_response": "优化后的回答示例",
+  "practice_recommendations": ["练习建议1", "练习建议2"]
+}}"""
 
 # ============================================================
 # 小作文批改（Task 1）
@@ -493,40 +439,28 @@ GENERATE_MODEL_ANSWER_PROMPT = f"""你是雅思写作考官。请为以下作文
 # ============================================================
 # 关键词生成口语答案
 # ============================================================
-KEYWORD_ANSWER_PROMPT = f"""你是雅思口语教练。请根据学生提供的关键词，生成一个自然、流利、符合雅思 {{part}} 要求的完整英文答案。
+KEYWORD_ANSWER_PROMPT = """你是雅思口语教练。请根据学生提供的关键词，生成一个自然、流利、符合雅思 {part} 要求的完整英文答案。
 
 题目/话题：
-{{question}}
+{question}
 
 学生准备的关键词：
-{{keywords}}
+{keywords}
 
 要求：
-- 答案长度适合 {{part}}（Part 1 约30-60秒，Part 2 约1-2分钟，Part 3 约45-60秒）
+- 答案长度适合 {part}（Part 1 约30-60秒，Part 2 约1-2分钟，Part 3 约45-60秒）
 - 自然融入学生提供的关键词
 - 使用适当的连接词和过渡语
 - 展现词汇和语法的丰富性
 
-请输出：
-
-# 完整答案
-完整的英文答案，自然流畅，包含开头、主体和结尾
-
-## 答案结构
-结构说明
-
-## 高级词汇
-- 词汇1
-- 词汇2
-
-## 可套用短语
-- 短语1
-- 短语2
-
-## 改进建议
-针对这些关键词的改进建议
-
-{OUTPUT_RULES}"""
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "full_answer": "完整的英文答案，自然流畅，包含开头、主体和结尾",
+  "answer_structure": "答案结构说明",
+  "advanced_vocabulary": ["高级词汇1", "高级词汇2"],
+  "useful_phrases": ["可套用短语1", "可套用短语2"],
+  "improvement_tips": "针对这些关键词的改进建议"
+}}"""
 
 # ============================================================
 # 词汇解释

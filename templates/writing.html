@@ -151,15 +151,18 @@
                 {% endif %}
                 <p style="font-size:1.05rem;line-height:1.7;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e5e7eb"><strong>题目：</strong>{{ result_data.question }}</p>
                 {% if result_data.key_features %}
-                  <p><strong>关键特征：</strong></p><ul>{% for f in result_data.key_features %}<li>{{ f }}</li>{% endfor %}</ul>
+                  <details class="result-accordion"><summary>📊 关键特征</summary><div class="result-body"><ul>{% for f in result_data.key_features %}<li>{{ f }}</li>{% endfor %}</ul></div></details>
                 {% endif %}
                 {% if result_data.chart_data %}
-                  <details class="result-accordion"><summary>表格数据（供 AI 互动使用）</summary><div class="result-body"><table class="data-table"><thead><tr><th>项目</th><th>数值</th></tr></thead><tbody>{% for row in result_data.chart_data %}<tr><td>{{ row.label }}</td><td>{{ row.value }}</td></tr>{% endfor %}</tbody></table></div></details>
+                  <details class="result-accordion"><summary>📋 表格数据（供 AI 互动使用）</summary><div class="result-body"><table class="data-table"><thead><tr><th>项目</th><th>数值</th></tr></thead><tbody>{% for row in result_data.chart_data %}<tr><td>{{ row.label }}</td><td>{{ row.value }}</td></tr>{% endfor %}</tbody></table></div></details>
                 {% endif %}
                 {% if result_data.key_points %}
-                  <p><strong>关键论点：</strong></p><ul>{% for pt in result_data.key_points %}<li>{{ pt }}</li>{% endfor %}</ul>
+                  <details class="result-accordion"><summary>💡 关键论点</summary><div class="result-body"><ul>{% for pt in result_data.key_points %}<li>{{ pt }}</li>{% endfor %}</ul></div></details>
                 {% endif %}
-                {% if result_data.suggested_structure %}<p><strong>建议结构：</strong>{{ result_data.suggested_structure }}</p>{% endif %}
+                {% if result_data.suggested_structure %}
+                  <details class="result-accordion"><summary>📐 建议结构</summary><div class="result-body"><p>{{ result_data.suggested_structure }}</p></div></details>
+                {% endif %}
+
                 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
                   <a class="primary-btn small" href="{{ url_for('writing', import_topic='1', import_question=result_data.question, import_task=target_task) }}">📝 导入题目开始练习</a>
                   <button class="ghost-btn small" type="button" onclick="document.getElementById('modelAnswerForm').style.display='block';this.style.display='none'">✨ 生成参考范文</button>

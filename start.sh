@@ -11,13 +11,27 @@ while [[ $# -gt 0 ]]; do
       export MYSQL_PORT="$2"
       shift 2
       ;;
+    -u|--mysql-user)
+      export MYSQL_USER="$2"
+      shift 2
+      ;;
+    -pw|--mysql-password)
+      export MYSQL_PASSWORD="$2"
+      shift 2
+      ;;
     *)
-      echo "用法: bash start.sh [-p|--mysql-port <端口号>]"
-      echo "示例: bash start.sh -p 13306"
+      echo "用法: bash start.sh [选项]"
+      echo "选项:"
+      echo "  -p, --mysql-port <端口号>      MySQL 端口 (默认: 3306)"
+      echo "  -u, --mysql-user <用户名>      MySQL 用户名 (默认: ielts)"
+      echo "  -pw, --mysql-password <密码>   MySQL 密码 (默认: ielts)"
+      echo "示例:"
+      echo "  bash start.sh -p 13306 -u root -pw mypassword"
       exit 1
       ;;
   esac
 done
+
 
 export FLASK_SECRET_KEY="${FLASK_SECRET_KEY:-ielts-shared-secret-key-2024}"
 export WEB_PORT="${WEB_PORT:-8600}"

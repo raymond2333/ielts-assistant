@@ -28,6 +28,8 @@
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
     .feedback-box { margin: 1rem 0; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }
     .answer-form { margin: 0.5rem 0; }
+    .speak-btn { border:1px solid #d9e2de; border-radius:999px; padding:4px 10px; background:white; cursor:pointer; font-weight:600; font-size:0.8rem; vertical-align:middle; }
+    .speak-btn:hover { background:#e5e7eb; }
   </style>
 </head>
 <body>
@@ -161,16 +163,34 @@
           {% if result_data and mode == 'part1' and result_data.questions %}
             {% for item in result_data.questions %}
               <details class="result-accordion" {% if loop.first %}open{% endif %}>
-                <summary>{{ loop.index }}. {{ item.question }} <button class="speak-btn" type="button" data-speak="{{ item.question }}">朗读题目</button></summary>
+                <summary>
+                  {{ loop.index }}. {{ item.question }}
+                  <button class="speak-btn" type="button" onclick="event.stopPropagation();speakText('{{ item.question|e }}')">🔊 朗读题目</button>
+                </summary>
                 <div class="result-body">
-                  {% if item.keywords %}<strong>关键词</strong><div class="phrase-list">{% for word in item.keywords %}<span>{{ word }}</span>{% endfor %}</div>{% endif %}
-                  {% if item.tips %}<strong>回答技巧</strong><ul>{% for tip in item.tips %}<li>{{ tip }}</li>{% endfor %}</ul>{% endif %}
+                  {% if item.keywords %}
+                  <details class="result-accordion nested-answer">
+                    <summary>🔑 关键词提示</summary>
+                    <div class="result-body"><div class="phrase-list">{% for word in item.keywords %}<span>{{ word }}</span>{% endfor %}</div></div>
+                  </details>
+                  {% endif %}
+                  {% if item.tips %}
+                  <details class="result-accordion nested-answer">
+                    <summary>💡 回答技巧</summary>
+                    <div class="result-body"><ul>{% for tip in item.tips %}<li>{{ tip }}</li>{% endfor %}</ul></div>
+                  </details>
+                  {% endif %}
+
+                  
+                  <!-- 中文思路生成英文答案 -->
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="answer_from_cn">
                     <input type="hidden" name="question" value="{{ item.question }}">
                     <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="例如：我平时喜欢在周末和朋友去咖啡馆，因为那里让我放松。"></textarea></label>
                     <button class="ghost-btn small" type="submit">生成英文答案</button>
                   </form>
+                  
+                  <!-- 输入英文回答获取批改 -->
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="speaking_feedback">
                     <input type="hidden" name="question" value="{{ item.question }}">
@@ -178,22 +198,45 @@
                     <label><span>输入英文回答，获取 AI 批改</span><textarea name="user_response" rows="3" placeholder="在这里输入你的英文回答，AI 将为你评分并提供改进建议..."></textarea></label>
                     <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
                   </form>
+
+                  <details class="result-accordion nested-answer">
+                    <summary>🔑 根据关键词生成完整答案</summary>
+                    <div class="result-body">
+                      <form method="post" class="settings-form answer-form">
+                        <input type="hidden" name="mode" value="keyword_answer">
+                        <input type="hidden" name="question" value="{{ item.question }}">
+                        <input type="hidden" name="part" value="Part 1">
+                        <label><span>你的关键词</span><textarea name="keywords" rows="3" placeholder="例如：weekends, coffee shop, relax, friends"></textarea></label>
+                        <button class="ghost-btn small" type="submit">生成完整答案</button>
+                      </form>
+                    </div>
+                  </details>
+                  
+                  <!-- 参考答案（折叠） -->
+                  {% if item.model_answer %}
                   <details class="result-accordion nested-answer">
                     <summary>查看参考答案</summary>
-                    <div class="result-body"><button class="speak-btn" type="button" data-speak="{{ item.model_answer }}">朗读参考答案</button><p>{{ item.model_answer }}</p></div>
+                    <div class="result-body">
+                      <button class="speak-btn" type="button" onclick="event.stopPropagation();speakText('{{ item.model_answer|e }}')">🔊 朗读参考答案</button>
+                      <p>{{ item.model_answer }}</p>
+                    </div>
                   </details>
+                  {% endif %}
                 </div>
               </details>
             {% endfor %}
             {% if result_data.preparation_advice %}
               <details class="result-accordion"><summary>备考建议</summary><div class="result-body">{{ result_data.preparation_advice }}</div></details>
             {% endif %}
+          
           {% elif result_data and mode == 'part2' %}
+            <!-- Part 2: 题目卡 -->
             <details class="result-accordion" open>
-              <summary>题目卡</summary>
+              <summary>🎯 题目卡 <button class="speak-btn" type="button" onclick="event.stopPropagation();speakText('{{ result_data.cue_card|e }}')">🔊 朗读题目</button></summary>
               <div class="result-body cue-card-body">{{ result_data.cue_card | simple_md }}</div>
             </details>
 
+            <!-- ⏱️ 计时器 -->
             <div class="result-body" style="margin: 1rem 0;">
               <h3>⏱️ 计时器</h3>
               <div class="timer-display" id="timerDisplay">01:00</div>
@@ -205,6 +248,7 @@
               <p class="hint" id="timerHint">点击按钮开始计时练习</p>
             </div>
 
+            <!-- 输入英文回答获取批改 -->
             <form method="post" class="settings-form answer-form">
               <input type="hidden" name="mode" value="speaking_feedback">
               <input type="hidden" name="question" value="{{ result_data.cue_card }}">
@@ -213,25 +257,52 @@
               <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
             </form>
 
+            <!-- 参考答案（折叠） -->
             {% if result_data.model_answer %}
               <details class="result-accordion">
-                <summary>参考答案</summary>
+                <summary>📖 参考答案</summary>
                 <div class="result-body">
-                  <button class="speak-btn" type="button" data-speak="{{ (result_data.model_answer.introduction or '') ~ ' ' ~ (result_data.model_answer.main_points or [])|join(' ') ~ ' ' ~ (result_data.model_answer.details or [])|join(' ') ~ ' ' ~ (result_data.model_answer.conclusion or '') }}">朗读参考答案</button>
+                  {% set answer_text = (result_data.model_answer.introduction or '') ~ ' ' ~ (result_data.model_answer.main_points or [])|join(' ') ~ ' ' ~ (result_data.model_answer.details or [])|join(' ') ~ ' ' ~ (result_data.model_answer.conclusion or '') %}
+                  <button class="speak-btn" type="button" onclick="speakText('{{ answer_text|e }}')">🔊 朗读参考答案</button>
+                  
+                  <!-- 中文思路生成英文答案 -->
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="answer_from_cn">
                     <input type="hidden" name="question" value="{{ result_data.cue_card }}">
                     <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="写下你想讲的中文内容"></textarea></label>
                     <button class="ghost-btn small" type="submit">生成英文答案</button>
                   </form>
-                  {% if result_data.model_answer.introduction %}<p><strong>开头：</strong>{{ result_data.model_answer.introduction }}</p>{% endif %}
-                  {% if result_data.model_answer.main_points %}<strong>主要观点</strong><ul>{% for point in result_data.model_answer.main_points %}<li>{{ point }}</li>{% endfor %}</ul>{% endif %}
-                  {% if result_data.model_answer.details %}<strong>细节展开</strong><ul>{% for detail in result_data.model_answer.details %}<li>{{ detail }}</li>{% endfor %}</ul>{% endif %}
-                  {% if result_data.model_answer.conclusion %}<p><strong>结尾：</strong>{{ result_data.model_answer.conclusion }}</p>{% endif %}
+                  
+                  {% if result_data.model_answer.introduction %}
+                  <details class="result-accordion nested-answer">
+                    <summary>开头</summary>
+                    <div class="result-body"><p>{{ result_data.model_answer.introduction }}</p></div>
+                  </details>
+                  {% endif %}
+                  {% if result_data.model_answer.main_points %}
+                  <details class="result-accordion nested-answer">
+                    <summary>主要观点</summary>
+                    <div class="result-body"><ul>{% for point in result_data.model_answer.main_points %}<li>{{ point }}</li>{% endfor %}</ul></div>
+                  </details>
+                  {% endif %}
+                  {% if result_data.model_answer.details %}
+                  <details class="result-accordion nested-answer">
+                    <summary>细节展开</summary>
+                    <div class="result-body"><ul>{% for detail in result_data.model_answer.details %}<li>{{ detail }}</li>{% endfor %}</ul></div>
+                  </details>
+                  {% endif %}
+                  {% if result_data.model_answer.conclusion %}
+                  <details class="result-accordion nested-answer">
+                    <summary>结尾</summary>
+                    <div class="result-body"><p>{{ result_data.model_answer.conclusion }}</p></div>
+                  </details>
+                  {% endif %}
+
                 </div>
               </details>
             {% endif %}
 
+            <!-- 🔑 关键词生成完整答案 -->
             <details class="result-accordion">
               <summary>🔑 根据关键词生成完整答案</summary>
               <div class="result-body">
@@ -249,19 +320,27 @@
             {% if result_data.vocabulary_highlight %}<details class="result-accordion"><summary>高级词汇</summary><div class="result-body"><div class="phrase-list">{% for word in result_data.vocabulary_highlight %}<span>{{ word }}</span>{% endfor %}</div></div></details>{% endif %}
             {% if result_data.grammar_structures %}<details class="result-accordion"><summary>语法结构</summary><div class="result-body"><ul>{% for item in result_data.grammar_structures %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
             {% if result_data.fluency_tips %}<details class="result-accordion"><summary>流利度建议</summary><div class="result-body"><ul>{% for item in result_data.fluency_tips %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+          
           {% elif result_data and mode == 'part3' and result_data.discussion_questions %}
             {% for item in result_data.discussion_questions %}
               <details class="result-accordion" {% if loop.first %}open{% endif %}>
-                <summary>{{ loop.index }}. {{ item.question }} <button class="speak-btn" type="button" data-speak="{{ item.question }}">朗读题目</button></summary>
+                <summary>
+                  {{ loop.index }}. {{ item.question }}
+                  <button class="speak-btn" type="button" onclick="event.stopPropagation();speakText('{{ item.question|e }}')">🔊 朗读题目</button>
+                </summary>
                 <div class="result-body">
                   {% if item.purpose %}<p><strong>考察点：</strong>{{ item.purpose }}</p>{% endif %}
                   {% if item.depth_required %}<p><strong>回答深度：</strong>{{ item.depth_required }}</p>{% endif %}
+                  
+                  <!-- 中文思路生成英文答案 -->
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="answer_from_cn">
                     <input type="hidden" name="question" value="{{ item.question }}">
                     <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="用中文写下你的观点和例子"></textarea></label>
                     <button class="ghost-btn small" type="submit">生成英文答案</button>
                   </form>
+                  
+                  <!-- 输入英文回答获取批改 -->
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="speaking_feedback">
                     <input type="hidden" name="question" value="{{ item.question }}">
@@ -269,15 +348,36 @@
                     <label><span>输入英文回答，获取 AI 批改</span><textarea name="user_response" rows="3" placeholder="在这里输入你的英文回答..."></textarea></label>
                     <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
                   </form>
+
+                  <details class="result-accordion nested-answer">
+                    <summary>🔑 根据关键词生成完整答案</summary>
+                    <div class="result-body">
+                      <form method="post" class="settings-form answer-form">
+                        <input type="hidden" name="mode" value="keyword_answer">
+                        <input type="hidden" name="question" value="{{ item.question }}">
+                        <input type="hidden" name="part" value="Part 3">
+                        <label><span>你的关键词</span><textarea name="keywords" rows="3" placeholder="例如：technology, communication, efficiency, drawbacks"></textarea></label>
+                        <button class="ghost-btn small" type="submit">生成完整答案</button>
+                      </form>
+                    </div>
+                  </details>
+                  
+                  <!-- 参考答案（折叠） -->
+                  {% if item.model_response %}
                   <details class="result-accordion nested-answer">
                     <summary>查看参考回答</summary>
-                    <div class="result-body"><button class="speak-btn" type="button" data-speak="{{ item.model_response }}">朗读参考答案</button><p>{{ item.model_response }}</p></div>
+                    <div class="result-body">
+                      <button class="speak-btn" type="button" onclick="event.stopPropagation();speakText('{{ item.model_response|e }}')">🔊 朗读参考答案</button>
+                      <p>{{ item.model_response }}</p>
+                    </div>
                   </details>
+                  {% endif %}
                 </div>
               </details>
             {% endfor %}
             {% if result_data.analytical_angles %}<details class="result-accordion"><summary>分析角度</summary><div class="result-body"><ul>{% for item in result_data.analytical_angles %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
             {% if result_data.extended_vocabulary %}<details class="result-accordion"><summary>扩展词汇</summary><div class="result-body"><div class="phrase-list">{% for word in result_data.extended_vocabulary %}<span>{{ word }}</span>{% endfor %}</div></div></details>{% endif %}
+          
           {% elif result_data and mode == 'speaking_feedback' %}
             <details class="result-accordion" open><summary>🎯 口语批改反馈</summary>
               <div class="result-body">
@@ -307,19 +407,37 @@
                 {% endif %}
               </div>
             </details>
+          
           {% elif result_data and mode == 'keyword_answer' %}
             <details class="result-accordion" open><summary>✨ 基于关键词生成的完整答案</summary>
               <div class="result-body">
                 {% if result_data.full_answer %}
-                  <p><strong>完整答案：</strong></p>
-                  <p>{{ result_data.full_answer }}</p>
+                  <details class="result-accordion nested-answer">
+                    <summary>📖 完整答案（点击展开）</summary>
+                    <div class="result-body">
+                      <button class="speak-btn" type="button" onclick="speakText('{{ result_data.full_answer|e }}')">🔊 朗读答案</button>
+                      <p>{{ result_data.full_answer }}</p>
+                    </div>
+                  </details>
                 {% endif %}
-                {% if result_data.answer_structure %}<p><strong>答案结构：</strong>{{ result_data.answer_structure }}</p>{% endif %}
-                {% if result_data.advanced_vocabulary %}<p><strong>高级词汇：</strong></p><div class="phrase-list">{% for w in result_data.advanced_vocabulary %}<span>{{ w }}</span>{% endfor %}</div>{% endif %}
-                {% if result_data.useful_phrases %}<p><strong>实用短语：</strong></p><div class="phrase-list">{% for p in result_data.useful_phrases %}<span>{{ p }}</span>{% endfor %}</div>{% endif %}
-                {% if result_data.improvement_tips %}<p><strong>改进建议：</strong>{{ result_data.improvement_tips }}</p>{% endif %}
+                {% if result_data.answer_structure %}<details class="result-accordion nested-answer"><summary>答案结构</summary><div class="result-body"><p>{{ result_data.answer_structure }}</p></div></details>{% endif %}
+                {% if result_data.advanced_vocabulary %}<details class="result-accordion nested-answer"><summary>高级词汇</summary><div class="result-body"><div class="phrase-list">{% for w in result_data.advanced_vocabulary %}<span>{{ w }}</span>{% endfor %}</div></div></details>{% endif %}
+                {% if result_data.useful_phrases %}<details class="result-accordion nested-answer"><summary>实用短语</summary><div class="result-body"><div class="phrase-list">{% for p in result_data.useful_phrases %}<span>{{ p }}</span>{% endfor %}</div></div></details>{% endif %}
+                {% if result_data.improvement_tips %}<details class="result-accordion nested-answer"><summary>改进建议</summary><div class="result-body"><p>{{ result_data.improvement_tips }}</p></div></details>{% endif %}
               </div>
             </details>
+          
+          {% elif result_data and mode == 'answer_from_cn' %}
+            <details class="result-accordion" open><summary>🌐 中文思路生成的英文答案</summary>
+              <div class="result-body">
+                <details class="result-accordion nested-answer">
+                  <summary>📖 英文答案（点击展开）</summary>
+                  <div class="result-body">{{ result | simple_md }}</div>
+                </details>
+              </div>
+            </details>
+
+          
           {% else %}
             <details class="result-accordion" open>
               <summary>AI 输出</summary>
@@ -333,6 +451,7 @@
   </div>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>
+    // ===== 计时器 =====
     let timerInterval = null;
     let remainingSeconds = 0;
 
@@ -393,6 +512,28 @@
       const btnSpeak = document.getElementById('btnSpeak');
       if (btnPrep) btnPrep.disabled = false;
       if (btnSpeak) btnSpeak.disabled = false;
+    }
+
+    // ===== 语音朗读 =====
+    function speakText(text) {
+      if (!text || !window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.78;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      const voices = speechSynthesis.getVoices();
+      const preferred = voices.find(v => /Microsoft Jenny|Microsoft Aria|Google US|Samantha|Alex|Daniel|Karen|Tingting/i.test(v.name)) ||
+        voices.find(v => /^en[-_](US|GB|AU)/i.test(v.lang));
+      if (preferred) utterance.voice = preferred;
+      setTimeout(() => speechSynthesis.speak(utterance), 80);
+    }
+
+    // 预加载语音
+    if (window.speechSynthesis) {
+      speechSynthesis.getVoices();
+      speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
     }
   </script>
   <script src="{{ url_for('static', filename='word_tools.js') }}"></script>

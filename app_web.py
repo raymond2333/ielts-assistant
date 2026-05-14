@@ -136,7 +136,10 @@ def record_result_filter(result_data, activity=""):
             f"{escape(result_data['question'])}</p>"
         )
         if result_data.get("key_features"):
-            meta.append("<p><strong>关键特征：</strong></p>" + _html_list(result_data["key_features"]))
+            meta.append(
+                "<details class='result-accordion'><summary>📊 关键特征</summary>"
+                f"<div class='result-body'>{_html_list(result_data['key_features'])}</div></details>"
+            )
         if result_data.get("chart_data"):
             rows = "".join(
                 f"<tr><td>{escape(row.get('label', ''))}</td><td>{escape(row.get('value', ''))}</td></tr>"
@@ -144,13 +147,20 @@ def record_result_filter(result_data, activity=""):
                 if isinstance(row, dict)
             )
             meta.append(
-                "<details class='result-accordion'><summary>表格数据（供 AI 互动使用）</summary>"
+                "<details class='result-accordion'><summary>📋 表格数据（供 AI 互动使用）</summary>"
                 f"<div class='result-body'><table class='data-table'><thead><tr><th>项目</th><th>数值</th></tr></thead><tbody>{rows}</tbody></table></div></details>"
             )
         if result_data.get("key_points"):
-            meta.append("<p><strong>关键论点：</strong></p>" + _html_list(result_data["key_points"]))
+            meta.append(
+                "<details class='result-accordion'><summary>💡 关键论点</summary>"
+                f"<div class='result-body'>{_html_list(result_data['key_points'])}</div></details>"
+            )
         if result_data.get("suggested_structure"):
-            meta.append(f"<p><strong>建议结构：</strong>{escape(result_data['suggested_structure'])}</p>")
+            meta.append(
+                "<details class='result-accordion'><summary>📐 建议结构</summary>"
+                f"<div class='result-body'><p>{escape(result_data['suggested_structure'])}</p></div></details>"
+            )
+
         sections.append(
             f"<details class='result-accordion' open><summary>{title}</summary>"
             f"<div class='result-body'>{''.join(meta)}</div></details>"
@@ -164,18 +174,25 @@ def record_result_filter(result_data, activity=""):
             body = [f"<p><strong>题目：</strong>{escape(item.get('question', ''))}</p>"]
             body.append(f"<button class='speak-btn' type='button' data-speak='{escape(item.get('question', ''))}'>朗读题目</button>")
             if item.get("keywords"):
-                body.append("<p><strong>关键词：</strong></p>" + _html_list(item["keywords"]))
+                body.append(
+                    "<details class='result-accordion nested-answer'><summary>🔑 关键词提示</summary>"
+                    f"<div class='result-body'>{_html_list(item['keywords'])}</div></details>"
+                )
             if item.get("tips"):
-                body.append("<p><strong>回答技巧：</strong></p>" + _html_list(item["tips"]))
+                body.append(
+                    "<details class='result-accordion nested-answer'><summary>💡 回答技巧</summary>"
+                    f"<div class='result-body'>{_html_list(item['tips'])}</div></details>"
+                )
             if item.get("model_answer"):
                 body.append(
-                    "<details class='result-accordion nested-answer'><summary>参考答案</summary>"
+                    "<details class='result-accordion nested-answer'><summary>📖 参考答案</summary>"
                     f"<div class='result-body'><button class='speak-btn' type='button' data-speak='{escape(item['model_answer'])}'>朗读参考答案</button><p>{escape(item['model_answer'])}</p></div></details>"
                 )
             sections.append(
                 f"<details class='result-accordion' open><summary>Part 1 题目 {index}</summary>"
                 f"<div class='result-body'>{''.join(body)}</div></details>"
             )
+
 
     discussion_questions = result_data.get("discussion_questions")
     if isinstance(discussion_questions, list):
@@ -211,8 +228,10 @@ def record_result_filter(result_data, activity=""):
         for key in ["introduction", "main_points", "details", "conclusion"]:
             value = model_answer.get(key)
             if value:
-                body.append(f"<p><strong>{labels[key]}：</strong></p>")
-                body.append(_html_list(value) if isinstance(value, list) else f"<p>{escape(value)}</p>")
+                body.append(
+                    f"<details class='result-accordion nested-answer'><summary>{labels[key]}</summary>"
+                    f"<div class='result-body'>{_html_list(value) if isinstance(value, list) else f'<p>{escape(value)}</p>'}</div></details>"
+                )
                 if isinstance(value, list):
                     speak_parts.extend(str(item) for item in value)
                 else:
@@ -226,6 +245,7 @@ def record_result_filter(result_data, activity=""):
                 "<details class='result-accordion'><summary>参考答案</summary>"
                 f"<div class='result-body'>{speak_html}{''.join(body)}</div></details>"
             )
+
     elif isinstance(model_answer, str) and model_answer.strip():
         sections.append(
             "<details class='result-accordion'><summary>参考答案</summary>"
@@ -239,6 +259,8 @@ def record_result_filter(result_data, activity=""):
         "analytical_angles": "分析角度",
         "critical_thinking_tips": "批判性思维建议",
         "extended_vocabulary": "扩展词汇",
+        "advanced_vocabulary": "高级词汇",
+        "useful_phrases": "可套用短语",
         "strengths": "优点",
         "improvements": "改进建议",
     }
@@ -256,15 +278,23 @@ def record_result_filter(result_data, activity=""):
         "suggested_corrections": "修改建议",
         "corrected_essay": "修正后作文",
         "model_essay": "参考范文",
+        "full_answer": "完整答案",
+        "answer_structure": "答案结构",
+        "improvement_tips": "改进建议",
         "formatted_text": "内容",
     }
     for key, label in scalar_labels.items():
         value = result_data.get(key)
         if value:
-            content = simple_md_filter(value) if key in {"corrected_essay", "model_essay", "suggested_corrections"} else escape(value)
+            if key == "formatted_text":
+                value = str(value).replace("无法解析为JSON格式的响应:\n\n", "")
+            content = simple_md_filter(value) if key in {"corrected_essay", "model_essay", "suggested_corrections", "formatted_text"} else escape(value)
+            speak_html = ""
+            if key == "full_answer":
+                speak_html = f"<button class='speak-btn' type='button' data-speak='{escape(value)}'>朗读答案</button>"
             sections.append(
                 f"<details class='result-accordion'><summary>{label}</summary>"
-                f"<div class='result-body'>{content}</div></details>"
+                f"<div class='result-body'>{speak_html}{content}</div></details>"
             )
 
     if not sections:
@@ -359,15 +389,7 @@ def provider_status_for(ai_config):
     return {key: bool(api_keys.get(key)) for key in AI_PROVIDERS}
 
 
-def _cross_login_token(user_id):
-    secret = app.secret_key
-    return hmac.new(secret.encode(), user_id.encode(), hashlib.sha256).hexdigest()[:16]
 
-
-def _verify_cross_token(user_id, token):
-    if not user_id or not token:
-        return False
-    return hmac.compare_digest(_cross_login_token(user_id), token)
 
 
 def common_context():
@@ -417,7 +439,8 @@ def parse_model_output(raw):
     try:
         return json.loads(text)
     except (TypeError, ValueError):
-        return None
+        return {"formatted_text": raw, "raw_response": raw}
+
 
 
 @app.before_request
