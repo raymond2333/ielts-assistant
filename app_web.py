@@ -51,7 +51,7 @@ from utils import (
 
 os.environ.setdefault("MYSQL_ENABLED", "true")
 os.environ.setdefault("MYSQL_HOST", "127.0.0.1")
-os.environ.setdefault("MYSQL_PORT", "3307")
+os.environ.setdefault("MYSQL_PORT", "3306")
 os.environ.setdefault("MYSQL_USER", "ielts")
 os.environ.setdefault("MYSQL_PASSWORD", "ielts")
 os.environ.setdefault("MYSQL_DATABASE", "ielts_learning")
