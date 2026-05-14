@@ -74,6 +74,7 @@ def initialize_database() -> bool:
                 ai_model VARCHAR(128) NULL,
                 ai_base_url VARCHAR(255) NULL,
                 ai_api_keys JSON NULL,
+                is_admin TINYINT(1) NOT NULL DEFAULT 0,
                 current_level DECIMAL(3,1) NOT NULL DEFAULT 5.0,
                 listening_level DECIMAL(3,1) NOT NULL DEFAULT 5.0,
                 speaking_level DECIMAL(3,1) NOT NULL DEFAULT 5.0,
@@ -97,6 +98,7 @@ def initialize_database() -> bool:
         _ensure_column(cursor, database_name, "users", "ai_model", "VARCHAR(128) NULL")
         _ensure_column(cursor, database_name, "users", "ai_base_url", "VARCHAR(255) NULL")
         _ensure_column(cursor, database_name, "users", "ai_api_keys", "JSON NULL")
+        _ensure_column(cursor, database_name, "users", "is_admin", "TINYINT(1) NOT NULL DEFAULT 0")
         _ensure_column(cursor, database_name, "users", "listening_level", "DECIMAL(3,1) NOT NULL DEFAULT 5.0")
         _ensure_column(cursor, database_name, "users", "speaking_level", "DECIMAL(3,1) NOT NULL DEFAULT 5.0")
         _ensure_column(cursor, database_name, "users", "reading_level", "DECIMAL(3,1) NOT NULL DEFAULT 5.0")
@@ -437,6 +439,78 @@ def load_user_ai_config(user_id: str) -> Dict[str, Any]:
     }
 
 
+def save_user_ai_config_map(
+    user_id: str,
+    provider: str,
+    api_keys: Dict[str, str],
+    model: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> None:
+    ensure_user(user_id)
+    provider = (provider or "tongyi").lower()
+    api_keys = {k: v for k, v in (api_keys or {}).items() if v}
+    with mysql_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            UPDATE users
+            SET ai_provider = %s,
+                ai_model = %s,
+                ai_base_url = %s,
+                ai_api_keys = %s,
+                dashscope_api_key = %s
+            WHERE user_id = %s
+            """,
+            (
+                provider,
+                model or _default_model(provider),
+                base_url or _default_base_url(provider),
+                json.dumps(api_keys, ensure_ascii=False),
+                api_keys.get("tongyi", ""),
+                user_id,
+            ),
+        )
+        connection.commit()
+        cursor.close()
+
+
+def update_user_password(user_id: str, password: str) -> bool:
+    if not password:
+        return False
+    with mysql_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE user_id = %s",
+            (_hash_password(password), user_id),
+        )
+        connection.commit()
+        affected = cursor.rowcount
+        cursor.close()
+        return affected > 0
+
+
+def set_user_admin(user_id: str, is_admin: bool) -> bool:
+    with mysql_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            "UPDATE users SET is_admin = %s WHERE user_id = %s",
+            (1 if is_admin else 0, user_id),
+        )
+        connection.commit()
+        affected = cursor.rowcount
+        cursor.close()
+        return affected > 0
+
+
+def user_is_admin(user_id: str) -> bool:
+    with mysql_connection() as connection:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SELECT is_admin FROM users WHERE user_id = %s", (user_id,))
+        row = cursor.fetchone()
+        cursor.close()
+    return bool(row and row.get("is_admin"))
+
+
 def _default_model(provider: str) -> str:
     defaults = {
         "tongyi": "qwen-turbo",
@@ -620,10 +694,10 @@ def list_users() -> List[Dict[str, Any]]:
             """
             SELECT
                 u.user_id, u.full_name, u.email, u.current_level, u.target_score,
-                u.created_at, u.updated_at, COUNT(sp.id) AS record_count
+                u.is_admin, u.created_at, u.updated_at, COUNT(sp.id) AS record_count
             FROM users u
             LEFT JOIN study_progress sp ON sp.user_id = u.user_id
-            GROUP BY u.user_id, u.full_name, u.email, u.current_level, u.target_score, u.created_at, u.updated_at
+            GROUP BY u.user_id, u.full_name, u.email, u.current_level, u.target_score, u.is_admin, u.created_at, u.updated_at
             ORDER BY u.created_at DESC
             """
         )
@@ -638,6 +712,7 @@ def list_users() -> List[Dict[str, Any]]:
             "email": row.get("email") or "",
             "current_level": _round_to_ielts_band(row.get("current_level", 5.0)),
             "target_score": _round_to_ielts_band(row.get("target_score", 6.5)),
+            "is_admin": bool(row.get("is_admin")),
             "record_count": int(row.get("record_count") or 0),
             "created_at": row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else str(row.get("created_at") or ""),
             "updated_at": row["updated_at"].isoformat() if isinstance(row.get("updated_at"), datetime) else str(row.get("updated_at") or ""),

@@ -28,9 +28,13 @@ from database import (
     register_user,
     save_progress,
     save_user_ai_config,
+    save_user_ai_config_map,
     save_user_profile,
     save_user_word,
     save_vocab_progress,
+    set_user_admin,
+    update_user_password,
+    user_is_admin,
 )
 from agents import TongyiIELTSAssistant
 from ielts_vocab import IELTS_WORDS
@@ -472,7 +476,12 @@ def is_admin_user(user_id=None):
     user_id = user_id or session.get("user_id", "")
     raw = os.getenv("ADMIN_USER_IDS", os.getenv("ADMIN_USER_ID", "admin"))
     admins = {item.strip() for item in raw.split(",") if item.strip()}
-    return user_id in admins
+    if user_id in admins:
+        return True
+    try:
+        return user_is_admin(user_id)
+    except Exception:
+        return False
 
 
 def _normalized_question(text):
@@ -852,14 +861,87 @@ def update_active_ai_provider():
 def admin_panel():
     selected_user = request.args.get("user_id", "").strip()
     users = list_users()
+    for item in users:
+        item["is_admin"] = bool(item.get("is_admin")) or is_admin_user(item.get("user_id"))
+    selected_profile = load_user_profile(selected_user) if selected_user else None
+    selected_ai_config = load_user_ai_config(selected_user) if selected_user else None
+    selected_is_admin = is_admin_user(selected_user) if selected_user else False
     records = prepare_progress(get_all_progress(limit=500, user_id=selected_user))
     return render_template(
         "admin.html",
         users=users,
         records=records,
         selected_user=selected_user,
+        selected_profile=selected_profile,
+        selected_ai_config=selected_ai_config,
+        selected_is_admin=selected_is_admin,
+        score_options=score_options(),
+        target_options=score_options(4.0, 9.0),
         **common_context(),
     )
+
+
+@app.post("/admin/users/<target_user>/profile")
+@admin_required
+def admin_update_user_profile(target_user):
+    profile = {
+        "user_id": target_user,
+        "full_name": request.form.get("full_name", "").strip(),
+        "email": request.form.get("email", "").strip(),
+        "listening_level": float_field("listening_level", 5.0),
+        "speaking_level": float_field("speaking_level", 5.0),
+        "reading_level": float_field("reading_level", 5.0),
+        "writing_level": float_field("writing_level", 5.0),
+        "target_score": float_field("target_score", 6.5),
+        "learning_goal": request.form.get("learning_goal", "").strip(),
+        "weak_areas": request.form.getlist("weak_areas"),
+        "study_time": int_field("study_time", 10),
+        "exam_date": request.form.get("exam_date", ""),
+    }
+    save_user_profile(target_user, profile)
+    set_user_admin(target_user, request.form.get("is_admin") == "1")
+    flash(f"用户 {target_user} 的资料已保存。", "success")
+    return redirect(url_for("admin_panel", user_id=target_user))
+
+
+@app.post("/admin/users/<target_user>/password")
+@admin_required
+def admin_update_user_password(target_user):
+    password = request.form.get("password", "")
+    confirm = request.form.get("confirm_password", "")
+    if len(password) < 4:
+        flash("新密码至少需要4位。", "error")
+    elif password != confirm:
+        flash("两次输入的密码不一致。", "error")
+    elif update_user_password(target_user, password):
+        flash(f"用户 {target_user} 的密码已更新。", "success")
+    else:
+        flash("用户不存在或密码更新失败。", "error")
+    return redirect(url_for("admin_panel", user_id=target_user))
+
+
+@app.post("/admin/users/<target_user>/ai-config")
+@admin_required
+def admin_update_user_ai_config(target_user):
+    provider = request.form.get("provider", "tongyi")
+    defaults = AI_PROVIDERS.get(provider, AI_PROVIDERS["tongyi"])
+    api_keys = {
+        key: request.form.get(f"api_key_{key}", "").strip()
+        for key in AI_PROVIDERS
+    }
+    model = request.form.get("model", "").strip() or defaults["model"]
+    base_url = request.form.get("base_url", "").strip() or defaults["base_url"]
+    save_user_ai_config_map(target_user, provider, api_keys, model, base_url)
+    flash(f"用户 {target_user} 的 AI 配置已保存。", "success")
+    return redirect(url_for("admin_panel", user_id=target_user))
+
+
+@app.post("/admin/users/<target_user>/role")
+@admin_required
+def admin_update_user_role(target_user):
+    set_user_admin(target_user, request.form.get("is_admin") == "1")
+    flash(f"用户 {target_user} 的管理员权限已更新。", "success")
+    return redirect(url_for("admin_panel", user_id=target_user))
 
 
 @app.post("/admin/users/<target_user>/delete")

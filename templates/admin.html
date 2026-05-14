@@ -10,30 +10,21 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-head">
-        <div class="brand-line"><div class="brand-icon">管</div><div><strong>信达雅</strong><span>管理员后台</span></div></div>
+        <div class="brand-line"><div class="brand-icon">管</div><div><strong>信达雅</strong><span>用户管理</span></div></div>
         <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
       </div>
       <nav>
-        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
-        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
-        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
-        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
-        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
-        <a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>
+        <a href="{{ url_for('admin_panel') }}" title="用户管理">🛡️ <span class="nav-text">用户管理</span></a>
       </nav>
     </aside>
 
     <main class="main-panel">
       <header class="topbar">
-        <div><p class="eyebrow">Admin</p><h1>管理员后台</h1></div>
+        <div><p class="eyebrow">Admin</p><h1>用户管理后台</h1></div>
         <div class="user-menu">
-          <a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer">稳定版</a>
           <details class="user-dropdown">
             <summary><span class="user-chip">管理员 · {{ user_id }}</span></summary>
             <div class="drop-menu" onclick="event.stopPropagation()">
-              <a href="{{ url_for('dashboard') }}">学习总览</a>
-              <a href="{{ url_for('settings_page') }}">用户设置</a>
-              <div class="drop-divider"></div>
               <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
             </div>
           </details>
@@ -48,24 +39,31 @@
 
       <section class="metric-grid">
         <div class="metric-card"><span>用户数</span><strong>{{ users|length }}</strong></div>
-        <div class="metric-card"><span>当前筛选</span><strong>{{ selected_user or '全部' }}</strong></div>
-        <div class="metric-card"><span>练习记录</span><strong>{{ records|length }}</strong></div>
+        <div class="metric-card"><span>当前用户</span><strong>{{ selected_user or '未选择' }}</strong></div>
+        <div class="metric-card"><span>该用户记录</span><strong>{{ records|length }}</strong></div>
       </section>
 
       <section class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">Users</p><h2>用户管理</h2></div></div>
+        <div class="panel-heading"><div><p class="eyebrow">Users</p><h2>成员列表</h2></div></div>
         {% if users %}
           <div class="timeline">
             {% for u in users %}
-              <details class="timeline-item">
-                <summary><strong>{{ u.user_id }}</strong><span>{{ u.record_count }} 条记录</span></summary>
+              <details class="timeline-item" {% if selected_user == u.user_id %}open{% endif %}>
+                <summary>
+                  <strong><a href="{{ url_for('admin_panel', user_id=u.user_id) }}">{{ u.user_id }}</a>{% if u.is_admin %} · 管理员{% endif %}</strong>
+                  <span>{{ u.record_count }} 条记录</span>
+                </summary>
                 <div class="result-body">
                   {% if u.full_name %}<p class="record-meta"><strong>姓名：</strong>{{ u.full_name }}</p>{% endif %}
                   {% if u.email %}<p class="record-meta"><strong>邮箱：</strong>{{ u.email }}</p>{% endif %}
                   <p class="record-meta"><strong>当前水平：</strong>{{ '%.1f'|format(u.current_level) }} · <strong>目标：</strong>{{ '%.1f'|format(u.target_score) }}</p>
                   <p class="record-meta"><strong>创建时间：</strong>{{ u.created_at }}</p>
-                  <a class="primary-btn small" href="{{ url_for('admin_panel', user_id=u.user_id) }}">查看该用户记录</a>
+                  <a class="primary-btn small" href="{{ url_for('admin_panel', user_id=u.user_id) }}">打开用户详情</a>
                   {% if u.user_id != user_id %}
+                    <form method="post" action="{{ url_for('admin_update_user_role', target_user=u.user_id) }}" style="display:inline-block;margin-left:8px">
+                      <input type="hidden" name="is_admin" value="{{ '0' if u.is_admin else '1' }}">
+                      <button class="ghost-btn small" type="submit">{{ '取消管理员' if u.is_admin else '设为管理员' }}</button>
+                    </form>
                     <form method="post" action="{{ url_for('admin_delete_user', target_user=u.user_id) }}" style="display:inline-block;margin-left:8px" onsubmit="return confirm('确定删除用户 {{ u.user_id }} 吗？该用户所有记录也会被删除。')">
                       <button class="ghost-btn small" type="submit" style="color:var(--danger)">删除用户</button>
                     </form>
@@ -79,6 +77,61 @@
         {% endif %}
       </section>
 
+      {% if selected_user and selected_profile %}
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Member</p><h2>{{ selected_user }} 的全部信息</h2></div></div>
+        <form method="post" action="{{ url_for('admin_update_user_profile', target_user=selected_user) }}" class="settings-form">
+          <div class="form-row">
+            <label><span>姓名</span><input name="full_name" value="{{ selected_profile.full_name }}"></label>
+            <label><span>邮箱</span><input name="email" value="{{ selected_profile.email }}"></label>
+          </div>
+          <div class="form-row">
+            <label><span>听力</span><select name="listening_level">{% for score in score_options %}<option value="{{ score }}" {% if selected_profile.listening_level == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
+            <label><span>口语</span><select name="speaking_level">{% for score in score_options %}<option value="{{ score }}" {% if selected_profile.speaking_level == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
+            <label><span>阅读</span><select name="reading_level">{% for score in score_options %}<option value="{{ score }}" {% if selected_profile.reading_level == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
+            <label><span>写作</span><select name="writing_level">{% for score in score_options %}<option value="{{ score }}" {% if selected_profile.writing_level == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
+          </div>
+          <div class="form-row">
+            <label><span>目标分数</span><select name="target_score">{% for score in target_options %}<option value="{{ score }}" {% if selected_profile.target_score == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
+            <label><span>每周学习时间</span><input type="number" name="study_time" min="1" max="80" value="{{ selected_profile.study_time }}"></label>
+            <label><span>考试日期</span><input type="date" name="exam_date" value="{{ selected_profile.exam_date }}"></label>
+          </div>
+          <label><span>学习目标</span><textarea name="learning_goal" rows="3">{{ selected_profile.learning_goal }}</textarea></label>
+          <label><span>弱项领域</span><select name="weak_areas" multiple size="4">{% for area in ['听力','口语','阅读','写作'] %}<option value="{{ area }}" {% if area in selected_profile.weak_areas %}selected{% endif %}>{{ area }}</option>{% endfor %}</select></label>
+          <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="is_admin" value="1" {% if selected_is_admin %}checked{% endif %}> 设置为管理员</label>
+          <button class="primary-btn" type="submit">保存用户资料</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Password</p><h2>修改成员密码</h2></div></div>
+        <form method="post" action="{{ url_for('admin_update_user_password', target_user=selected_user) }}" class="settings-form">
+          <div class="form-row">
+            <label><span>新密码</span><input type="password" name="password" autocomplete="new-password"></label>
+            <label><span>确认新密码</span><input type="password" name="confirm_password" autocomplete="new-password"></label>
+          </div>
+          <button class="primary-btn" type="submit">更新密码</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">API</p><h2>AI 与 API 配置</h2></div></div>
+        <form method="post" action="{{ url_for('admin_update_user_ai_config', target_user=selected_user) }}" class="settings-form">
+          <div class="form-row">
+            <label><span>当前模型供应商</span><select name="provider">{% for key, provider in providers.items() %}<option value="{{ key }}" {% if selected_ai_config.provider == key %}selected{% endif %}>{{ provider.label }}</option>{% endfor %}</select></label>
+            <label><span>模型名称</span><input name="model" value="{{ selected_ai_config.model }}"></label>
+            <label><span>Base URL</span><input name="base_url" value="{{ selected_ai_config.base_url }}"></label>
+          </div>
+          {% for key, provider in providers.items() %}
+            <label><span>{{ provider.label }} API Key</span><input name="api_key_{{ key }}" value="{{ selected_ai_config.api_keys.get(key, '') }}" autocomplete="off"></label>
+          {% endfor %}
+          <button class="primary-btn" type="submit">保存 API 配置</button>
+        </form>
+      </section>
+      {% else %}
+        <section class="panel"><p class="empty-text">点击成员列表中的用户名，查看和编辑该用户的全部信息。</p></section>
+      {% endif %}
+
       <section class="panel">
         <div class="panel-heading">
           <div><p class="eyebrow">Records</p><h2>练习记录管理</h2></div>
@@ -89,7 +142,7 @@
                 <option value="{{ u.user_id }}" {% if selected_user == u.user_id %}selected{% endif %}>{{ u.user_id }}</option>
               {% endfor %}
             </select>
-            {% if selected_user %}<a href="{{ url_for('admin_panel') }}" class="ghost-btn small">清除筛选</a>{% endif %}
+            {% if selected_user %}<a href="{{ url_for('admin_panel') }}" class="ghost-btn small">查看全部记录</a>{% endif %}
           </form>
         </div>
         {% if records %}
