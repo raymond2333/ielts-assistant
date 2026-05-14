@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>管理员后台 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line"><div class="brand-icon">管</div><div><strong>信达雅</strong><span>管理员后台</span></div></div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+        <a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div><p class="eyebrow">Admin</p><h1>管理员后台</h1></div>
+        <div class="user-menu">
+          <a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer">稳定版</a>
+          <details class="user-dropdown">
+            <summary><span class="user-chip">管理员 · {{ user_id }}</span></summary>
+            <div class="drop-menu" onclick="event.stopPropagation()">
+              <a href="{{ url_for('dashboard') }}">学习总览</a>
+              <a href="{{ url_for('settings_page') }}">用户设置</a>
+              <div class="drop-divider"></div>
+              <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="metric-grid">
+        <div class="metric-card"><span>用户数</span><strong>{{ users|length }}</strong></div>
+        <div class="metric-card"><span>当前筛选</span><strong>{{ selected_user or '全部' }}</strong></div>
+        <div class="metric-card"><span>练习记录</span><strong>{{ records|length }}</strong></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Users</p><h2>用户管理</h2></div></div>
+        {% if users %}
+          <div class="timeline">
+            {% for u in users %}
+              <details class="timeline-item">
+                <summary><strong>{{ u.user_id }}</strong><span>{{ u.record_count }} 条记录</span></summary>
+                <div class="result-body">
+                  {% if u.full_name %}<p class="record-meta"><strong>姓名：</strong>{{ u.full_name }}</p>{% endif %}
+                  {% if u.email %}<p class="record-meta"><strong>邮箱：</strong>{{ u.email }}</p>{% endif %}
+                  <p class="record-meta"><strong>当前水平：</strong>{{ '%.1f'|format(u.current_level) }} · <strong>目标：</strong>{{ '%.1f'|format(u.target_score) }}</p>
+                  <p class="record-meta"><strong>创建时间：</strong>{{ u.created_at }}</p>
+                  <a class="primary-btn small" href="{{ url_for('admin_panel', user_id=u.user_id) }}">查看该用户记录</a>
+                  {% if u.user_id != user_id %}
+                    <form method="post" action="{{ url_for('admin_delete_user', target_user=u.user_id) }}" style="display:inline-block;margin-left:8px" onsubmit="return confirm('确定删除用户 {{ u.user_id }} 吗？该用户所有记录也会被删除。')">
+                      <button class="ghost-btn small" type="submit" style="color:var(--danger)">删除用户</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </details>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-text">暂无用户。</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Records</p><h2>练习记录管理</h2></div>
+          <form method="get" style="display:flex;gap:8px;align-items:center">
+            <select name="user_id" onchange="this.form.submit()">
+              <option value="">全部用户</option>
+              {% for u in users %}
+                <option value="{{ u.user_id }}" {% if selected_user == u.user_id %}selected{% endif %}>{{ u.user_id }}</option>
+              {% endfor %}
+            </select>
+            {% if selected_user %}<a href="{{ url_for('admin_panel') }}" class="ghost-btn small">清除筛选</a>{% endif %}
+          </form>
+        </div>
+        {% if records %}
+          <div class="timeline">
+            {% for item in records %}
+              <details class="timeline-item">
+                <summary><strong>{{ item.activity }}</strong><span>{{ item.user_id }} · {{ item.timestamp }}</span></summary>
+                <div class="result-body">
+                  <p class="record-meta"><strong>记录ID：</strong>{{ item.id }}</p>
+                  <p class="record-meta"><strong>用户：</strong>{{ item.user_id }}</p>
+                  {% if item.data.mode %}<p class="record-meta"><strong>模式：</strong>{{ item.data.mode }}</p>{% endif %}
+                  {% if item.data.topic %}<p class="record-meta"><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
+                  {% if item.data.question %}<p class="record-meta"><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
+                  {% if item.data.user_response %}<p class="record-meta"><strong>用户回答：</strong>{{ item.data.user_response[:240] }}{% if item.data.user_response|length > 240 %}...{% endif %}</p>{% endif %}
+                  {% if item.data.essay_content %}<p class="record-meta"><strong>作文内容：</strong>{{ item.data.essay_content[:300] }}{% if item.data.essay_content|length > 300 %}...{% endif %}</p>{% endif %}
+                  <form method="post" action="{{ url_for('delete_record', record_id=item.id) }}" onsubmit="return confirm('确定删除这条记录吗？')" style="margin:10px 0">
+                    <input type="hidden" name="scope" value="admin">
+                    <input type="hidden" name="next" value="{{ url_for('admin_panel', user_id=selected_user) }}">
+                    <button class="ghost-btn small" type="submit" style="color:var(--danger)">删除记录</button>
+                  </form>
+                  {% if item.data.result_data %}
+                    <details class="result-accordion"><summary>{{ item.activity | record_title }}</summary><div class="result-body">{{ item.data.result_data | record_result(item.activity) }}</div></details>
+                  {% elif item.data.result %}
+                    <details class="result-accordion"><summary>{{ item.activity | record_title }}</summary><div class="result-body">{{ item.data.result | simple_md }}</div></details>
+                  {% endif %}
+                </div>
+              </details>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-text">暂无练习记录。</p>
+        {% endif %}
+      </section>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

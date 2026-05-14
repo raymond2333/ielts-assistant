@@ -586,11 +586,118 @@ def get_progress(user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
                 "user_id": row["user_id"],
                 "timestamp": timestamp,
                 "activity": row["activity"],
+                "score": float(row["score"]) if row.get("score") is not None else None,
                 "data": data,
             }
         )
 
     return records
+
+
+def _progress_row_to_record(row: Dict[str, Any]) -> Dict[str, Any]:
+    data = row["data"]
+    if isinstance(data, str):
+        data = json.loads(data)
+
+    timestamp = row["created_at"]
+    if isinstance(timestamp, datetime):
+        timestamp = timestamp.isoformat()
+
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "timestamp": timestamp,
+        "activity": row["activity"],
+        "score": float(row["score"]) if row.get("score") is not None else None,
+        "data": data,
+    }
+
+
+def list_users() -> List[Dict[str, Any]]:
+    with mysql_connection() as connection:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT
+                u.user_id, u.full_name, u.email, u.current_level, u.target_score,
+                u.created_at, u.updated_at, COUNT(sp.id) AS record_count
+            FROM users u
+            LEFT JOIN study_progress sp ON sp.user_id = u.user_id
+            GROUP BY u.user_id, u.full_name, u.email, u.current_level, u.target_score, u.created_at, u.updated_at
+            ORDER BY u.created_at DESC
+            """
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+
+    users = []
+    for row in rows:
+        users.append({
+            "user_id": row["user_id"],
+            "full_name": row.get("full_name") or "",
+            "email": row.get("email") or "",
+            "current_level": _round_to_ielts_band(row.get("current_level", 5.0)),
+            "target_score": _round_to_ielts_band(row.get("target_score", 6.5)),
+            "record_count": int(row.get("record_count") or 0),
+            "created_at": row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else str(row.get("created_at") or ""),
+            "updated_at": row["updated_at"].isoformat() if isinstance(row.get("updated_at"), datetime) else str(row.get("updated_at") or ""),
+        })
+    return users
+
+
+def get_all_progress(limit: int = 500, user_id: str = "") -> List[Dict[str, Any]]:
+    with mysql_connection() as connection:
+        cursor = connection.cursor(dictionary=True)
+        if user_id:
+            cursor.execute(
+                """
+                SELECT id, user_id, activity, score, data, created_at
+                FROM study_progress
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (user_id, limit),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT id, user_id, activity, score, data, created_at
+                FROM study_progress
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+        rows = cursor.fetchall()
+        cursor.close()
+    return [_progress_row_to_record(row) for row in rows]
+
+
+def delete_progress_record_by_id(record_id: int, user_id: str = "") -> bool:
+    with mysql_connection() as connection:
+        cursor = connection.cursor()
+        if user_id:
+            cursor.execute(
+                "DELETE FROM study_progress WHERE id = %s AND user_id = %s",
+                (record_id, user_id),
+            )
+        else:
+            cursor.execute("DELETE FROM study_progress WHERE id = %s", (record_id,))
+        connection.commit()
+        affected = cursor.rowcount
+        cursor.close()
+        return affected > 0
+
+
+def delete_user(user_id: str) -> bool:
+    with mysql_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+        connection.commit()
+        affected = cursor.rowcount
+        cursor.close()
+        return affected > 0
 
 
 def delete_progress_record(user_id: str, timestamp: str) -> bool:

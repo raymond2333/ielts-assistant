@@ -13,12 +13,16 @@ from markupsafe import Markup, escape
 
 from database import (
     authenticate_user,
+    delete_progress_record_by_id,
     delete_progress_record,
+    delete_user,
+    get_all_progress,
     get_database_status,
     get_progress,
     get_user_words,
     get_vocab_progress,
     initialize_database,
+    list_users,
     load_user_ai_config,
     load_user_profile,
     register_user,
@@ -391,6 +395,30 @@ def provider_status_for(ai_config):
     return {key: bool(api_keys.get(key)) for key in AI_PROVIDERS}
 
 
+def is_admin_user(user_id=None):
+    user_id = user_id or session.get("user_id", "")
+    raw = os.getenv("ADMIN_USER_IDS", os.getenv("ADMIN_USER_ID", "admin"))
+    admins = {item.strip() for item in raw.split(",") if item.strip()}
+    return user_id in admins
+
+
+def visible_progress(records):
+    return [record for record in records if record.get("activity") != "学习计划"]
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("auth"))
+        if not is_admin_user():
+            flash("需要管理员权限。", "error")
+            return redirect(url_for("dashboard"))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
 def _normalize_base_url(value):
     value = (value or "").strip().rstrip("/")
     if not value:
@@ -465,6 +493,7 @@ def common_context():
         "ai_config": ai_config,
         "providers": AI_PROVIDERS,
         "provider_status": provider_status_for(ai_config),
+        "is_admin": is_admin_user(user_id),
         "legacy_streamlit_url": _legacy_url,
         "streamlit_cross_url": f"{_legacy_url}?user_id={user_id}&x_token={x_token}",
     }
@@ -574,7 +603,7 @@ def auth():
 def dashboard():
     user_id = session["user_id"]
     date_filter = request.args.get("date", "").strip()
-    progress = list(reversed(get_progress(user_id, limit=50)))
+    progress = visible_progress(list(reversed(get_progress(user_id, limit=80))))
     if date_filter:
         progress = [p for p in progress if (p.get("timestamp") or "").startswith(date_filter)]
     progress = progress[:12]
@@ -595,7 +624,7 @@ def dashboard():
 def generate_suggestions():
     user_id = session["user_id"]
     profile = load_user_profile(user_id) or default_profile(user_id)
-    progress = list(reversed(get_progress(user_id, limit=50)))
+    progress = visible_progress(list(reversed(get_progress(user_id, limit=50))))
     assistant, _ = current_assistant()
     if assistant is None:
         flash("请先保存可用的 AI API Key。", "error")
@@ -679,6 +708,45 @@ def update_active_ai_provider():
     )
     flash(f"已切换到 {defaults['label']}。", "success")
     return redirect(request.referrer or url_for("dashboard"))
+
+
+@app.route("/admin")
+@admin_required
+def admin_panel():
+    selected_user = request.args.get("user_id", "").strip()
+    users = list_users()
+    records = visible_progress(get_all_progress(limit=500, user_id=selected_user))
+    return render_template(
+        "admin.html",
+        users=users,
+        records=records,
+        selected_user=selected_user,
+        **common_context(),
+    )
+
+
+@app.post("/admin/users/<target_user>/delete")
+@admin_required
+def admin_delete_user(target_user):
+    if target_user == session.get("user_id"):
+        flash("不能删除当前登录的管理员账号。", "error")
+    elif delete_user(target_user):
+        flash(f"用户 {target_user} 已删除。", "success")
+    else:
+        flash("用户不存在或删除失败。", "error")
+    return redirect(url_for("admin_panel"))
+
+
+@app.post("/records/<int:record_id>/delete")
+@login_required
+def delete_record(record_id):
+    next_url = request.form.get("next") or url_for("dashboard", _anchor="history")
+    if is_admin_user() and request.form.get("scope") == "admin":
+        ok = delete_progress_record_by_id(record_id)
+    else:
+        ok = delete_progress_record_by_id(record_id, session["user_id"])
+    flash("练习记录已删除。" if ok else "记录不存在或无权删除。", "success" if ok else "error")
+    return redirect(next_url)
 
 
 @app.route("/settings")
@@ -1004,7 +1072,7 @@ def writing():
 @login_required
 def analysis():
     user_id = session["user_id"]
-    progress = list(reversed(get_progress(user_id, limit=50)))
+    progress = visible_progress(list(reversed(get_progress(user_id, limit=80))))
     user_words = get_user_words(user_id)
     return render_template(
         "analysis.html",
