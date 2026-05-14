@@ -5,6 +5,7 @@ import hashlib
 import random
 import uuid
 import pandas as pd
+import seaborn as sns
 from typing import Dict, Any, List, Tuple
 import streamlit as st
 from datetime import datetime, timedelta
@@ -421,6 +422,71 @@ def build_task1_chart_assets(result_data, raw_text=""):
     data = dict(result_data)
     chart_type = data.get("chart_type") or "柱状图"
 
+    # 表格：解析 table_data JSON，不生成图片，由前端渲染 HTML 表格
+    if chart_type == "表格":
+        if not data.get("table_data") and raw_text:
+            td_match = re.search(r'\*\*table_data：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+            if td_match:
+                try:
+                    data["table_data"] = json.loads(td_match.group(1))
+                except Exception:
+                    pass
+        return data
+
+    chart_types_with_image = ["柱状图", "线形图", "饼图", "流程图"]
+    if chart_type not in chart_types_with_image:
+        return data
+
+    image_dir = os.path.join(os.path.dirname(__file__), "data", "charts")
+    os.makedirs(image_dir, exist_ok=True)
+    filename = f"task1_{uuid.uuid4().hex[:10]}.png"
+    path = os.path.join(image_dir, filename)
+
+    # --- 流程图：Graphviz 渲染 ---
+    if "流程" in chart_type:
+        if not data.get("chart_dot") and raw_text:
+            dot_match = re.search(r'\*\*chart_dot：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+            if dot_match:
+                try:
+                    data["chart_dot"] = json.loads(dot_match.group(1))
+                except Exception:
+                    pass
+
+        chart_dot = data.get("chart_dot") or {}
+        nodes = chart_dot.get("nodes", [])
+        edges = chart_dot.get("edges", [])
+
+        if not nodes:
+            data["chart_image"] = ""
+            return data
+
+        try:
+            import graphviz
+            dot = graphviz.Digraph(format="png")
+            dot.attr(rankdir="TB", bgcolor="white", fontname="Helvetica")
+            dot.attr("node", shape="box", style="filled,rounded",
+                     fillcolor="#e8f5e9", fontname="Helvetica", fontsize="11",
+                     margin="0.15,0.1")
+            dot.attr("edge", fontname="Helvetica", fontsize="9", color="#555555")
+
+            for i, node in enumerate(nodes):
+                dot.node(f"n{i}", str(node))
+
+            for edge in edges:
+                try:
+                    from_idx, to_idx = int(edge[0]), int(edge[1])
+                    dot.edge(f"n{from_idx}", f"n{to_idx}")
+                except (IndexError, ValueError, TypeError):
+                    pass
+
+            tmp_path = path.replace(".png", "")
+            dot.render(tmp_path, cleanup=True)
+            data["chart_image"] = f"data/charts/{filename}"
+        except Exception:
+            data["chart_image"] = ""
+        return data
+
+    # --- 柱状图 / 线形图 / 饼图：matplotlib + seaborn 美化 ---
     # 尝试从 raw_text 中提取 chart_labels 和 chart_data
     if not data.get("chart_data") and raw_text:
         labels_match = re.search(r'\*\*chart_labels：\*\*\s*(\[.*?\])\s*\n', raw_text)
@@ -437,14 +503,12 @@ def build_task1_chart_assets(result_data, raw_text=""):
                 pass
 
     labels = data.get("chart_labels") or []
-    # 当 AI 提供了 chart_data 但没提供 chart_labels 时，从 data 提取
     if not labels and data.get("chart_data"):
-        labels = [item.get("label", f"项{i+1}") for i, item in enumerate(data["chart_data"])]
+        labels = [item.get("label", f"Item {i+1}") for i, item in enumerate(data["chart_data"])]
 
-    # 智能 fallback — 随机选一组标签
     if not labels:
         fallback_sets = [
-            ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+            ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
             ["Spring", "Summer", "Autumn", "Winter"],
             ["2018", "2019", "2020", "2021", "2022", "2023"],
             ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -457,30 +521,30 @@ def build_task1_chart_assets(result_data, raw_text=""):
         data["chart_data"] = [{"label": label, "value": value} for label, value in zip(labels, values)]
 
     data["chart_labels"] = labels
-    image_dir = os.path.join(os.path.dirname(__file__), "data", "charts")
-    os.makedirs(image_dir, exist_ok=True)
-    filename = f"task1_{uuid.uuid4().hex[:10]}.png"
-    path = os.path.join(image_dir, filename)
     try:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        sns.set_theme(style="whitegrid")
         table = data["chart_data"]
         x_labels = [str(item.get("label", "")) for item in table]
         y_values = [float(item.get("value", 0)) for item in table]
+        palette = sns.color_palette("Set2", len(x_labels))
         fig, ax = plt.subplots(figsize=(7.2, 4.2), dpi=140)
-        colors = ["#0f7b63", "#e67e22", "#3498db", "#9b59b6", "#e74c3c", "#1abc9c", "#f39c12", "#2ecc71"]
         if "线" in chart_type:
-            ax.plot(x_labels, y_values, marker="o", linewidth=2.4, color="#0f7b63")
+            sns.lineplot(x=x_labels, y=y_values, marker="o", linewidth=2.4,
+                         color=palette[0], ax=ax)
         elif "饼" in chart_type or len(x_labels) <= 2:
-            ax.pie(y_values, labels=x_labels, autopct="%1.0f%%", startangle=90, colors=colors[:len(x_labels)])
+            ax.pie(y_values, labels=x_labels, autopct="%1.0f%%", startangle=90,
+                   colors=palette)
             ax.axis("equal")
         else:
-            bars = ax.bar(x_labels, y_values, color=[colors[i % len(colors)] for i in range(len(x_labels))])
-        ax.set_title(data.get("question", "IELTS Task 1 Chart")[:90], fontsize=11)
+            sns.barplot(x=x_labels, y=y_values, hue=x_labels,
+                        palette=palette, legend=False, ax=ax)
+        ax.set_title(data.get("question", "IELTS Task 1 Chart")[:90], fontsize=11,
+                     fontweight="bold")
         if "饼" not in chart_type and len(x_labels) > 2:
             ax.set_ylabel("Value")
-            ax.grid(axis="y", alpha=0.25)
             if len(x_labels) > 8:
                 plt.xticks(rotation=45, ha="right")
         fig.tight_layout()
@@ -531,6 +595,20 @@ def parse_generated_topic_md(raw_text, task_type="Task 2"):
         if cd:
             try:
                 result["chart_data"] = json.loads(cd.group(1))
+            except Exception:
+                pass
+
+        dot = re.search(r'\*\*chart_dot：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+        if dot:
+            try:
+                result["chart_dot"] = json.loads(dot.group(1))
+            except Exception:
+                pass
+
+        td = re.search(r'\*\*table_data：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+        if td:
+            try:
+                result["table_data"] = json.loads(td.group(1))
             except Exception:
                 pass
 

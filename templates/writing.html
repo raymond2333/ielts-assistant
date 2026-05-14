@@ -63,10 +63,37 @@
           <details class="result-accordion idea-box">
             <summary>🎲 随机生成小作文题目</summary>
             <div class="result-body">
-              <p class="hint">AI 将随机生成一道雅思 Task 1 真题风格的题目（含图表），无需选择目标分数，方便你随时练习。</p>
+              <p class="hint">选择图表类型和话题，AI 将生成一道雅思 Task 1 真题风格的题目（含图表），无需选择目标分数，方便你随时练习。</p>
               <form method="post" class="settings-form">
                 <input type="hidden" name="mode" value="generate_topic">
                 <input type="hidden" name="task_type" value="Task 1">
+                <div class="form-row">
+                  <label><span>图表类型</span>
+                    <select name="chart_type">
+                      <option value="柱状图">柱状图 (Bar Chart) 🖼️</option>
+                      <option value="线形图">线形图 (Line Graph) 🖼️</option>
+                      <option value="饼图">饼图 (Pie Chart) 🖼️</option>
+                      <option value="表格">表格 (Table)</option>
+                      <option value="流程图">流程图 (Process/Flow Chart) 🖼️</option>
+                      <option value="地图">地图 (Map)</option>
+                    </select>
+                  </label>
+                  <label><span>话题</span>
+                    <select name="topic">
+                      <option value="教育">教育 (Education)</option>
+                      <option value="科技">科技 (Technology)</option>
+                      <option value="环境">环境 (Environment)</option>
+                      <option value="交通">交通 (Transport)</option>
+                      <option value="经济">经济 (Economy)</option>
+                      <option value="人口">人口 (Population)</option>
+                      <option value="能源">能源 (Energy)</option>
+                      <option value="旅游">旅游 (Tourism)</option>
+                      <option value="健康">健康 (Health)</option>
+                      <option value="文化">文化 (Culture)</option>
+                    </select>
+                  </label>
+                </div>
+                <p class="hint" style="font-size:0.85rem;color:var(--text-dim);margin-top:4px">🖼️ 表示可自动生成图表图片</p>
                 <button class="primary-btn" type="submit">🎲 生成小作文题目</button>
               </form>
             </div>
@@ -97,10 +124,24 @@
           <details class="result-accordion idea-box">
             <summary>🎲 随机生成大作文题目</summary>
             <div class="result-body">
-              <p class="hint">AI 将随机生成一道雅思 Task 2 真题风格的题目，无需选择目标分数，方便你随时练习。</p>
+              <p class="hint">选择话题，AI 将生成一道雅思 Task 2 真题风格的题目，无需选择目标分数，方便你随时练习。</p>
               <form method="post" class="settings-form">
                 <input type="hidden" name="mode" value="generate_topic">
                 <input type="hidden" name="task_type" value="Task 2">
+                <div class="form-row">
+                  <label><span>话题</span>
+                    <select name="topic">
+                      <option value="教育">教育 (Education)</option>
+                      <option value="科技">科技 (Technology)</option>
+                      <option value="环境">环境 (Environment)</option>
+                      <option value="社会">社会 (Society)</option>
+                      <option value="文化">文化 (Culture)</option>
+                      <option value="工作">工作 (Work)</option>
+                      <option value="政府">政府 (Government)</option>
+                      <option value="全球化">全球化 (Globalization)</option>
+                    </select>
+                  </label>
+                </div>
                 <button class="primary-btn" type="submit">🎲 生成大作文题目</button>
               </form>
             </div>
@@ -143,6 +184,14 @@
                   {% if result_data.chart_image %}
                     <div style="margin-top:12px">
                       <img src="/{{ result_data.chart_image }}" alt="Task 1 chart" style="max-width:100%;border:1px solid var(--line);border-radius:12px;background:white">
+                    </div>
+                  {% endif %}
+                  {% if result_data.table_data %}
+                    <div style="margin-top:12px;overflow-x:auto">
+                      <table class="data-table" style="width:100%">
+                        <thead><tr>{% for h in result_data.table_data.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+                        <tbody>{% for row in result_data.table_data.rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+                      </table>
                     </div>
                   {% endif %}
                 {% else %}

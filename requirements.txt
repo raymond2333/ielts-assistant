@@ -9,4 +9,6 @@ langchain-openai
 openai
 markupsafe
 matplotlib
+seaborn
+graphviz
 waitress

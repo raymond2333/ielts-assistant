@@ -854,6 +854,10 @@ def _render_writing_task1():
             st.markdown(f"**图表类型：** {gen['chart_type']}")
         if gen.get("chart_image"):
             st.image(os.path.join(os.path.dirname(__file__), gen["chart_image"]))
+        if gen.get("table_data"):
+            import pandas as pd
+            td = gen["table_data"]
+            st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
         if gen.get("question"):
             st.info(f"📌 **题目：** {gen['question']}")
         if gen.get("key_features"):
@@ -1246,6 +1250,10 @@ def _display_record_result_data(result_data):
                     st.session_state[f"show_{result_data['chart_image']}"] = not st.session_state.get(f"show_{result_data['chart_image']}", False)
                 if st.session_state.get(f"show_{result_data['chart_image']}", False):
                     st.image(os.path.join(os.path.dirname(__file__), result_data["chart_image"]))
+            if result_data.get("table_data"):
+                import pandas as pd
+                td = result_data["table_data"]
+                st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
             if result_data.get("topic_category"):
                 st.markdown(f"**话题类别：** {result_data['topic_category']}")
             if result_data.get("essay_type"):

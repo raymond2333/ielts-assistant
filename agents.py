@@ -97,9 +97,62 @@ class TongyiIELTSAssistant:
     # ============================================================
     # 生成写作题目
     # ============================================================
-    def generate_writing_topic(self, task_type):
-        prompt_template = GENERATE_WRITING_TOPIC_PROMPT_MAP.get(task_type, GENERATE_WRITING_TOPIC_TASK2_PROMPT)
-        return self.llm.invoke(prompt_template).content
+    def generate_writing_topic(self, task_type, chart_type="柱状图", topic="教育"):
+        if task_type == "Task 1":
+            # 根据图表类型动态构建 prompt 的不同部分
+            chart_types_with_data = ["柱状图", "线形图", "饼图"]
+            if chart_type in chart_types_with_data:
+                chart_specific_instructions = (
+                    "4. 横轴标签（chart_labels）使用英文，根据话题使用实际语境对应的年份、月份或类别。例如：\n"
+                    "   - 线形图/柱状图：Jan-Dec（月份）、2015-2023（年份）、Spring-Winter（季节）\n"
+                    "   - 饼图：类别名（如年龄段、支出类别、能源类型等）\n"
+                    "5. 必须同时输出 chart_data 数组（每个元素含 label 和 value），label 用英文\n"
+                    "6. 数值范围应在 5-95 之间"
+                )
+                chart_specific_fields = (
+                    "**chart_labels：** [\"Label1\", \"Label2\", \"Label3\", \"Label4\", \"Label5\", \"Label6\"]\n\n"
+                    "**chart_data：** [{\"label\": \"Label1\", \"value\": 数值}, {\"label\": \"Label2\", \"value\": 数值}, ...]"
+                )
+            elif chart_type == "流程图":
+                chart_specific_instructions = (
+                    "4. 描述流程的各个步骤，确保步骤按实际顺序排列\n"
+                    "5. 必须输出 chart_dot JSON 对象：包含 nodes（流程步骤英文名称列表，4-8 个步骤）和 edges（步骤连接关系，每个边用 [from_index, to_index] 表示序号索引）\n"
+                    "6. 流程通常为线性步骤，可带有简单分支，如 [[0,1],[1,2],[2,3],[3,4]] 表示 5 个步骤依次连接"
+                )
+                chart_specific_fields = (
+                    "**chart_dot：** {\"nodes\": [\"Raw materials harvested\", \"Transported to factory\", \"Sorted and cleaned\", \"Processed into products\", \"Packaged for distribution\"], \"edges\": [[0, 1], [1, 2], [2, 3], [3, 4]]}"
+                )
+            elif chart_type == "表格":
+                chart_specific_instructions = (
+                    "4. 设计一个包含多行多列的数据表格，第1列为类别/项目名称，后续列为不同时间段或不同类别的数值\n"
+                    "5. 必须输出 table_data JSON 对象：headers（列标题英文列表）和 rows（数据行列表，每行为一个英文列表）\n"
+                    "6. 表格应有 4-7 行数据、2-5 列，数值合理\n"
+                    "7. 不需要输出 chart_labels 或 chart_data"
+                )
+                chart_specific_fields = (
+                    "**table_data：** {\"headers\": [\"Category\", \"2018\", \"2019\", \"2020\"], \"rows\": [[\"Category A\", 45, 52, 61], [\"Category B\", 38, 41, 49], [\"Category C\", 55, 48, 42], [\"Category D\", 62, 58, 55]]}"
+                )
+            else:
+                # 地图 — 不需要 chart_data，只出题目描述
+                chart_specific_instructions = (
+                    "4. 详细描述地图的内容，包括区域、方向、变化等信息\n"
+                    "5. 不需要输出 chart_labels 或 chart_data"
+                )
+                chart_specific_fields = "**图表描述：** 详细的图表内容描述"
+
+            prompt = GENERATE_WRITING_TOPIC_TASK1_PROMPT.format(
+                chart_type=chart_type,
+                topic=topic,
+                chart_specific_instructions=chart_specific_instructions,
+                chart_specific_fields=chart_specific_fields,
+                output_rules=OUTPUT_RULES,
+            )
+        else:
+            prompt = GENERATE_WRITING_TOPIC_TASK2_PROMPT.format(
+                topic=topic,
+                OUTPUT_RULES=OUTPUT_RULES,
+            )
+        return self.llm.invoke(prompt).content
 
     # ============================================================
     # 生成参考范文

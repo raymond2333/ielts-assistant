@@ -208,6 +208,14 @@ def record_result_filter(result_data, activity=""):
             meta.append(f"<p><strong>图表类型：</strong>{escape(result_data['chart_type'])}</p>")
         if result_data.get("chart_image"):
             meta.append(f"<div style='margin-top:12px'><img src='/{escape(result_data['chart_image'])}' alt='Task 1 chart' style='max-width:100%;border:1px solid var(--line);border-radius:12px;background:white'></div>")
+        if result_data.get("table_data"):
+            td = result_data["table_data"]
+            headers_html = "".join(f"<th>{escape(str(h))}</th>" for h in td.get("headers", []))
+            rows_html = ""
+            for row in td.get("rows", []):
+                cells = "".join(f"<td>{escape(str(c))}</td>" for c in row)
+                rows_html += f"<tr>{cells}</tr>"
+            meta.append(f"<div style='margin-top:12px;overflow-x:auto'><table class='data-table' style='width:100%'><thead><tr>{headers_html}</tr></thead><tbody>{rows_html}</tbody></table></div>")
         if result_data.get("topic_category"):
             meta.append(f"<p><strong>话题类别：</strong>{escape(result_data['topic_category'])}</p>")
         if result_data.get("essay_type"):
@@ -1166,7 +1174,9 @@ def writing():
             return redirect(url_for("dashboard"))
         if mode == "generate_topic":
             task_type = request.form.get("task_type", "Task 2")
-            result = assistant.generate_writing_topic(task_type)
+            chart_type = request.form.get("chart_type", "柱状图")
+            topic = request.form.get("topic", "教育")
+            result = assistant.generate_writing_topic(task_type, chart_type=chart_type, topic=topic)
             result_data = parse_generated_topic_md(result, task_type)
             result_data = build_task1_chart_assets(result_data, raw_text=result)
             session["generated_topic_text"] = result_data.get("question", "")
