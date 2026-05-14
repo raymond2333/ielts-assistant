@@ -107,6 +107,76 @@ def _html_list(items):
     return "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
 
 
+def _feedback_html(feedbacks):
+    if not feedbacks:
+        return ""
+    blocks = []
+    for index, feedback in enumerate(feedbacks, 1):
+        data = feedback.get("result_data") if isinstance(feedback, dict) else None
+        data = data if isinstance(data, dict) else {}
+        body = []
+        if feedback.get("timestamp"):
+            body.append(f"<p class='record-meta'><strong>反馈时间：</strong>{escape(feedback['timestamp'])}</p>")
+        if feedback.get("user_response"):
+            body.append(f"<p><strong>当时我的回答：</strong></p><p>{escape(feedback['user_response'])}</p>")
+        if data.get("overall_score") is not None:
+            body.append(f"<p><strong>AI 评分：</strong>{escape(data['overall_score'])} / 9.0</p>")
+        breakdown = data.get("breakdown")
+        if isinstance(breakdown, dict):
+            labels = {
+                "fluency_coherence": "流利度与连贯性",
+                "lexical_resource": "词汇资源",
+                "grammatical_range_accuracy": "语法范围与准确性",
+                "pronunciation": "发音",
+            }
+            for key, label in labels.items():
+                item = breakdown.get(key)
+                if not isinstance(item, dict):
+                    continue
+                detail = []
+                if item.get("score") is not None:
+                    detail.append(f"<p><strong>分数：</strong>{escape(item['score'])}</p>")
+                for field, title in [
+                    ("strengths", "优点"),
+                    ("weaknesses", "待改进"),
+                    ("suggestions", "建议"),
+                    ("suggested_words", "推荐词汇"),
+                    ("common_errors", "常见错误"),
+                    ("improvement_tips", "改进提示"),
+                ]:
+                    if item.get(field):
+                        detail.append(f"<p><strong>{title}：</strong></p>{_html_list(item[field])}")
+                for field, title in [
+                    ("vocabulary_analysis", "词汇分析"),
+                    ("grammar_analysis", "语法分析"),
+                    ("pronunciation_analysis", "发音分析"),
+                ]:
+                    if item.get(field):
+                        detail.append(f"<p><strong>{title}：</strong>{escape(item[field])}</p>")
+                if detail:
+                    body.append(
+                        f"<details class='result-accordion nested-answer'><summary>{label}</summary>"
+                        f"<div class='result-body'>{''.join(detail)}</div></details>"
+                    )
+        if data.get("improved_response"):
+            body.append(
+                "<details class='result-accordion nested-answer'><summary>优化回答示例</summary>"
+                f"<div class='result-body'><p>{escape(data['improved_response'])}</p></div></details>"
+            )
+        if data.get("practice_recommendations"):
+            body.append(
+                "<details class='result-accordion nested-answer'><summary>练习建议</summary>"
+                f"<div class='result-body'>{_html_list(data['practice_recommendations'])}</div></details>"
+            )
+        if not data and feedback.get("result"):
+            body.append(simple_md_filter(feedback["result"]))
+        blocks.append(
+            f"<details class='result-accordion nested-answer' open><summary>当时回答与 AI 评分 {index}</summary>"
+            f"<div class='result-body'>{''.join(body)}</div></details>"
+        )
+    return "".join(blocks)
+
+
 @app.template_filter("record_result")
 def record_result_filter(result_data, activity=""):
     if not isinstance(result_data, dict):
@@ -116,9 +186,10 @@ def record_result_filter(result_data, activity=""):
 
     cue_card = result_data.get("cue_card")
     if cue_card:
+        feedback_html = _feedback_html(result_data.get("_feedbacks"))
         sections.append(
             "<details class='result-accordion' open><summary>题目卡</summary>"
-            f"<div class='result-body cue-card-body'>{simple_md_filter(cue_card)}</div></details>"
+            f"<div class='result-body cue-card-body'>{simple_md_filter(cue_card)}{feedback_html}</div></details>"
         )
 
     if result_data.get("question"):
@@ -194,6 +265,7 @@ def record_result_filter(result_data, activity=""):
                     "<details class='result-accordion nested-answer'><summary>📖 参考答案</summary>"
                     f"<div class='result-body'><button class='speak-btn' type='button' data-speak='{escape(item['model_answer'])}'>朗读参考答案</button><p>{escape(item['model_answer'])}</p></div></details>"
                 )
+            body.append(_feedback_html(item.get("_feedbacks")))
             sections.append(
                 f"<details class='result-accordion' open><summary>Part 1 题目 {index}</summary>"
                 f"<div class='result-body'>{''.join(body)}</div></details>"
@@ -216,6 +288,7 @@ def record_result_filter(result_data, activity=""):
                     "<details class='result-accordion nested-answer'><summary>参考回答</summary>"
                     f"<div class='result-body'><button class='speak-btn' type='button' data-speak='{escape(item['model_response'])}'>朗读参考答案</button><p>{escape(item['model_response'])}</p></div></details>"
                 )
+            body.append(_feedback_html(item.get("_feedbacks")))
             sections.append(
                 f"<details class='result-accordion' open><summary>Part 3 题目 {index}</summary>"
                 f"<div class='result-body'>{''.join(body)}</div></details>"
@@ -402,8 +475,72 @@ def is_admin_user(user_id=None):
     return user_id in admins
 
 
+def _normalized_question(text):
+    return " ".join(str(text or "").split())
+
+
+def is_speaking_feedback_record(record):
+    data = record.get("data") if isinstance(record, dict) else {}
+    return record.get("activity") == "口语反馈" or (isinstance(data, dict) and data.get("mode") == "speaking_feedback")
+
+
+def attach_speaking_feedback(records):
+    feedback_by_question = {}
+    for record in records:
+        if not is_speaking_feedback_record(record):
+            continue
+        data = record.get("data") or {}
+        question_key = _normalized_question(data.get("question", ""))
+        if not question_key:
+            continue
+        feedback_by_question.setdefault(question_key, []).append({
+            "id": record.get("id"),
+            "timestamp": record.get("timestamp", ""),
+            "user_response": data.get("user_response", ""),
+            "result": data.get("result", ""),
+            "result_data": data.get("result_data"),
+        })
+
+    for record in records:
+        if is_speaking_feedback_record(record):
+            continue
+        data = record.get("data") or {}
+        result_data = data.get("result_data")
+        if not isinstance(result_data, dict):
+            continue
+        if isinstance(result_data.get("questions"), list):
+            for item in result_data["questions"]:
+                if isinstance(item, dict):
+                    feedbacks = feedback_by_question.get(_normalized_question(item.get("question", "")), [])
+                    if feedbacks:
+                        item["_feedbacks"] = feedbacks
+        if isinstance(result_data.get("discussion_questions"), list):
+            for item in result_data["discussion_questions"]:
+                if isinstance(item, dict):
+                    feedbacks = feedback_by_question.get(_normalized_question(item.get("question", "")), [])
+                    if feedbacks:
+                        item["_feedbacks"] = feedbacks
+        if result_data.get("cue_card"):
+            feedbacks = feedback_by_question.get(_normalized_question(result_data.get("cue_card", "")), [])
+            if feedbacks:
+                result_data["_feedbacks"] = feedbacks
+    return records
+
+
 def visible_progress(records):
-    return [record for record in records if record.get("activity") != "学习计划"]
+    return [
+        record for record in records
+        if record.get("activity") != "学习计划" and not is_speaking_feedback_record(record)
+    ]
+
+
+def prepare_progress(records):
+    return visible_progress(attach_speaking_feedback(records))
+
+
+def prepare_feedback_context(records):
+    return attach_speaking_feedback(records)
+
 
 
 def admin_required(view):
@@ -603,7 +740,7 @@ def auth():
 def dashboard():
     user_id = session["user_id"]
     date_filter = request.args.get("date", "").strip()
-    progress = visible_progress(list(reversed(get_progress(user_id, limit=80))))
+    progress = prepare_progress(list(reversed(get_progress(user_id, limit=160))))
     if date_filter:
         progress = [p for p in progress if (p.get("timestamp") or "").startswith(date_filter)]
     progress = progress[:12]
@@ -624,7 +761,7 @@ def dashboard():
 def generate_suggestions():
     user_id = session["user_id"]
     profile = load_user_profile(user_id) or default_profile(user_id)
-    progress = visible_progress(list(reversed(get_progress(user_id, limit=50))))
+    progress = prepare_progress(list(reversed(get_progress(user_id, limit=100))))
     assistant, _ = current_assistant()
     if assistant is None:
         flash("请先保存可用的 AI API Key。", "error")
@@ -715,7 +852,7 @@ def update_active_ai_provider():
 def admin_panel():
     selected_user = request.args.get("user_id", "").strip()
     users = list_users()
-    records = visible_progress(get_all_progress(limit=500, user_id=selected_user))
+    records = prepare_progress(get_all_progress(limit=500, user_id=selected_user))
     return render_template(
         "admin.html",
         users=users,
@@ -1072,7 +1209,7 @@ def writing():
 @login_required
 def analysis():
     user_id = session["user_id"]
-    progress = visible_progress(list(reversed(get_progress(user_id, limit=80))))
+    progress = prepare_progress(list(reversed(get_progress(user_id, limit=160))))
     user_words = get_user_words(user_id)
     return render_template(
         "analysis.html",
