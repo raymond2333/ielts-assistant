@@ -40,7 +40,7 @@ from typing import Dict, Any, List
 
 os.environ.setdefault("MYSQL_ENABLED", "true")
 os.environ.setdefault("MYSQL_HOST", "127.0.0.1")
-os.environ.setdefault("MYSQL_PORT", "3307")
+os.environ.setdefault("MYSQL_PORT", "3306")
 os.environ.setdefault("MYSQL_USER", "ielts")
 os.environ.setdefault("MYSQL_PASSWORD", "ielts")
 os.environ.setdefault("MYSQL_DATABASE", "ielts_learning")
@@ -1227,6 +1227,8 @@ def _display_writing_feedback(feedback_data, task_type):
 
 def _display_record_result_data(result_data):
     """Properly render saved result_data from learning records."""
+    import pandas as pd
+
     if not isinstance(result_data, dict):
         st.text(str(result_data))
         return
@@ -1251,7 +1253,6 @@ def _display_record_result_data(result_data):
                 if st.session_state.get(f"show_{result_data['chart_image']}", False):
                     st.image(os.path.join(os.path.dirname(__file__), result_data["chart_image"]))
             if result_data.get("table_data"):
-                import pandas as pd
                 td = result_data["table_data"]
                 st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
             if result_data.get("topic_category"):
