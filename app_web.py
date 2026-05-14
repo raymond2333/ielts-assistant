@@ -375,14 +375,16 @@ def common_context():
     profile = load_user_profile(user_id) or default_profile(user_id)
     ai_config = load_user_ai_config(user_id)
     x_token = _cross_login_token(user_id)
+    _domain = os.getenv("SERVER_DOMAIN", "127.0.0.1")
+    _legacy_url = os.getenv("LEGACY_STREAMLIT_URL", f"http://{_domain}:8501")
     return {
         "user_id": user_id,
         "profile": profile,
         "ai_config": ai_config,
         "providers": AI_PROVIDERS,
         "provider_status": provider_status_for(ai_config),
-        "legacy_streamlit_url": os.getenv("LEGACY_STREAMLIT_URL", "http://127.0.0.1:8503"),
-        "streamlit_cross_url": f"{os.getenv('LEGACY_STREAMLIT_URL', 'http://127.0.0.1:8503')}?user_id={user_id}&x_token={x_token}",
+        "legacy_streamlit_url": _legacy_url,
+        "streamlit_cross_url": f"{_legacy_url}?user_id={user_id}&x_token={x_token}",
     }
 
 
@@ -481,7 +483,7 @@ def auth():
         flash("用户不存在或密码不正确。", "error")
         return redirect(url_for("auth"))
 
-    return render_template("auth.html", mode=request.args.get("mode", "login"), streamlit_url=os.getenv("LEGACY_STREAMLIT_URL", "http://127.0.0.1:8501"))
+    return render_template("auth.html", mode=request.args.get("mode", "login"), streamlit_url=os.getenv("LEGACY_STREAMLIT_URL", f"http://{os.getenv('SERVER_DOMAIN', '127.0.0.1')}:8501"))
 
 
 @app.route("/dashboard")

@@ -71,6 +71,11 @@ def _cross_login_token(user_id):
     return cross_login_token(user_id)
 
 
+def _flask_base_url():
+    _domain = os.getenv("SERVER_DOMAIN", "127.0.0.1")
+    return os.getenv("NEW_FLASK_URL", f"http://{_domain}:8600")
+
+
 def _verify_cross_token(user_id, token):
     return verify_cross_token(user_id, token)
 
@@ -1526,7 +1531,7 @@ def _render_login_page():
         else:
             st.info("当前未启用 MySQL。可以临时登录体验，但 API Key 无法跨重启持久保存。")
 
-    flask_cross_url = f"{os.getenv('NEW_FLASK_URL', 'http://127.0.0.1:8600')}?user_id={st.session_state.get('login_user_id', '')}&x_token={_cross_login_token(st.session_state.get('login_user_id', ''))}"
+    flask_cross_url = f"{_flask_base_url()}?user_id={st.session_state.get('login_user_id', '')}&x_token={_cross_login_token(st.session_state.get('login_user_id', ''))}"
     st.link_button("进入 Beta 版", flask_cross_url, use_container_width=True)
 
     login_tab, register_tab = st.tabs(["登录", "注册"])
@@ -1784,7 +1789,7 @@ with st.sidebar:
 
     st.title("🔐 当前用户")
     st.write(f"用户ID：`{st.session_state.current_user_id}`")
-    flask_cross_url = f"{os.getenv('NEW_FLASK_URL', 'http://127.0.0.1:8600')}?user_id={st.session_state.current_user_id}&x_token={_cross_login_token(st.session_state.current_user_id)}"
+    flask_cross_url = f"{_flask_base_url()}?user_id={st.session_state.current_user_id}&x_token={_cross_login_token(st.session_state.current_user_id)}"
     st.link_button("进入 Beta 版", flask_cross_url, use_container_width=True)
     if st.button("退出登录", use_container_width=True):
         st.query_params.clear()
@@ -2381,7 +2386,7 @@ if st.session_state.active_tab.startswith("📊"):
                 timestamp = record.get("timestamp", "")
                 activity = record.get("activity", "学习记录")
                 with st.expander(f"{activity} — {timestamp}" + (f" | 得分：{score}" if score else "")):
-                    flask_url = os.getenv("NEW_FLASK_URL", "http://127.0.0.1:8600")
+                    flask_url = _flask_base_url()
                     user_id = st.session_state.get("login_user_id") or st.session_state.get("current_user_id", "")
                     x_token = _cross_login_token(user_id) if user_id else ""
                     record_id = record.get("id", "")
