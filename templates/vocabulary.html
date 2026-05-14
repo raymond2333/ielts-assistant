@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>背单词 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line">
+          <div class="brand-icon">雅</div>
+          <div>
+            <strong>信达雅</strong>
+            <span>雅思词汇</span>
+          </div>
+        </div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Vocabulary</p>
+          <h1>雅思核心词汇</h1>
+        </div>
+        <div class="user-menu">
+          <a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer" title="免登录打开稳定版">稳定版</a>
+          <div class="db-pill">已掌握 {{ learned_count }} / {{ total_count }}</div>
+          <form method="post" action="{{ url_for('update_active_ai_provider') }}" class="model-switcher">
+            <select name="provider" onchange="this.form.submit()" title="选择生成模型">
+              {% for key, provider in providers.items() %}
+                <option value="{{ key }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}{{ '' if provider_status[key] else '（未配置）' }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          <details class="user-dropdown">
+            <summary><span class="user-chip">用户中心 · {{ user_id }}</span></summary>
+            <div class="drop-menu" onclick="event.stopPropagation()">
+              <a href="{{ url_for('dashboard') }}">学习总览</a>
+              <a href="{{ url_for('settings_page') }}">用户设置</a>
+              <div class="drop-divider"></div>
+              <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="panel">
+        <form method="get" class="form-row">
+          <label>
+            <span>搜索单词或释义</span>
+            <input name="q" value="{{ query }}" placeholder="例如 sustainable / 环境">
+          </label>
+          <label>
+            <span>话题筛选</span>
+            <select name="topic">
+              <option value="">全部话题</option>
+              {% for item in topics %}
+                <option value="{{ item }}" {% if selected_topic == item %}selected{% endif %}>{{ item }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button class="primary-btn filter-btn" type="submit">筛选</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Wordbook</p><h2>我的生词本</h2></div></div>
+        {% if user_words %}
+          <div class="vocab-grid">
+          {% for item in user_words %}
+            <article class="word-card learned">
+              <div class="word-top"><div><h2>{{ item.word }}</h2><span>{{ item.source or '训练收藏' }}</span></div></div>
+              <p class="meaning">{{ item.translation or '暂无释义' }}</p>
+              <div class="essay-use"><strong>用法</strong><p>{{ item.usage_note or '可在 AI 输出中选中该词继续查询用法。' }}</p></div>
+            </article>
+          {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-text">训练时选中 AI 输出里的陌生词，点击“加入生词本”后会出现在这里。</p>
+        {% endif %}
+      </section>
+
+      <section class="vocab-grid">
+        {% for item in words %}
+          {% set state = progress.get(item.word, {}) %}
+          <article class="word-card {{ 'learned' if state.status == 'learned' else '' }}">
+            <div class="word-top">
+              <div>
+                <h2>{{ item.word }}</h2>
+                <span>{{ item.phonetic }} · {{ item.topic }}</span>
+              </div>
+              <form method="post" action="{{ url_for('vocabulary_progress', word=item.word) }}">
+                <input type="hidden" name="status" value="{{ 'learning' if state.status == 'learned' else 'learned' }}">
+                <button class="ghost-btn small" type="submit">{{ '复习中' if state.status == 'learned' else '标记掌握' }}</button>
+              </form>
+            </div>
+            <p class="meaning">{{ item.meaning }}</p>
+            <div class="phrase-list">
+              {% for phrase in item.phrases %}
+                <span>{{ phrase }}</span>
+              {% endfor %}
+            </div>
+            <div class="essay-use">
+              <strong>作文使用</strong>
+              <p>{{ item.essay_use }}</p>
+            </div>
+          </article>
+        {% endfor %}
+      </section>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

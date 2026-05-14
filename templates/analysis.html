@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习分析 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line"><div class="brand-icon">析</div><div><strong>信达雅</strong><span>学习分析</span></div></div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a><a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a><a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a><a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a><a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a><a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+      </nav>
+    </aside>
+    <main class="main-panel">
+      <header class="topbar"><div><p class="eyebrow">Analysis</p><h1>学习分析</h1></div><div class="user-menu"><a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer" title="免登录打开稳定版">稳定版</a><form method="post" action="{{ url_for('update_active_ai_provider') }}" class="model-switcher"><select name="provider" onchange="this.form.submit()" title="选择生成模型">{% for key, provider in providers.items() %}<option value="{{ key }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}{{ '' if provider_status[key] else '（未配置）' }}</option>{% endfor %}</select></form><details class="user-dropdown"><summary><span class="user-chip">用户中心 · {{ user_id }}</span></summary><div class="drop-menu" onclick="event.stopPropagation()"><a href="{{ url_for('dashboard') }}">学习总览</a><a href="{{ url_for('settings_page') }}">用户设置</a><div class="drop-divider"></div><form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form></div></details></div></header>
+      <section class="metric-grid">
+        <div class="metric-card"><span>综合水平</span><strong>{{ '%.1f'|format(profile.current_level) }}</strong></div>
+        <div class="metric-card"><span>目标分数</span><strong>{{ '%.1f'|format(profile.target_score) }}</strong></div>
+        <div class="metric-card"><span>学习记录</span><strong>{{ progress|length }}</strong></div>
+        <div class="metric-card"><span>生词本</span><strong>{{ user_words|length }}</strong></div>
+      </section>
+      <section class="panel"><h2>最近学习记录</h2>{% if progress %}<div class="timeline">{% for item in progress %}<details class="timeline-item detail-record"><summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp }}</span></summary><div class="result-body">
+        <p><strong>记录ID：</strong>{{ item.id }}</p>
+        <a class="primary-btn small" href="{{ url_for('replay', id=item.id) }}" style="margin-bottom:10px;display:inline-block">重新练习此题</a>
+        {% if item.data.mode %}<p><strong>模式：</strong>{{ item.data.mode }}</p>{% endif %}
+        {% if item.data.topic %}<p><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
+        {% if item.data.question %}<p><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
+        {% if item.data.essay_content %}<p><strong>作文内容（前300字）：</strong>{{ item.data.essay_content[:300] }}</p>{% endif %}
+        {% if item.data.chinese_answer %}<p><strong>中文思路：</strong>{{ item.data.chinese_answer }}</p>{% endif %}
+        {% if item.data.score %}<p><strong>得分：</strong>{{ item.data.score }}</p>{% endif %}
+        {% if item.data.result_data %}
+          <details class="result-accordion" open><summary>{{ item.activity | record_title }}</summary><div class="result-body">{{ item.data.result_data | record_result(item.activity) }}</div></details>
+        {% elif item.data.result %}
+          <details class="result-accordion" open><summary>{{ item.activity | record_title }}</summary><div class="result-body">{{ item.data.result | simple_md }}</div></details>
+        {% endif %}
+      </div></details>{% endfor %}</div>{% else %}<p class="empty-text">暂无学习记录。</p>{% endif %}</section>
+      <section class="panel"><h2>生词本概览</h2>{% if user_words %}<div class="phrase-list">{% for item in user_words[:30] %}<span>{{ item.word }}</span>{% endfor %}</div>{% else %}<p class="empty-text">选中 AI 输出中的单词即可收藏到生词本。</p>{% endif %}</section>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

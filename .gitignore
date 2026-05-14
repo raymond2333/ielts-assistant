@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+mysql-data/
+data/charts/*.png
+.ielts_last_user.json
+.DS_Store
+*.doc
+*.pptx

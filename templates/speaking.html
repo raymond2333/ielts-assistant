@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>口语练习 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <style>
+    .timer-display {
+      font-size: 3rem;
+      font-weight: bold;
+      text-align: center;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 12px;
+      background: #f0f4ff;
+      border: 2px solid #4f46e5;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer-display.warning { background: #fef3c7; border-color: #d97706; color: #92400e; }
+    .timer-display.danger { background: #fee2e2; border-color: #dc2626; color: #991b1b; animation: pulse 1s infinite; }
+    .timer-controls { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin: 1rem 0; }
+    .timer-btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; font-size: 0.95rem; font-weight: 600; }
+    .timer-btn.prep { background: #4f46e5; color: #fff; }
+    .timer-btn.speak { background: #059669; color: #fff; }
+    .timer-btn.stop { background: #dc2626; color: #fff; }
+    .timer-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .feedback-box { margin: 1rem 0; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }
+    .answer-form { margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line"><div class="brand-icon">信</div><div><strong>信达雅</strong><span>口语练习</span></div></div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Speaking</p>
+          <h1>口语练习</h1>
+        </div>
+        <div class="user-menu">
+          <a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer" title="免登录打开稳定版">稳定版</a>
+          <form method="post" action="{{ url_for('update_active_ai_provider') }}" class="model-switcher">
+            <select name="provider" onchange="this.form.submit()" title="选择生成模型">
+              {% for key, provider in providers.items() %}
+                <option value="{{ key }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}{{ '' if provider_status[key] else '（未配置）' }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          <details class="user-dropdown">
+            <summary><span class="user-chip">用户中心 · {{ user_id }}</span></summary>
+            <div class="drop-menu" onclick="event.stopPropagation()">
+              <a href="{{ url_for('dashboard') }}">学习总览</a>
+              <a href="{{ url_for('settings_page') }}">用户设置</a>
+              <div class="drop-divider"></div>
+              <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="panel" data-tab-group>
+        <div class="subtabs" role="tablist">
+          <button type="button" data-tab-target="part1" class="{{ 'active' if mode == 'part1' else '' }}">Part 1</button>
+          <button type="button" data-tab-target="part2" class="{{ 'active' if mode == 'part2' else '' }}">Part 2</button>
+          <button type="button" data-tab-target="part3" class="{{ 'active' if mode == 'part3' else '' }}">Part 3</button>
+        </div>
+
+        <div class="tab-panel {{ 'active' if mode == 'part1' else '' }}" data-tab-panel="part1">
+          <div class="panel-description">
+            <p><strong>📋 Part 1: 自我介绍与日常话题</strong> — 考官会问关于你的工作/学习、家乡、兴趣等个人话题。回答时长 4-5 分钟，每题 20-30 秒。自然流利、不要背答案。</p>
+          </div>
+          <form method="post" class="settings-form">
+            <input type="hidden" name="mode" value="part1">
+            <div class="form-row">
+              <label>
+                <span>话题类型</span>
+                <select name="topic">
+                  {% for topic in ['工作/学习','家乡','家庭','兴趣爱好','日常生活','旅行','食物','节日'] %}
+                    <option value="{{ topic }}">{{ topic }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>难度</span>
+                <select name="difficulty"><option>简单</option><option selected>中等</option><option>困难</option></select>
+              </label>
+            </div>
+            <button class="primary-btn" type="submit">生成 Part 1 题目</button>
+          </form>
+        </div>
+
+        <div class="tab-panel {{ 'active' if mode == 'part2' else '' }}" data-tab-panel="part2">
+          <div class="panel-description">
+            <p><strong>🎯 Part 2: 个人陈述（Cue Card）</strong> — 你将领到一张话题卡，1 分钟准备 + 2 分钟连续发言。需涵盖卡片上的所有提示点，注意内容组织和时间控制。</p>
+          </div>
+          <form method="post" class="settings-form">
+            <input type="hidden" name="mode" value="part2">
+            <div class="form-row">
+              <label>
+                <span>话题卡类型</span>
+                <select name="topic">
+                  {% for topic in ['人物描述','地点描述','事件经历','物品描述','活动经历','理想目标'] %}
+                    <option value="{{ topic }}">{{ topic }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>题目卡类型</span>
+                <select name="cue_type"><option>描述类</option><option>经历类</option><option>观点类</option><option>比较类</option></select>
+              </label>
+            </div>
+            <button class="primary-btn" type="submit">生成 Part 2 题目卡</button>
+          </form>
+        </div>
+
+        <div class="tab-panel {{ 'active' if mode == 'part3' else '' }}" data-tab-panel="part3">
+          <div class="panel-description">
+            <p><strong>🧠 Part 3: 深入讨论</strong> — 考官基于 Part 2 话题延展提问，考察分析、比较和观点表达能力。回答时长 4-5 分钟，每题 45-60 秒。需展现批判性思维。</p>
+          </div>
+          <form method="post" class="settings-form">
+            <input type="hidden" name="mode" value="part3">
+            <label>
+              <span>Part 2 话题</span>
+              <textarea name="part2_topic" rows="4" placeholder="粘贴或输入 Part 2 话题，例如 Describe a person who inspired you"></textarea>
+            </label>
+            <label>
+              <span>讨论类型</span>
+              <select name="discussion_type"><option>社会影响</option><option>发展趋势</option><option>比较分析</option><option>问题解决</option><option>个人观点</option></select>
+            </label>
+            <button class="primary-btn" type="submit">生成 Part 3 讨论题</button>
+          </form>
+        </div>
+      </section>
+
+      {% if result %}
+      <section class="panel result-panel" data-result-for="{{ mode }}">
+        <div class="panel-heading"><div><p class="eyebrow">Result</p><h2>练习内容</h2></div></div>
+        <div class="result-stack ai-output">
+          {% if result_data and mode == 'part1' and result_data.questions %}
+            {% for item in result_data.questions %}
+              <details class="result-accordion" {% if loop.first %}open{% endif %}>
+                <summary>{{ loop.index }}. {{ item.question }} <button class="speak-btn" type="button" data-speak="{{ item.question }}">朗读题目</button></summary>
+                <div class="result-body">
+                  {% if item.keywords %}<strong>关键词</strong><div class="phrase-list">{% for word in item.keywords %}<span>{{ word }}</span>{% endfor %}</div>{% endif %}
+                  {% if item.tips %}<strong>回答技巧</strong><ul>{% for tip in item.tips %}<li>{{ tip }}</li>{% endfor %}</ul>{% endif %}
+                  <form method="post" class="settings-form answer-form">
+                    <input type="hidden" name="mode" value="answer_from_cn">
+                    <input type="hidden" name="question" value="{{ item.question }}">
+                    <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="例如：我平时喜欢在周末和朋友去咖啡馆，因为那里让我放松。"></textarea></label>
+                    <button class="ghost-btn small" type="submit">生成英文答案</button>
+                  </form>
+                  <form method="post" class="settings-form answer-form">
+                    <input type="hidden" name="mode" value="speaking_feedback">
+                    <input type="hidden" name="question" value="{{ item.question }}">
+                    <input type="hidden" name="target_score" value="{{ profile.target_score }}">
+                    <label><span>输入英文回答，获取 AI 批改</span><textarea name="user_response" rows="3" placeholder="在这里输入你的英文回答，AI 将为你评分并提供改进建议..."></textarea></label>
+                    <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
+                  </form>
+                  <details class="result-accordion nested-answer">
+                    <summary>查看参考答案</summary>
+                    <div class="result-body"><button class="speak-btn" type="button" data-speak="{{ item.model_answer }}">朗读参考答案</button><p>{{ item.model_answer }}</p></div>
+                  </details>
+                </div>
+              </details>
+            {% endfor %}
+            {% if result_data.preparation_advice %}
+              <details class="result-accordion"><summary>备考建议</summary><div class="result-body">{{ result_data.preparation_advice }}</div></details>
+            {% endif %}
+          {% elif result_data and mode == 'part2' %}
+            <details class="result-accordion" open>
+              <summary>题目卡</summary>
+              <div class="result-body cue-card-body">{{ result_data.cue_card | simple_md }}</div>
+            </details>
+
+            <div class="result-body" style="margin: 1rem 0;">
+              <h3>⏱️ 计时器</h3>
+              <div class="timer-display" id="timerDisplay">01:00</div>
+              <div class="timer-controls">
+                <button class="timer-btn prep" id="btnPrep" onclick="startTimer(60, 'prep')">⏱️ 1分钟准备</button>
+                <button class="timer-btn speak" id="btnSpeak" onclick="startTimer(120, 'speak')">🎤 2分钟发言</button>
+                <button class="timer-btn stop" id="btnStop" onclick="stopTimer()">⏹️ 停止</button>
+              </div>
+              <p class="hint" id="timerHint">点击按钮开始计时练习</p>
+            </div>
+
+            <form method="post" class="settings-form answer-form">
+              <input type="hidden" name="mode" value="speaking_feedback">
+              <input type="hidden" name="question" value="{{ result_data.cue_card }}">
+              <input type="hidden" name="target_score" value="{{ profile.target_score }}">
+              <label><span>你的 Part 2 回答</span><textarea name="user_response" rows="6" placeholder="计时结束后，在这里输入你的英文回答，AI 将给出评分和改进建议。"></textarea></label>
+              <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
+            </form>
+
+            {% if result_data.model_answer %}
+              <details class="result-accordion">
+                <summary>参考答案</summary>
+                <div class="result-body">
+                  <button class="speak-btn" type="button" data-speak="{{ (result_data.model_answer.introduction or '') ~ ' ' ~ (result_data.model_answer.main_points or [])|join(' ') ~ ' ' ~ (result_data.model_answer.details or [])|join(' ') ~ ' ' ~ (result_data.model_answer.conclusion or '') }}">朗读参考答案</button>
+                  <form method="post" class="settings-form answer-form">
+                    <input type="hidden" name="mode" value="answer_from_cn">
+                    <input type="hidden" name="question" value="{{ result_data.cue_card }}">
+                    <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="写下你想讲的中文内容"></textarea></label>
+                    <button class="ghost-btn small" type="submit">生成英文答案</button>
+                  </form>
+                  {% if result_data.model_answer.introduction %}<p><strong>开头：</strong>{{ result_data.model_answer.introduction }}</p>{% endif %}
+                  {% if result_data.model_answer.main_points %}<strong>主要观点</strong><ul>{% for point in result_data.model_answer.main_points %}<li>{{ point }}</li>{% endfor %}</ul>{% endif %}
+                  {% if result_data.model_answer.details %}<strong>细节展开</strong><ul>{% for detail in result_data.model_answer.details %}<li>{{ detail }}</li>{% endfor %}</ul>{% endif %}
+                  {% if result_data.model_answer.conclusion %}<p><strong>结尾：</strong>{{ result_data.model_answer.conclusion }}</p>{% endif %}
+                </div>
+              </details>
+            {% endif %}
+
+            <details class="result-accordion">
+              <summary>🔑 根据关键词生成完整答案</summary>
+              <div class="result-body">
+                <p class="hint">输入你准备的关键词，AI 将围绕这些关键词为你生成一个自然流利的完整答案。</p>
+                <form method="post" class="settings-form answer-form">
+                  <input type="hidden" name="mode" value="keyword_answer">
+                  <input type="hidden" name="question" value="{{ result_data.cue_card }}">
+                  <input type="hidden" name="part" value="Part 2">
+                  <label><span>你的关键词</span><textarea name="keywords" rows="4" placeholder="输入你想用的关键词，每行一个或用逗号分隔&#10;例如：&#10;childhood memory, river, fishing, grandfather, patient, life lesson"></textarea></label>
+                  <button class="primary-btn" type="submit">✨ 生成完整答案</button>
+                </form>
+              </div>
+            </details>
+
+            {% if result_data.vocabulary_highlight %}<details class="result-accordion"><summary>高级词汇</summary><div class="result-body"><div class="phrase-list">{% for word in result_data.vocabulary_highlight %}<span>{{ word }}</span>{% endfor %}</div></div></details>{% endif %}
+            {% if result_data.grammar_structures %}<details class="result-accordion"><summary>语法结构</summary><div class="result-body"><ul>{% for item in result_data.grammar_structures %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.fluency_tips %}<details class="result-accordion"><summary>流利度建议</summary><div class="result-body"><ul>{% for item in result_data.fluency_tips %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+          {% elif result_data and mode == 'part3' and result_data.discussion_questions %}
+            {% for item in result_data.discussion_questions %}
+              <details class="result-accordion" {% if loop.first %}open{% endif %}>
+                <summary>{{ loop.index }}. {{ item.question }} <button class="speak-btn" type="button" data-speak="{{ item.question }}">朗读题目</button></summary>
+                <div class="result-body">
+                  {% if item.purpose %}<p><strong>考察点：</strong>{{ item.purpose }}</p>{% endif %}
+                  {% if item.depth_required %}<p><strong>回答深度：</strong>{{ item.depth_required }}</p>{% endif %}
+                  <form method="post" class="settings-form answer-form">
+                    <input type="hidden" name="mode" value="answer_from_cn">
+                    <input type="hidden" name="question" value="{{ item.question }}">
+                    <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="用中文写下你的观点和例子"></textarea></label>
+                    <button class="ghost-btn small" type="submit">生成英文答案</button>
+                  </form>
+                  <form method="post" class="settings-form answer-form">
+                    <input type="hidden" name="mode" value="speaking_feedback">
+                    <input type="hidden" name="question" value="{{ item.question }}">
+                    <input type="hidden" name="target_score" value="{{ profile.target_score }}">
+                    <label><span>输入英文回答，获取 AI 批改</span><textarea name="user_response" rows="3" placeholder="在这里输入你的英文回答..."></textarea></label>
+                    <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
+                  </form>
+                  <details class="result-accordion nested-answer">
+                    <summary>查看参考回答</summary>
+                    <div class="result-body"><button class="speak-btn" type="button" data-speak="{{ item.model_response }}">朗读参考答案</button><p>{{ item.model_response }}</p></div>
+                  </details>
+                </div>
+              </details>
+            {% endfor %}
+            {% if result_data.analytical_angles %}<details class="result-accordion"><summary>分析角度</summary><div class="result-body"><ul>{% for item in result_data.analytical_angles %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.extended_vocabulary %}<details class="result-accordion"><summary>扩展词汇</summary><div class="result-body"><div class="phrase-list">{% for word in result_data.extended_vocabulary %}<span>{{ word }}</span>{% endfor %}</div></div></details>{% endif %}
+          {% elif result_data and mode == 'speaking_feedback' %}
+            <details class="result-accordion" open><summary>🎯 口语批改反馈</summary>
+              <div class="result-body">
+                {% if result_data.overall_score %}
+                  <p><strong>总体评分：</strong>{{ result_data.overall_score }} / 9.0</p>
+                {% endif %}
+                {% if result_data.breakdown %}
+                  {% for key, label in [('fluency_coherence','流利度与连贯性'),('lexical_resource','词汇资源'),('grammatical_range_accuracy','语法范围与准确性'),('pronunciation','发音')] %}
+                    {% if result_data.breakdown[key] %}
+                      <details class="result-accordion"><summary>{{ label }} · {{ result_data.breakdown[key].score }}</summary>
+                        <div class="result-body">
+                          {% if result_data.breakdown[key].strengths %}<p><strong>优点：</strong></p><ul>{% for s in result_data.breakdown[key].strengths %}<li>{{ s }}</li>{% endfor %}</ul>{% endif %}
+                          {% if result_data.breakdown[key].weaknesses %}<p><strong>待改进：</strong></p><ul>{% for w in result_data.breakdown[key].weaknesses %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+                          {% if result_data.breakdown[key].suggestions %}<p><strong>建议：</strong></p><ul>{% for s in result_data.breakdown[key].suggestions %}<li>{{ s }}</li>{% endfor %}</ul>{% endif %}
+                          {% if result_data.breakdown[key].vocabulary_analysis %}<p>{{ result_data.breakdown[key].vocabulary_analysis }}</p>{% endif %}
+                          {% if result_data.breakdown[key].grammar_analysis %}<p>{{ result_data.breakdown[key].grammar_analysis }}</p>{% endif %}
+                        </div>
+                      </details>
+                    {% endif %}
+                  {% endfor %}
+                {% endif %}
+                {% if result_data.improved_response %}
+                  <details class="result-accordion"><summary>✨ 优化后的回答示例</summary><div class="result-body"><p>{{ result_data.improved_response }}</p></div></details>
+                {% endif %}
+                {% if result_data.practice_recommendations %}
+                  <details class="result-accordion"><summary>📋 练习建议</summary><div class="result-body"><ul>{% for r in result_data.practice_recommendations %}<li>{{ r }}</li>{% endfor %}</ul></div></details>
+                {% endif %}
+              </div>
+            </details>
+          {% elif result_data and mode == 'keyword_answer' %}
+            <details class="result-accordion" open><summary>✨ 基于关键词生成的完整答案</summary>
+              <div class="result-body">
+                {% if result_data.full_answer %}
+                  <p><strong>完整答案：</strong></p>
+                  <p>{{ result_data.full_answer }}</p>
+                {% endif %}
+                {% if result_data.answer_structure %}<p><strong>答案结构：</strong>{{ result_data.answer_structure }}</p>{% endif %}
+                {% if result_data.advanced_vocabulary %}<p><strong>高级词汇：</strong></p><div class="phrase-list">{% for w in result_data.advanced_vocabulary %}<span>{{ w }}</span>{% endfor %}</div>{% endif %}
+                {% if result_data.useful_phrases %}<p><strong>实用短语：</strong></p><div class="phrase-list">{% for p in result_data.useful_phrases %}<span>{{ p }}</span>{% endfor %}</div>{% endif %}
+                {% if result_data.improvement_tips %}<p><strong>改进建议：</strong>{{ result_data.improvement_tips }}</p>{% endif %}
+              </div>
+            </details>
+          {% else %}
+            <details class="result-accordion" open>
+              <summary>AI 输出</summary>
+              <div class="result-body">{{ result | simple_md }}</div>
+            </details>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>
+    let timerInterval = null;
+    let remainingSeconds = 0;
+
+    function updateTimerDisplay() {
+      const display = document.getElementById('timerDisplay');
+      const hint = document.getElementById('timerHint');
+      if (!display) return;
+      const mins = Math.floor(remainingSeconds / 60);
+      const secs = remainingSeconds % 60;
+      display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+
+      display.classList.remove('warning', 'danger');
+      if (remainingSeconds <= 10) {
+        display.classList.add('danger');
+      } else if (remainingSeconds <= 30) {
+        display.classList.add('warning');
+      }
+
+      if (hint) {
+        if (remainingSeconds > 0) {
+          hint.textContent = '计时进行中...';
+        } else {
+          hint.textContent = '⏰ 时间到！';
+        }
+      }
+    }
+
+    function startTimer(seconds, type) {
+      stopTimer();
+      remainingSeconds = seconds;
+      updateTimerDisplay();
+
+      const btnPrep = document.getElementById('btnPrep');
+      const btnSpeak = document.getElementById('btnSpeak');
+      if (btnPrep) btnPrep.disabled = true;
+      if (btnSpeak) btnSpeak.disabled = true;
+
+      timerInterval = setInterval(() => {
+        remainingSeconds--;
+        updateTimerDisplay();
+        if (remainingSeconds <= 0) {
+          stopTimer();
+          if (type === 'prep') {
+            alert('准备时间结束！现在可以开始2分钟发言。');
+          } else {
+            alert('发言时间结束！');
+          }
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      const btnPrep = document.getElementById('btnPrep');
+      const btnSpeak = document.getElementById('btnSpeak');
+      if (btnPrep) btnPrep.disabled = false;
+      if (btnSpeak) btnSpeak.disabled = false;
+    }
+  </script>
+  <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
+  <script src="{{ url_for('static', filename='voice_input.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>作文批改 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line"><div class="brand-icon">雅</div><div><strong>信达雅</strong><span>作文批改</span></div></div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div><p class="eyebrow">Writing</p><h1>作文批改</h1></div>
+        <div class="user-menu">
+          <a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer" title="免登录打开稳定版">稳定版</a>
+          <form method="post" action="{{ url_for('update_active_ai_provider') }}" class="model-switcher">
+            <select name="provider" onchange="this.form.submit()" title="选择生成模型">
+              {% for key, provider in providers.items() %}
+                <option value="{{ key }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}{{ '' if provider_status[key] else '（未配置）' }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          <details class="user-dropdown">
+            <summary><span class="user-chip">用户中心 · {{ user_id }}</span></summary>
+            <div class="drop-menu" onclick="event.stopPropagation()">
+              <a href="{{ url_for('dashboard') }}">学习总览</a>
+              <a href="{{ url_for('settings_page') }}">用户设置</a>
+              <div class="drop-divider"></div>
+              <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="panel" data-tab-group>
+        <div class="subtabs" role="tablist">
+          <button type="button" data-tab-target="task1" class="{{ 'active' if mode in ['task1', 'ideas', 'generate_topic'] else '' }}">小作文 Task 1</button>
+          <button type="button" data-tab-target="task2" class="{{ 'active' if mode == 'task2' else '' }}">大作文 Task 2</button>
+        </div>
+
+        <div class="tab-panel {{ 'active' if mode in ['task1', 'ideas', 'generate_topic'] or (import_topic and import_task == 'Task 1') else '' }}" data-tab-panel="task1">
+          <details class="result-accordion idea-box">
+            <summary>🎲 随机生成小作文题目</summary>
+            <div class="result-body">
+              <p class="hint">AI 将随机生成一道雅思 Task 1 真题风格的题目（含图表），无需选择目标分数，方便你随时练习。</p>
+              <form method="post" class="settings-form">
+                <input type="hidden" name="mode" value="generate_topic">
+                <input type="hidden" name="task_type" value="Task 1">
+                <button class="primary-btn" type="submit">🎲 生成小作文题目</button>
+              </form>
+            </div>
+          </details>
+          <details class="result-accordion idea-box">
+            <summary>💡 作文题目思路互动</summary>
+            <div class="result-body">
+              <form method="post" class="settings-form">
+                <input type="hidden" name="mode" value="ideas">
+                <label><span>作文题目</span><textarea name="topic" rows="4" placeholder="粘贴雅思小作文题目或图表描述" class="no-voice">{{ generated_topic_text if generated_topic_text and generated_topic_task == 'Task 1' else (import_question if import_topic else '') }}</textarea></label>
+                <label><span>想问 AI 的问题</span><input name="question" placeholder="例如：这道题应该先写哪些关键信息？"></label>
+                <button class="primary-btn" type="submit">向 AI 提问找思路</button>
+              </form>
+            </div>
+          </details>
+
+          <form method="post" class="settings-form">
+            <input type="hidden" name="mode" value="task1">
+            <div class="form-row">
+              <label><span>图表类型</span><select name="task_type"><option>线形图</option><option>柱状图</option><option>饼图</option><option>表格</option><option>流程图</option><option>地图</option></select></label>
+            </div>
+            <label><span>小作文内容</span><textarea name="essay_content" rows="12" placeholder="粘贴 Task 1 作文" class="no-voice">{{ generated_topic_text if generated_topic_text and generated_topic_task == 'Task 1' else (import_question if import_topic and import_task == 'Task 1' else '') }}</textarea></label>
+            <button class="primary-btn" type="submit">批改小作文</button>
+          </form>
+        </div>
+
+        <div class="tab-panel {{ 'active' if mode == 'task2' or (import_topic and import_task == 'Task 2') else '' }}" data-tab-panel="task2">
+          <details class="result-accordion idea-box">
+            <summary>🎲 随机生成大作文题目</summary>
+            <div class="result-body">
+              <p class="hint">AI 将随机生成一道雅思 Task 2 真题风格的题目，无需选择目标分数，方便你随时练习。</p>
+              <form method="post" class="settings-form">
+                <input type="hidden" name="mode" value="generate_topic">
+                <input type="hidden" name="task_type" value="Task 2">
+                <button class="primary-btn" type="submit">🎲 生成大作文题目</button>
+              </form>
+            </div>
+          </details>
+          <details class="result-accordion idea-box">
+            <summary>💡 作文题目思路互动</summary>
+            <div class="result-body">
+              <form method="post" class="settings-form">
+                <input type="hidden" name="mode" value="ideas">
+                <label><span>作文题目</span><textarea name="topic" rows="4" placeholder="粘贴雅思大作文题目" class="no-voice">{{ generated_topic_text if generated_topic_text and generated_topic_task == 'Task 2' else (import_question if import_topic else '') }}</textarea></label>
+                <label><span>想问 AI 的问题</span><input name="question" placeholder="例如：这个题目支持和反对方分别怎么展开？"></label>
+                <button class="primary-btn" type="submit">向 AI 提问找思路</button>
+              </form>
+            </div>
+          </details>
+
+          <form method="post" class="settings-form">
+            <input type="hidden" name="mode" value="task2">
+            <div class="form-row">
+              <label><span>话题类别</span><select name="topic_category"><option>教育</option><option>科技</option><option>环境</option><option>社会</option><option>文化</option><option>工作</option><option>政府</option><option>全球化</option></select></label>
+              <label><span>作文类型</span><select name="essay_type"><option>同意不同意型</option><option>讨论双方观点型</option><option>利弊分析型</option><option>问题解决型</option></select></label>
+            </div>
+            <label><span>大作文内容</span><textarea name="essay_content" rows="12" placeholder="粘贴 Task 2 作文" class="no-voice">{{ generated_topic_text if generated_topic_text and generated_topic_task == 'Task 2' else (import_question if import_topic and import_task == 'Task 2' else '') }}</textarea></label>
+            <button class="primary-btn" type="submit">批改大作文</button>
+          </form>
+        </div>
+      </section>
+
+      {% if result %}
+      <section class="panel result-panel">
+        <div class="panel-heading"><div><p class="eyebrow">Result</p><h2>{{ '生成题目' if mode == 'generate_topic' else ('思路建议' if mode == 'ideas' else '批改结果') }}</h2></div></div>
+        <div class="result-stack ai-output">
+          {% if result_data and mode == 'generate_topic' %}
+            {% set target_task = result_data.task_type if result_data.task_type else 'Task 2' %}
+            <details class="result-accordion" open>
+              <summary>{{ '📋 小作文题目' if target_task == 'Task 1' else '📝 大作文题目' }}</summary>
+              <div class="result-body">
+                {% if target_task == 'Task 1' %}
+                  <p><strong>图表类型：</strong>{{ result_data.chart_type }}</p>
+                  {% if result_data.chart_image %}
+                    <div style="margin-top:12px">
+                      <img src="/{{ result_data.chart_image }}" alt="Task 1 chart" style="max-width:100%;border:1px solid var(--line);border-radius:12px;background:white">
+                    </div>
+                  {% endif %}
+                {% else %}
+                  <p><strong>话题类别：</strong>{{ result_data.topic_category }}</p>
+                  <p><strong>作文类型：</strong>{{ result_data.essay_type }}</p>
+                {% endif %}
+                <p style="font-size:1.05rem;line-height:1.7;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e5e7eb"><strong>题目：</strong>{{ result_data.question }}</p>
+                {% if result_data.key_features %}
+                  <p><strong>关键特征：</strong></p><ul>{% for f in result_data.key_features %}<li>{{ f }}</li>{% endfor %}</ul>
+                {% endif %}
+                {% if result_data.chart_data %}
+                  <details class="result-accordion"><summary>表格数据（供 AI 互动使用）</summary><div class="result-body"><table class="data-table"><thead><tr><th>项目</th><th>数值</th></tr></thead><tbody>{% for row in result_data.chart_data %}<tr><td>{{ row.label }}</td><td>{{ row.value }}</td></tr>{% endfor %}</tbody></table></div></details>
+                {% endif %}
+                {% if result_data.key_points %}
+                  <p><strong>关键论点：</strong></p><ul>{% for pt in result_data.key_points %}<li>{{ pt }}</li>{% endfor %}</ul>
+                {% endif %}
+                {% if result_data.suggested_structure %}<p><strong>建议结构：</strong>{{ result_data.suggested_structure }}</p>{% endif %}
+                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                  <a class="primary-btn small" href="{{ url_for('writing', import_topic='1', import_question=result_data.question, import_task=target_task) }}">📝 导入题目开始练习</a>
+                  <button class="ghost-btn small" type="button" onclick="document.getElementById('modelAnswerForm').style.display='block';this.style.display='none'">✨ 生成参考范文</button>
+                </div>
+                <div id="modelAnswerForm" style="display:none;margin-top:10px">
+                  <form method="post" class="settings-form">
+                    <input type="hidden" name="mode" value="generate_model_answer">
+                    <input type="hidden" name="topic" value="{{ result_data.question }}">
+                    <input type="hidden" name="task_type" value="{{ target_task }}">
+                    <button class="ghost-btn small" type="submit">✨ 确认生成参考范文</button>
+                  </form>
+                </div>
+              </div>
+            </details>
+          {% elif result_data and mode == 'generate_model_answer' %}
+            <details class="result-accordion" open><summary>✨ 参考范文</summary><div class="result-body">{{ result | simple_md }}</div></details>
+          {% elif result_data and mode == 'task1' %}
+            <details class="result-accordion" open><summary>总分与整体评价</summary><div class="result-body"><p><strong>总分：</strong>{{ result_data.overall_score }}</p><p>{{ result_data.band_description }}</p></div></details>
+            {% for key, label in [('task_achievement','任务完成度'),('coherence_cohesion','连贯与衔接'),('lexical_resource','词汇资源'),('grammatical_range','语法多样性与准确性'),('grammatical_range_accuracy','语法多样性与准确性')] %}
+              {% if result_data[key] %}
+                <details class="result-accordion"><summary>{{ label }} · {{ result_data[key].score }}</summary><div class="result-body"><p>{{ result_data[key].comments or result_data[key].assessment or result_data[key].grammar_analysis }}</p></div></details>
+              {% endif %}
+            {% endfor %}
+            {% if result_data.strengths %}<details class="result-accordion"><summary>优点</summary><div class="result-body"><ul>{% for item in result_data.strengths %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.improvements %}<details class="result-accordion"><summary>改进建议</summary><div class="result-body"><ul>{% for item in result_data.improvements %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.suggested_corrections %}<details class="result-accordion"><summary>修改建议</summary><div class="result-body"><p>{{ result_data.suggested_corrections }}</p></div></details>{% endif %}
+            {% if result_data.model_answer %}<details class="result-accordion"><summary>参考范文</summary><div class="result-body">{{ result_data.model_answer | simple_md }}</div></details>{% endif %}
+          {% elif result_data and mode == 'task2' %}
+            <details class="result-accordion" open><summary>总分与整体评价</summary><div class="result-body"><p><strong>总分：</strong>{{ result_data.overall_score }}</p><p>{{ result_data.band_description }}</p></div></details>
+            {% for key, label in [('task_response','任务回应'),('coherence_cohesion','连贯与衔接'),('lexical_resource','词汇资源'),('grammatical_range','语法多样性与准确性'),('grammatical_range_accuracy','语法多样性与准确性')] %}
+              {% if result_data[key] %}
+                <details class="result-accordion">
+                  <summary>{{ label }} · {{ result_data[key].score }}</summary>
+                  <div class="result-body">
+                    <ul>
+                      {% for sub_key, value in result_data[key].items() %}
+                        {% if sub_key != 'score' %}<li><strong>{{ sub_key }}：</strong>{{ value | simple_md if value is string else value }}</li>{% endif %}
+                      {% endfor %}
+                    </ul>
+                  </div>
+                </details>
+              {% endif %}
+            {% endfor %}
+            {% if result_data.strengths %}<details class="result-accordion"><summary>优点</summary><div class="result-body"><ul>{% for item in result_data.strengths %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.improvements %}<details class="result-accordion"><summary>改进建议</summary><div class="result-body"><ul>{% for item in result_data.improvements %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.suggested_corrections %}<details class="result-accordion"><summary>修改建议</summary><div class="result-body"><p>{{ result_data.suggested_corrections | simple_md if result_data.suggested_corrections is string else result_data.suggested_corrections }}</p></div></details>{% endif %}
+            {% if result_data.corrected_essay %}<details class="result-accordion"><summary>修正后作文</summary><div class="result-body">{{ result_data.corrected_essay | simple_md }}</div></details>{% endif %}
+          {% else %}
+            {% if mode == 'ideas' and (ideas_topic or ideas_question) %}
+            <details class="result-accordion" open><summary>你的作文题目</summary><div class="result-body">
+              {% if ideas_topic %}<p><strong>题目：</strong>{{ ideas_topic }}</p>{% endif %}
+              {% if ideas_question %}<p><strong>你的问题：</strong>{{ ideas_question }}</p>{% endif %}
+            </div></details>
+            {% endif %}
+            <details class="result-accordion" open>
+              <summary>{{ '思路建议' if mode == 'ideas' else 'AI 输出' }}</summary>
+              <div class="result-body">{{ result | simple_md }}</div>
+            </details>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
+</body>
+</html>

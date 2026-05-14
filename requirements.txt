@@ -1,0 +1,10 @@
+streamlit
+flask
+pandas
+langchain
+langchain-community
+dashscope
+mysql-connector-python
+langchain-openai
+openai
+waitress

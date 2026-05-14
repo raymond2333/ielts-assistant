@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用户设置 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line">
+          <div class="brand-icon">信</div>
+          <div>
+            <strong>信达雅</strong>
+            <span>用户设置</span>
+          </div>
+        </div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Settings</p>
+          <h1>用户设置</h1>
+        </div>
+        <div class="user-menu">
+          <a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer" title="免登录打开稳定版">稳定版</a>
+          <form method="post" action="{{ url_for('update_active_ai_provider') }}" class="model-switcher">
+            <select name="provider" onchange="this.form.submit()" title="选择生成模型">
+              {% for key, provider in providers.items() %}
+                <option value="{{ key }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}{{ '' if provider_status[key] else '（未配置）' }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          <details class="user-dropdown">
+            <summary><span class="user-chip">用户中心 · {{ user_id }}</span></summary>
+            <div class="drop-menu" onclick="event.stopPropagation()">
+              <a href="{{ url_for('dashboard') }}">学习总览</a>
+              <a href="{{ url_for('settings_page') }}">用户设置</a>
+              <div class="drop-divider"></div>
+              <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section id="profile" class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Profile</p>
+            <h2>个人信息与学习目标</h2>
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('update_profile') }}" class="settings-form">
+          <div class="form-row">
+            <label>
+              <span>姓名</span>
+              <input name="full_name" value="{{ profile.full_name }}" placeholder="你的姓名">
+            </label>
+            <label>
+              <span>邮箱</span>
+              <input name="email" type="email" value="{{ profile.email }}" placeholder="name@example.com">
+            </label>
+          </div>
+
+          <div class="form-row four">
+            {% for key, label in [('listening_level','听力'),('speaking_level','口语'),('reading_level','阅读'),('writing_level','写作')] %}
+            <label>
+              <span>{{ label }}</span>
+              <select name="{{ key }}">
+                {% for score in score_options %}
+                  <option value="{{ score }}" {% if profile[key] == score %}selected{% endif %}>{{ '%.1f' | format(score) }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% endfor %}
+          </div>
+
+          <div class="form-row">
+            <label>
+              <span>目标总分</span>
+              <select name="target_score">
+                {% for score in target_options %}
+                  <option value="{{ score }}" {% if profile.target_score == score %}selected{% endif %}>{{ '%.1f' | format(score) }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>考试时间</span>
+              <input name="exam_date" type="date" value="{{ profile.exam_date }}">
+            </label>
+            <label>
+              <span>每周学习小时</span>
+              <input name="study_time" type="number" min="1" max="80" value="{{ profile.study_time }}">
+            </label>
+          </div>
+
+          <div class="check-row">
+            <span>重点弱项</span>
+            {% for area in ['听力','口语','阅读','写作'] %}
+              <label class="check-pill">
+                <input type="checkbox" name="weak_areas" value="{{ area }}" {% if area in profile.weak_areas %}checked{% endif %}>
+                {{ area }}
+              </label>
+            {% endfor %}
+          </div>
+
+          <label>
+            <span>学习目标</span>
+            <textarea name="learning_goal" rows="4" placeholder="例如：8周内写作从6.0提升到7.0，保持每天30分钟口语练习。">{{ profile.learning_goal }}</textarea>
+          </label>
+
+          <button class="primary-btn" type="submit">保存用户信息</button>
+        </form>
+      </section>
+
+      <section id="apis" class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Model Keys</p>
+            <h2>各模型 API 配置</h2>
+          </div>
+          <div class="provider-tags">
+            {% for key, provider in providers.items() %}
+              <span class="{{ 'ready' if provider_status[key] else '' }}">{{ provider.label }}</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        <form method="post" action="{{ url_for('update_ai_config') }}" class="settings-form">
+          <div class="form-row">
+            <label>
+              <span>模型供应商</span>
+              <select name="provider" id="providerSelect">
+                {% for key, provider in providers.items() %}
+                  <option value="{{ key }}" data-model="{{ provider.model }}" data-base="{{ provider.base_url }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>模型名称</span>
+              <input id="modelInput" name="model" value="{{ ai_config.model }}">
+            </label>
+          </div>
+          <div class="form-row">
+            <label>
+              <span>Base URL</span>
+              <input id="baseInput" name="base_url" value="{{ ai_config.base_url }}" placeholder="OpenAI官方可留空">
+            </label>
+            <label>
+              <span>API Key</span>
+              <input name="api_key" type="password" placeholder="保存后会绑定到当前用户">
+            </label>
+          </div>
+          <button class="primary-btn" type="submit">保存模型配置</button>
+        </form>
+      </section>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>
+    const providerSelect = document.getElementById('providerSelect');
+    const modelInput = document.getElementById('modelInput');
+    const baseInput = document.getElementById('baseInput');
+    providerSelect?.addEventListener('change', () => {
+      const selected = providerSelect.options[providerSelect.selectedIndex];
+      modelInput.value = selected.dataset.model || '';
+      baseInput.value = selected.dataset.base || '';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习助手 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-line">
+        <div class="brand-icon">信</div>
+        <div>
+          <strong>信达雅</strong>
+          <span>AI 学习助手</span>
+        </div>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}">用户中心</a>
+        <a href="{{ url_for('speaking') }}">口语练习</a>
+        <a href="{{ url_for('theme_linking') }}">口语串题</a>
+        <a href="{{ url_for('writing') }}">作文批改</a>
+        <a href="{{ url_for('analysis') }}">学习分析</a>
+        <a href="{{ url_for('assistant_center') }}">学习助手</a>
+        <a href="{{ url_for('vocabulary') }}">背单词</a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Assistant</p>
+          <h1>学习助手</h1>
+        </div>
+        <div class="db-pill">{{ providers[ai_config.provider].label if ai_config.provider in providers else ai_config.provider }} · {{ ai_config.model }}</div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Writing</p>
+            <h2>作文题目思路互动</h2>
+          </div>
+        </div>
+        <form method="post" class="settings-form">
+          <input type="hidden" name="mode" value="writing_ideas">
+          <label>
+            <span>作文题目</span>
+            <textarea name="topic" rows="4" placeholder="粘贴雅思作文题目，例如 Some people think..."></textarea>
+          </label>
+          <label>
+            <span>你想问 AI 的问题</span>
+            <input name="question" placeholder="例如：这个题目可以从哪些角度论证？有没有高分例子？">
+          </label>
+          <button class="primary-btn" type="submit">向 AI 提问</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Speaking</p>
+            <h2>口语 Part 2 题目生成</h2>
+          </div>
+        </div>
+        <form method="post" class="settings-form">
+          <input type="hidden" name="mode" value="speaking_part2">
+          <div class="form-row">
+            <label>
+              <span>话题类型</span>
+              <select name="speaking_topic">
+                {% for topic in ['人物描述','地点描述','事件经历','物品描述','活动经历','理想目标'] %}
+                  <option value="{{ topic }}">{{ topic }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>题目卡类型</span>
+              <select name="cue_type">
+                {% for cue in ['描述类','经历类','观点类','比较类'] %}
+                  <option value="{{ cue }}">{{ cue }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <button class="primary-btn" type="submit">生成口语题目</button>
+        </form>
+      </section>
+
+      {% if result %}
+      <section class="panel result-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Result</p>
+            <h2>AI 输出</h2>
+          </div>
+        </div>
+        <pre class="ai-output">{{ result }}</pre>
+      </section>
+      {% endif %}
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
+  <script src="{{ url_for('static', filename='voice_input.js') }}"></script>
+</body>
+</html>

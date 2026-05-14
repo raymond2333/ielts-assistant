@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>口语串题 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line"><div class="brand-icon">达</div><div><strong>信达雅</strong><span>口语串题</span></div></div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a><a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a><a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a><a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a><a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a><a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+      </nav>
+    </aside>
+    <main class="main-panel">
+      <header class="topbar"><div><p class="eyebrow">Theme Linking</p><h1>口语串题</h1></div><div class="user-menu"><a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer" title="免登录打开稳定版">稳定版</a><form method="post" action="{{ url_for('update_active_ai_provider') }}" class="model-switcher"><select name="provider" onchange="this.form.submit()" title="选择生成模型">{% for key, provider in providers.items() %}<option value="{{ key }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}{{ '' if provider_status[key] else '（未配置）' }}</option>{% endfor %}</select></form><details class="user-dropdown"><summary><span class="user-chip">用户中心 · {{ user_id }}</span></summary><div class="drop-menu" onclick="event.stopPropagation()"><a href="{{ url_for('dashboard') }}">学习总览</a><a href="{{ url_for('settings_page') }}">用户设置</a><div class="drop-divider"></div><form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form></div></details></div></header>
+      {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="flash-stack">{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+      <section class="panel">
+        <form method="post" class="settings-form">
+          <label><span>需要串联的话题（每行一个）</span><textarea name="topics" rows="6" placeholder="描述一个敬佩的人&#10;谈论一次旅行经历&#10;描述一个重要决定"></textarea></label>
+          <div class="form-row">
+            <label><span>核心主题</span><input name="main_theme" placeholder="例如：个人成长"></label>
+            <label><span>目标分数</span><select name="target_score">{% for score in [5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0] %}<option value="{{ score }}">{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
+          </div>
+          <button class="primary-btn" type="submit">生成串题方案</button>
+        </form>
+      </section>
+      {% if result_data and result_data.get('unifying_theme') %}
+      <section class="panel result-panel">
+        <h2>核心主题</h2>
+        <p><strong>🇨🇳</strong> {{ result_data.get('unifying_theme', '') }}</p>
+        {% if result_data.get('unifying_theme_en') %}<p><strong>🇬🇧</strong> {{ result_data.get('unifying_theme_en', '') }}</p>{% endif %}
+
+        {% if result_data.get('linked_responses') %}
+        <h2>话题串联方案</h2>
+        {% for item in result_data.linked_responses %}
+        <div class="theme-card">
+          <h3>{{ item.get('topic', '') }}</h3>
+          {% if item.get('topic_en') %}<p><em>{{ item.get('topic_en', '') }}</em></p>{% endif %}
+          <details>
+            <summary>查看中英文方案</summary>
+            <div class="result-body">
+              {% if item.get('adapted_response') %}<p><strong>🇨🇳 中文方案：</strong>{{ item.get('adapted_response', '') }}</p>{% endif %}
+              {% if item.get('adapted_response_en') %}<p><strong>🇬🇧 English Response：</strong>{{ item.get('adapted_response_en', '') }}</p>{% endif %}
+            </div>
+          </details>
+          {% if item.get('key_elements') %}
+          <p class="tag-row"><strong>关键元素：</strong>
+            {% for el in item.key_elements %}<span class="tag">{{ el }}</span>{% endfor %}
+          </p>
+          {% endif %}
+          {% if item.get('transition_phrases') %}
+          <p class="tag-row"><strong>过渡短语：</strong>
+            {% for ph in item.transition_phrases %}<span class="tag tag-accent">{{ ph }}</span>{% endfor %}
+          </p>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if result_data.get('versatile_vocabulary') or result_data.get('versatile_vocabulary_en') %}
+        <h2>通用词汇</h2>
+        <div class="two-col">
+          {% if result_data.get('versatile_vocabulary') %}<div><p class="eyebrow">🇨🇳</p>{% for v in result_data.versatile_vocabulary %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
+          {% if result_data.get('versatile_vocabulary_en') %}<div><p class="eyebrow">🇬🇧</p>{% for v in result_data.versatile_vocabulary_en %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if result_data.get('practice_strategy') %}
+        <h2>练习策略</h2>
+        <p>{{ result_data.get('practice_strategy', '') }}</p>
+        {% endif %}
+
+        {% if result_data.get('study_plan') %}
+        <h2>学习计划</h2>
+        <p>{{ result_data.get('study_plan', '') }}</p>
+        {% endif %}
+      </section>
+      {% elif result %}
+      <section class="panel result-panel">
+        <h2>AI 输出</h2>
+        <p class="empty-text">模型未返回标准格式，以下是原始输出：</p>
+        <pre class="ai-output">{{ result }}</pre>
+      </section>
+      {% endif %}
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
+</body>
+</html>

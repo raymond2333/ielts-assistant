@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习总览 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line">
+          <div class="brand-icon">信</div>
+          <div>
+            <strong>信达雅</strong>
+            <span>学习总览</span>
+          </div>
+        </div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Home</p>
+          <h1>学习总览</h1>
+        </div>
+        <div class="user-menu">
+          <a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer" title="免登录打开稳定版 ">稳定版 </a>
+          <form method="post" action="{{ url_for('update_active_ai_provider') }}" class="model-switcher">
+            <select name="provider" onchange="this.form.submit()" title="选择生成模型">
+              {% for key, provider in providers.items() %}
+                <option value="{{ key }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}{{ '' if provider_status[key] else '（未配置）' }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          <details class="user-dropdown">
+            <summary><span class="user-chip">用户中心 · {{ user_id }}</span></summary>
+            <div class="drop-menu" onclick="event.stopPropagation()">
+              <a href="{{ url_for('dashboard') }}">学习总览</a>
+              <a href="{{ url_for('settings_page') }}">用户设置</a>
+              <div class="drop-divider"></div>
+              <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="metric-grid">
+        <div class="metric-card">
+          <span>综合水平</span>
+          <strong>{{ '%.1f' | format(profile.current_level) }}</strong>
+        </div>
+        <div class="metric-card">
+          <span>目标分数</span>
+          <strong>{{ '%.1f' | format(profile.target_score) }}</strong>
+        </div>
+        <div class="metric-card">
+          <span>考试日期</span>
+          <strong>{{ profile.exam_date or '未设置' }}</strong>
+        </div>
+        <div class="metric-card">
+          <span>每周学习</span>
+          <strong>{{ profile.study_time }}h</strong>
+        </div>
+      </section>
+
+      <section class="feature-grid">
+        <a class="panel feature-card action-card" href="{{ url_for('speaking') }}">
+          <p class="eyebrow">Speaking</p>
+          <h2>口语练习</h2>
+          <p>Part 1、Part 2、Part 3 分开练习，生成题目和参考内容。</p>
+        </a>
+        <a class="panel feature-card action-card" href="{{ url_for('theme_linking') }}">
+          <p class="eyebrow">Theme Linking</p>
+          <h2>口语串题</h2>
+          <p>把多个 Part 2 话题串成统一故事，降低记忆负担。</p>
+        </a>
+        <a class="panel feature-card action-card" href="{{ url_for('writing') }}">
+          <p class="eyebrow">Writing</p>
+          <h2>作文批改</h2>
+          <p>小作文、大作文分开批改，也可以先向 AI 询问题目思路。</p>
+        </a>
+        <a class="panel feature-card action-card" href="{{ url_for('vocabulary') }}">
+          <p class="eyebrow">Vocabulary</p>
+          <h2>背单词</h2>
+          <p>复习内置雅思词库和训练过程中收藏的生词。</p>
+        </a>
+        <a class="panel feature-card action-card" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer">
+          <p class="eyebrow">Stable</p>
+          <h2>稳定版</h2>
+          <p>免登录自动同步账号，打开稳定版信达雅。</p>
+        </a>
+      </section>
+
+      <section class="panel" style="background:linear-gradient(135deg,#f0f4ff,#faf5ff);border:1px solid var(--accent)">
+        <div class="panel-heading"><div><p class="eyebrow">Features</p><h2>Beta 版新功能</h2></div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.9rem">
+          <span>✅ 写作题目导出 (.txt)</span>
+          <span>✅ 小作文参考图表生成</span>
+          <span>✅ AI 重点提升建议</span>
+          <span>✅ 录音保存与回放</span>
+          <span>✅ 学习记录日历筛选</span>
+          <span>✅ 一键回练历史题目</span>
+          <span>✅ 口语各部分说明指引</span>
+          <span>✅ 背单词、生词本与选词解释</span>
+        </div>
+        <p style="margin-top:10px;font-size:0.8rem;color:#6b7280">版本: Beta 2.0 · 支持多模型 API、词汇复习、选词解释、语音朗读、录音评分和学习记录回看。</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Band Scores</p>
+            <h2>四项水平</h2>
+          </div>
+        </div>
+        <div class="metric-grid">
+          <div class="metric-card compact"><span>听力</span><strong>{{ '%.1f' | format(profile.listening_level) }}</strong></div>
+          <div class="metric-card compact"><span>口语</span><strong>{{ '%.1f' | format(profile.speaking_level) }}</strong></div>
+          <div class="metric-card compact"><span>阅读</span><strong>{{ '%.1f' | format(profile.reading_level) }}</strong></div>
+          <div class="metric-card compact"><span>写作</span><strong>{{ '%.1f' | format(profile.writing_level) }}</strong></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Suggestions</p>
+            <h2>重点提升建议</h2>
+          </div>
+          {% if not suggestions %}
+          <form method="post" action="{{ url_for('generate_suggestions') }}" style="margin:0">
+            <button class="primary-btn" type="submit">生成提升建议</button>
+          </form>
+          {% endif %}
+        </div>
+        {% if suggestions %}
+          <p><strong>{{ suggestions.get('summary', '') }}</strong></p>
+          {% if suggestions.get('priority_areas') %}
+          <p class="tag-row">
+            {% for area in suggestions.priority_areas %}<span class="tag tag-accent">{{ area }}</span>{% endfor %}
+          </p>
+          {% endif %}
+          {% if suggestions.get('suggestions') %}
+          {% for s in suggestions.suggestions %}
+          <div class="theme-card">
+            <h3>{{ s.get('area', '') }}</h3>
+            <p class="record-meta"><strong>当前问题：</strong>{{ s.get('current_issue', '') }}</p>
+            <p class="record-meta"><strong>行动建议：</strong>{{ s.get('action', '') }}</p>
+            <p class="record-meta"><strong>每周目标：</strong>{{ s.get('weekly_goal', '') }}</p>
+            <p class="record-meta"><strong>预计提升：</strong>{{ s.get('estimated_improvement', '') }}</p>
+          </div>
+          {% endfor %}
+          {% endif %}
+          {% if suggestions.get('study_tips') %}
+          <p class="tag-row"><strong>学习技巧：</strong>
+            {% for tip in suggestions.study_tips %}<span class="tag">{{ tip }}</span>{% endfor %}
+          </p>
+          {% endif %}
+          {% if suggestions.get('motivation') %}
+          <p class="record-meta" style="color:var(--accent);font-weight:800;text-align:center;font-size:1.05rem">{{ suggestions.motivation }}</p>
+          {% endif %}
+          <form method="post" action="{{ url_for('generate_suggestions') }}" style="margin-top:12px">
+            <button class="ghost-btn" type="submit">重新生成</button>
+          </form>
+        {% else %}
+          <p class="empty-text">点击上方按钮，AI 会根据你的训练记录和弱项生成个性化提升建议。</p>
+        {% endif %}
+      </section>
+
+      <section id="history" class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Activity</p>
+            <h2>最近学习记录</h2>
+          </div>
+          <form method="get" style="display:flex;align-items:center;gap:6px">
+            <label style="font-size:0.85rem;white-space:nowrap">📅 日期筛选</label>
+            <input type="date" name="date" value="{{ date_filter }}" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem" onchange="this.form.submit()">
+            {% if date_filter %}<a href="?" style="font-size:0.8rem;color:var(--danger)">✕ 清除</a>{% endif %}
+          </form>
+        </div>
+        {% if progress %}
+          <div class="timeline">
+            {% for item in progress %}
+              <details class="timeline-item">
+                <summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp }}</span></summary>
+                <div class="result-body">
+                  <p class="record-meta"><strong>记录ID：</strong>{{ item.id }}</p>
+                  <a class="primary-btn small" href="{{ url_for('replay', id=item.id) }}" style="margin-bottom:10px;display:inline-block">🔄 重新练习此题</a>
+                  {% if item.data.mode %}<p class="record-meta"><strong>模式：</strong>{{ item.data.mode }}</p>{% endif %}
+                  {% if item.data.task_type %}<p class="record-meta"><strong>任务类型：</strong>{{ item.data.task_type }}</p>{% endif %}
+                  {% if item.data.topics %}
+                    <p class="record-meta"><strong>话题列表：</strong>
+                      {% for t in item.data.topics %}<span class="tag">{{ t }}</span>{% endfor %}
+                    </p>
+                  {% endif %}
+                  {% if item.data.topic %}<p class="record-meta"><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
+                  {% if item.data.question %}<p class="record-meta"><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
+                  {% if item.data.user_response %}<p class="record-meta"><strong>你的回答：</strong>{{ item.data.user_response[:200] }}{% if item.data.user_response|length > 200 %}...{% endif %}</p>{% endif %}
+                  {% if item.data.essay_content %}<p class="record-meta"><strong>作文内容（前300字）：</strong>{{ item.data.essay_content[:300] }}{% if item.data.essay_content|length > 300 %}...{% endif %}</p>{% endif %}
+                  {% if item.data.chinese_answer %}<p class="record-meta"><strong>中文思路：</strong>{{ item.data.chinese_answer }}</p>{% endif %}
+                  {% if item.data.keywords %}<p class="record-meta"><strong>关键词：</strong>{{ item.data.keywords }}</p>{% endif %}
+                  {% if item.data.score %}<p class="record-meta"><strong>得分：</strong>{{ item.data.score }}</p>{% endif %}
+                  {% if item.score %}<p class="record-meta"><strong>得分：</strong>{{ '%.1f'|format(item.score) }}</p>{% endif %}
+                  {% if item.data.word_count %}<p class="record-meta"><strong>字数：</strong>{{ item.data.word_count }}</p>{% endif %}
+                  {% if item.data.audio_file %}
+                    <p class="record-meta"><strong>录音：</strong>
+                      <audio controls preload="none" style="width:100%;max-width:320px">
+                        <source src="/{{ item.data.audio_file }}" type="{{ 'audio/webm' if item.data.audio_file.endswith('.webm') else 'audio/mp4' }}">
+                      </audio>
+                      <button class="ghost-btn small del-recording-btn" data-timestamp="{{ item.timestamp }}" style="margin-left:8px;color:var(--danger)">删除录音</button>
+                    </p>
+                  {% endif %}
+                  {% if item.data.transcript %}<p class="record-meta"><strong>转写内容：</strong>{{ item.data.transcript[:300] }}</p>{% endif %}
+                  {% if item.data.feedback %}<p class="record-meta"><strong>反馈：</strong>{{ item.data.feedback }}</p>{% endif %}
+                  {% if item.data.result_data %}
+                    <details class="result-accordion">
+                      <summary>{{ item.activity | record_title }}</summary>
+                      <div class="result-body">{{ item.data.result_data | record_result(item.activity) }}</div>
+                    </details>
+                  {% elif item.data.result %}
+                    <details class="result-accordion">
+                      <summary>{{ item.activity | record_title }}</summary>
+                      <div class="result-body">{{ item.data.result | simple_md }}</div>
+                    </details>
+                  {% endif %}
+                </div>
+              </details>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-text">暂无学习记录。完成口语反馈、作文批改或保存学习计划后会显示在这里。</p>
+        {% endif %}
+      </section>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

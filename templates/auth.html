@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>信达雅 · 登录</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <section class="auth-copy">
+      <div class="brand-mark">信</div>
+      <h1>信达雅 <span style="font-size:0.6em;color:var(--accent);font-weight:800">Beta 版</span></h1>
+      <p>集中管理学习目标、考试时间、四项分数和各模型 API。登录后进入你的个人学习中心。</p>
+      <p style="margin-top:16px"><a href="{{ streamlit_url }}" style="color:var(--accent);font-weight:700;text-decoration:underline">进入稳定版 &rarr;</a></p>
+    </section>
+
+    <section class="auth-card">
+      <div class="tabs">
+        <a class="{{ 'active' if mode != 'register' else '' }}" href="{{ url_for('auth') }}">登录</a>
+        <a class="{{ 'active' if mode == 'register' else '' }}" href="{{ url_for('auth', mode='register') }}">注册</a>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <form method="post" class="form-grid">
+        <input type="hidden" name="mode" value="{{ 'register' if mode == 'register' else 'login' }}">
+        <label>
+          <span>用户ID</span>
+          <input name="user_id" placeholder="例如 raymond" autocomplete="username" required>
+        </label>
+        <label>
+          <span>密码</span>
+          <input name="password" type="password" autocomplete="{{ 'new-password' if mode == 'register' else 'current-password' }}" required>
+        </label>
+        {% if mode == 'register' %}
+        <label>
+          <span>确认密码</span>
+          <input name="confirm_password" type="password" autocomplete="new-password" required>
+        </label>
+        {% endif %}
+        <button class="primary-btn" type="submit">{{ '注册并进入用户中心' if mode == 'register' else '登录用户中心' }}</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
