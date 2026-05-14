@@ -8,3 +8,4 @@ data/charts/*.png
 .DS_Store
 *.doc
 *.pptx
+.gitignore
