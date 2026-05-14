@@ -7,4 +7,6 @@ dashscope
 mysql-connector-python
 langchain-openai
 openai
+markupsafe
+matplotlib
 waitress
