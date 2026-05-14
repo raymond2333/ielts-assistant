@@ -145,6 +145,23 @@ bash start.sh
 - Beta 版：`http://localhost:8600`
 - 稳定版：`http://localhost:8501`
 
+服务器部署时，如果通过域名访问，推荐显式配置公网 URL，避免跳转到内网地址：
+
+```bash
+export NEW_FLASK_URL=https://your-domain.com
+export LEGACY_STREAMLIT_URL=https://stable.your-domain.com
+```
+
+如果两个版本直接暴露在不同端口，也可以这样配置：
+
+```bash
+export SERVER_DOMAIN=your-domain.com
+export WEB_PORT=8600
+export STREAMLIT_PORT=8501
+```
+
+不要把 `SERVER_DOMAIN` 设置为 `10.x.x.x`、`172.16.x.x`、`192.168.x.x` 等内网地址。若不设置公网 URL，应用会尽量根据浏览器当前访问的域名自动推导跨版本入口。
+
 > Ctrl+C 可同时关闭两个服务。Beta 版使用 waitress 生产级 WSGI 服务器运行，无开发服务器警告。
 
 **自定义 MySQL 端口**：如果 MySQL 不在默认的 3306 端口，用 `-p` 参数指定端口即可：

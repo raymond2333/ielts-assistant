@@ -9,6 +9,7 @@ import hashlib
 import random
 import uuid
 from urllib.parse import urlsplit, urlunsplit
+import ipaddress
 from agents import TongyiIELTSAssistant
 from utils import (
     authenticate_user,
@@ -118,13 +119,28 @@ def _streamlit_request_base_url() -> str:
     return ""
 
 
+def _is_private_host(hostname: str) -> bool:
+    try:
+        ip = ipaddress.ip_address((hostname or "").strip("[]"))
+        return ip.is_private or ip.is_loopback or ip.is_link_local
+    except ValueError:
+        return False
+
+
+def _should_ignore_private_env_host(env_url: str) -> bool:
+    env_host = urlsplit(_normalize_base_url(env_url)).hostname or ""
+    current = _streamlit_request_base_url()
+    current_host = urlsplit(current).hostname if current else ""
+    return _is_private_host(env_host) and current_host and not _is_private_host(current_host)
+
+
 def _flask_base_url():
     explicit = _normalize_base_url(os.getenv("NEW_FLASK_URL", ""))
-    if explicit:
+    if explicit and not _should_ignore_private_env_host(explicit):
         return explicit
     domain = _normalize_base_url(os.getenv("SERVER_DOMAIN", ""))
     flask_port = os.getenv("WEB_PORT", "8600")
-    if domain:
+    if domain and not _should_ignore_private_env_host(domain):
         return _replace_url_port(domain, flask_port)
     current = _streamlit_request_base_url()
     if current:

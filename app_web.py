@@ -6,6 +6,7 @@ import random
 import uuid
 from functools import wraps
 from urllib.parse import urlsplit, urlunsplit
+import ipaddress
 
 from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from markupsafe import Markup, escape
@@ -406,6 +407,20 @@ def _request_base_url():
     return f"{scheme}://{host}".rstrip("/")
 
 
+def _is_private_host(hostname):
+    try:
+        ip = ipaddress.ip_address((hostname or "").strip("[]"))
+        return ip.is_private or ip.is_loopback or ip.is_link_local
+    except ValueError:
+        return False
+
+
+def _should_ignore_private_env_host(env_url):
+    env_host = urlsplit(_normalize_base_url(env_url)).hostname or ""
+    request_host = urlsplit(_request_base_url()).hostname or ""
+    return _is_private_host(env_host) and request_host and not _is_private_host(request_host)
+
+
 def _replace_url_port(base_url, port):
     parts = urlsplit(_normalize_base_url(base_url))
     hostname = parts.hostname or parts.netloc
@@ -426,11 +441,11 @@ def _replace_url_port(base_url, port):
 
 def _legacy_streamlit_base_url():
     explicit = _normalize_base_url(os.getenv("LEGACY_STREAMLIT_URL", ""))
-    if explicit:
+    if explicit and not _should_ignore_private_env_host(explicit):
         return explicit
     domain = _normalize_base_url(os.getenv("SERVER_DOMAIN", ""))
     streamlit_port = os.getenv("STREAMLIT_PORT", "8501")
-    if domain:
+    if domain and not _should_ignore_private_env_host(domain):
         return _replace_url_port(domain, streamlit_port)
     return _replace_url_port(_request_base_url(), streamlit_port)
 
