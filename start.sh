@@ -4,6 +4,21 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
 
+# 解析命令行参数
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--mysql-port)
+      export MYSQL_PORT="$2"
+      shift 2
+      ;;
+    *)
+      echo "用法: bash start.sh [-p|--mysql-port <端口号>]"
+      echo "示例: bash start.sh -p 13306"
+      exit 1
+      ;;
+  esac
+done
+
 export FLASK_SECRET_KEY="${FLASK_SECRET_KEY:-ielts-shared-secret-key-2024}"
 export WEB_PORT="${WEB_PORT:-8600}"
 export STREAMLIT_PORT="${STREAMLIT_PORT:-8501}"

@@ -144,8 +144,24 @@ bash start.sh
 - Beta 版：`http://localhost:8600`
 - 稳定版：`http://localhost:8501`
 
-> Ctrl+C 可同时关闭两个服务。MySQL 端口等环境变量可在 `start.sh` 顶部按需调整。
-> Beta 版使用 waitress 生产级 WSGI 服务器运行，无开发服务器警告。
+> Ctrl+C 可同时关闭两个服务。Beta 版使用 waitress 生产级 WSGI 服务器运行，无开发服务器警告。
+
+**自定义 MySQL 端口**：如果 MySQL 不在默认的 3306 端口，用 `-p` 参数指定端口即可：
+
+```bash
+bash start.sh -p 13306
+```
+
+> **注意**：如果使用 `nohup` 后台运行，同样支持参数：
+> ```bash
+> nohup bash start.sh -p 13306 > output.log 2>&1 &
+> ```
+
+其他环境变量（如数据库地址、密码等）也可通过前缀覆盖，例如：
+
+```bash
+MYSQL_HOST=192.168.1.100 MYSQL_PASSWORD=myPass bash start.sh -p 13306
+```
 
 ### 单独启动 Beta 版
 
@@ -154,13 +170,19 @@ bash start.sh
 ```bash
 MYSQL_ENABLED=true \
 MYSQL_HOST=127.0.0.1 \
-MYSQL_PORT=3307 \
+MYSQL_PORT=3306 \
 MYSQL_USER=ielts \
 MYSQL_PASSWORD=ielts \
 MYSQL_DATABASE=ielts_learning \
 WEB_PORT=8600 \
 FLASK_SECRET_KEY=your-secret-key \
 python3 app_web.py
+```
+
+如果 MySQL 在其他端口（如 13306），修改 `MYSQL_PORT` 即可：
+
+```bash
+MYSQL_PORT=13306 python3 app_web.py
 ```
 
 访问：
