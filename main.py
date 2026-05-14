@@ -9,6 +9,7 @@ import hmac
 import hashlib
 import random
 import uuid
+from urllib.parse import urlsplit, urlunsplit
 from agents import TongyiIELTSAssistant
 from utils import (
     authenticate_user,
@@ -71,9 +72,65 @@ def _cross_login_token(user_id):
     return cross_login_token(user_id)
 
 
+def _normalize_base_url(value: str) -> str:
+    value = (value or "").strip().rstrip("/")
+    if not value:
+        return ""
+    if value.startswith(("http://", "https://")):
+        return value
+    return f"http://{value}"
+
+
+def _replace_url_port(base_url: str, port: str) -> str:
+    parts = urlsplit(_normalize_base_url(base_url))
+    hostname = parts.hostname or parts.netloc
+    if not hostname:
+        return ""
+    netloc = hostname
+    if ":" in hostname and not hostname.startswith("["):
+        netloc = f"[{hostname}]"
+    if parts.username:
+        userinfo = parts.username
+        if parts.password:
+            userinfo += f":{parts.password}"
+        netloc = f"{userinfo}@{netloc}"
+    if port:
+        netloc = f"{netloc}:{port}"
+    return urlunsplit((parts.scheme or "http", netloc, "", "", "")).rstrip("/")
+
+
+def _streamlit_request_base_url() -> str:
+    context = getattr(st, "context", None)
+    if context is not None:
+        url = getattr(context, "url", "") or ""
+        if url:
+            parts = urlsplit(url)
+            if parts.scheme and parts.netloc:
+                return urlunsplit((parts.scheme, parts.netloc, "", "", "")).rstrip("/")
+        headers = getattr(context, "headers", None)
+        if headers:
+            try:
+                host = headers.get("X-Forwarded-Host") or headers.get("Host") or headers.get("host")
+                proto = headers.get("X-Forwarded-Proto") or "http"
+                if host:
+                    return f"{str(proto).split(',')[0].strip()}://{str(host).split(',')[0].strip()}".rstrip("/")
+            except Exception:
+                pass
+    return ""
+
+
 def _flask_base_url():
-    _domain = os.getenv("SERVER_DOMAIN", "127.0.0.1")
-    return os.getenv("NEW_FLASK_URL", f"http://{_domain}:8600")
+    explicit = _normalize_base_url(os.getenv("NEW_FLASK_URL", ""))
+    if explicit:
+        return explicit
+    domain = _normalize_base_url(os.getenv("SERVER_DOMAIN", ""))
+    flask_port = os.getenv("WEB_PORT", "8600")
+    if domain:
+        return _replace_url_port(domain, flask_port)
+    current = _streamlit_request_base_url()
+    if current:
+        return _replace_url_port(current, flask_port)
+    return f"http://127.0.0.1:{flask_port}"
 
 
 def _verify_cross_token(user_id, token):

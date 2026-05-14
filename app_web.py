@@ -5,6 +5,7 @@ import os
 import random
 import uuid
 from functools import wraps
+from urllib.parse import urlsplit, urlunsplit
 
 from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from markupsafe import Markup, escape
@@ -389,6 +390,51 @@ def provider_status_for(ai_config):
     return {key: bool(api_keys.get(key)) for key in AI_PROVIDERS}
 
 
+def _normalize_base_url(value):
+    value = (value or "").strip().rstrip("/")
+    if not value:
+        return ""
+    if value.startswith(("http://", "https://")):
+        return value
+    return f"http://{value}"
+
+
+def _request_base_url():
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+    scheme = forwarded_proto or request.scheme or "http"
+    host = request.headers.get("X-Forwarded-Host", "").split(",")[0].strip() or request.host
+    return f"{scheme}://{host}".rstrip("/")
+
+
+def _replace_url_port(base_url, port):
+    parts = urlsplit(_normalize_base_url(base_url))
+    hostname = parts.hostname or parts.netloc
+    if not hostname:
+        return ""
+    netloc = hostname
+    if ":" in hostname and not hostname.startswith("["):
+        netloc = f"[{hostname}]"
+    if parts.username:
+        userinfo = parts.username
+        if parts.password:
+            userinfo += f":{parts.password}"
+        netloc = f"{userinfo}@{netloc}"
+    if port:
+        netloc = f"{netloc}:{port}"
+    return urlunsplit((parts.scheme or "http", netloc, "", "", "")).rstrip("/")
+
+
+def _legacy_streamlit_base_url():
+    explicit = _normalize_base_url(os.getenv("LEGACY_STREAMLIT_URL", ""))
+    if explicit:
+        return explicit
+    domain = _normalize_base_url(os.getenv("SERVER_DOMAIN", ""))
+    streamlit_port = os.getenv("STREAMLIT_PORT", "8501")
+    if domain:
+        return _replace_url_port(domain, streamlit_port)
+    return _replace_url_port(_request_base_url(), streamlit_port)
+
+
 
 
 
@@ -397,8 +443,7 @@ def common_context():
     profile = load_user_profile(user_id) or default_profile(user_id)
     ai_config = load_user_ai_config(user_id)
     x_token = _cross_login_token(user_id)
-    _domain = os.getenv("SERVER_DOMAIN", "127.0.0.1")
-    _legacy_url = os.getenv("LEGACY_STREAMLIT_URL", f"http://{_domain}:8501")
+    _legacy_url = _legacy_streamlit_base_url()
     return {
         "user_id": user_id,
         "profile": profile,
@@ -506,7 +551,7 @@ def auth():
         flash("用户不存在或密码不正确。", "error")
         return redirect(url_for("auth"))
 
-    return render_template("auth.html", mode=request.args.get("mode", "login"), streamlit_url=os.getenv("LEGACY_STREAMLIT_URL", f"http://{os.getenv('SERVER_DOMAIN', '127.0.0.1')}:8501"))
+    return render_template("auth.html", mode=request.args.get("mode", "login"), streamlit_url=_legacy_streamlit_base_url())
 
 
 @app.route("/dashboard")

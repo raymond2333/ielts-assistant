@@ -36,22 +36,28 @@ done
 export FLASK_SECRET_KEY="${FLASK_SECRET_KEY:-ielts-shared-secret-key-2024}"
 export WEB_PORT="${WEB_PORT:-8600}"
 export STREAMLIT_PORT="${STREAMLIT_PORT:-8501}"
-export SERVER_DOMAIN="${SERVER_DOMAIN:-127.0.0.1}"
+if [ -z "${SERVER_DOMAIN:-}" ]; then
+  DETECTED_HOST="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  if [ -z "${DETECTED_HOST}" ]; then
+    DETECTED_HOST="$(hostname 2>/dev/null || true)"
+  fi
+  export SERVER_DOMAIN="${DETECTED_HOST:-127.0.0.1}"
+fi
 export MYSQL_ENABLED="${MYSQL_ENABLED:-true}"
 export MYSQL_HOST="${MYSQL_HOST:-127.0.0.1}"
 export MYSQL_PORT="${MYSQL_PORT:-3306}"
 export MYSQL_USER="${MYSQL_USER:-ielts}"
 export MYSQL_PASSWORD="${MYSQL_PASSWORD:-ielts}"
 export MYSQL_DATABASE="${MYSQL_DATABASE:-ielts_learning}"
-export LEGACY_STREAMLIT_URL="http://${SERVER_DOMAIN}:${STREAMLIT_PORT}"
-export NEW_FLASK_URL="http://${SERVER_DOMAIN}:${WEB_PORT}"
+export LEGACY_STREAMLIT_URL="${LEGACY_STREAMLIT_URL:-http://${SERVER_DOMAIN}:${STREAMLIT_PORT}}"
+export NEW_FLASK_URL="${NEW_FLASK_URL:-http://${SERVER_DOMAIN}:${WEB_PORT}}"
 
 echo ""
 echo "╔════════════════════════════════════════╗"
 echo "║        信达雅 IELTS 学习平台          ║"
 echo "╠════════════════════════════════════════╣"
-echo "║  Beta 版  → http://${SERVER_DOMAIN}:${WEB_PORT}   ║"
-echo "║  稳定版  → http://${SERVER_DOMAIN}:${STREAMLIT_PORT}  ║"
+echo "║  Beta 版  → ${NEW_FLASK_URL}"
+echo "║  稳定版  → ${LEGACY_STREAMLIT_URL}"
 echo "║  跨版本免登录已启用                    ║"
 echo "╚════════════════════════════════════════╝"
 echo ""
