@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import json
 import pandas as pd
 from datetime import datetime
@@ -216,35 +215,6 @@ def _provider_from_label(label: str) -> str:
     return "tongyi"
 
 
-def _speak_button(text: str, key: str, label: str = "🔊 朗读"):
-    if not text:
-        return
-    safe_text = json.dumps(str(text), ensure_ascii=False)
-    components.html(
-        f"""
-        <button id="{key}" style="border:1px solid #d9e2de;border-radius:999px;padding:6px 12px;background:white;cursor:pointer;font-weight:700;">{label}</button>
-        <script>
-        document.getElementById("{key}").onclick = () => {{
-          const text = {safe_text}.replace(/\\s+/g, " ").trim();
-          if (!window.speechSynthesis) return;
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.lang = "en-US";
-          utterance.rate = 0.78;
-          utterance.pitch = 1;
-          utterance.volume = 1;
-          const voices = speechSynthesis.getVoices();
-          const preferred = voices.find(v => /Microsoft Jenny|Microsoft Aria|Google US|Samantha|Alex|Daniel|Karen|Tingting/i.test(v.name)) ||
-            voices.find(v => /^en[-_](US|GB|AU)/i.test(v.lang));
-          if (preferred) utterance.voice = preferred;
-          setTimeout(() => speechSynthesis.speak(utterance), 80);
-        }};
-        </script>
-        """,
-        height=42,
-    )
-
-
 # 页面设置
 st.set_page_config(
     page_title="信达雅",
@@ -332,7 +302,6 @@ def _render_speaking_part1():
 
             for i, q in enumerate(question_data["questions"]):
                 with st.expander(f"问题 {i + 1}: {q.get('question', '')}"):
-                    _speak_button(q.get("question", ""), f"part1_question_speak_{i}", "🔊 朗读题目")
                     if "keywords" in q:
                         with st.expander("🔑 关键词提示"):
                             st.write(", ".join(q["keywords"]))
@@ -343,7 +312,6 @@ def _render_speaking_part1():
 
                     if "model_answer" in q:
                         with st.expander("📖 参考答案"):
-                            _speak_button(q["model_answer"], f"part1_answer_speak_{i}", "🔊 朗读参考答案")
                             st.write(q["model_answer"])
 
                     # 用户回答区域
@@ -657,7 +625,6 @@ def _render_speaking_part2():
                 with st.expander("🌟 高分参考答案"):
                     model = question_data["model_answer"]
                     if isinstance(model, str):
-                        _speak_button(model, f"part2_answer_speak_{abs(hash(model))}", "🔊 朗读参考答案")
                         st.write(model)
                     else:
                         answer_parts = []
@@ -679,9 +646,6 @@ def _render_speaking_part2():
                             st.write("**结尾:**")
                             st.write(model["conclusion"])
                             answer_parts.append(str(model["conclusion"]))
-                        if answer_parts:
-                            _speak_button(" ".join(answer_parts), f"part2_answer_speak_{abs(hash(' '.join(answer_parts)))}", "🔊 朗读参考答案")
-
 
 # 口语Part 3界面函数
 def _render_speaking_part3():
@@ -779,14 +743,12 @@ def _render_speaking_part3():
 
             for i, q in enumerate(question_data["discussion_questions"]):
                 with st.expander(f"讨论题 {i + 1}: {q.get('question', '')}"):
-                    _speak_button(q.get("question", ""), f"part3_question_speak_{i}", "🔊 朗读题目")
                     if "purpose" in q:
                         st.write(f"**考察目的:** {q['purpose']}")
 
                     # 添加参考答案按钮
                     if "model_response" in q:
                         with st.expander("🌟 高分参考答案"):
-                            _speak_button(q["model_response"], f"part3_answer_speak_{i}", "🔊 朗读参考答案")
                             st.write(q["model_response"])
 
                     if "depth_required" in q:
@@ -1293,7 +1255,6 @@ def _display_record_result_data(result_data):
                 continue
             with st.expander(f"Part 1 题目 {i}", expanded=i == 1):
                 st.markdown(f"**题目：** {item.get('question', '')}")
-                _speak_button(item.get("question", ""), f"record_part1_q_{i}_{abs(hash(item.get('question', '')))}", "🔊 朗读题目")
                 if item.get("keywords"):
                     st.markdown("**关键词：**")
                     for word in item["keywords"]:
@@ -1304,7 +1265,6 @@ def _display_record_result_data(result_data):
                         st.markdown(f"- {tip}")
                 if item.get("model_answer"):
                     with st.expander("参考答案"):
-                        _speak_button(item["model_answer"], f"record_part1_a_{i}_{abs(hash(item.get('question', '')))}", "🔊 朗读参考答案")
                         st.write(item["model_answer"])
 
     if isinstance(result_data.get("discussion_questions"), list):
@@ -1313,14 +1273,12 @@ def _display_record_result_data(result_data):
                 continue
             with st.expander(f"Part 3 题目 {i}", expanded=i == 1):
                 st.markdown(f"**题目：** {item.get('question', '')}")
-                _speak_button(item.get("question", ""), f"record_part3_q_{i}_{abs(hash(item.get('question', '')))}", "🔊 朗读题目")
                 if item.get("purpose"):
                     st.markdown(f"**考察点：** {item['purpose']}")
                 if item.get("depth_required"):
                     st.markdown(f"**回答深度：** {item['depth_required']}")
                 if item.get("model_response"):
                     with st.expander("参考回答"):
-                        _speak_button(item["model_response"], f"record_part3_a_{i}_{abs(hash(item.get('question', '')))}", "🔊 朗读参考答案")
                         st.write(item["model_response"])
 
     model_answer = result_data.get("model_answer")
@@ -1349,11 +1307,8 @@ def _display_record_result_data(result_data):
                     answer_text.extend(str(item) for item in value)
                 elif value:
                     answer_text.append(str(value))
-            if answer_text:
-                _speak_button(" ".join(answer_text), f"record_part2_answer_{abs(hash(' '.join(answer_text)))}", "🔊 朗读参考答案")
     elif isinstance(model_answer, str) and model_answer.strip():
         with st.expander("参考答案"):
-            _speak_button(model_answer, f"record_model_answer_{abs(hash(model_answer))}", "🔊 朗读参考答案")
             st.write(model_answer)
 
     for key, label in {
@@ -1392,7 +1347,6 @@ def _display_record_result_data(result_data):
         if value:
             with st.expander(label):
                 if key == "full_answer":
-                    _speak_button(value, f"record_full_answer_{abs(hash(value))}", "🔊 朗读答案")
                     st.write(value)
                 elif key == "formatted_text":
                     cleaned = str(value).replace("无法解析为JSON格式的响应:\n\n", "")
@@ -1793,114 +1747,6 @@ if not st.session_state.authenticated:
         _render_login_page()
         st.stop()
 
-# 语音输入组件
-st.markdown("""
-<style>
-.voice-btn-st { display:inline-block; cursor:pointer; font-size:20px; user-select:none; margin:0 4px; padding:4px 8px; border-radius:6px; border:1px solid #ddd; background:#f9fafb; vertical-align:middle; }
-.voice-btn-st:hover { background:#e5e7eb; }
-.voice-btn-st.recording { background:#fee2e2; border-color:#dc2626; animation:stPulse 0.6s infinite; }
-@keyframes stPulse { 0%,100% { box-shadow:0 0 0 0 rgba(220,38,38,.4); } 50% { box-shadow:0 0 0 6px rgba(220,38,38,0); } }
-</style>
-""", unsafe_allow_html=True)
-
-st.components.v1.html("""
-<script>
-(function(){
-  if(window.__voiceInit) return; window.__voiceInit=1;
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var hasRecorder = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  var rec = null, chunks = [], targetTA = null, recordBtn = null;
-
-  function makeBtn(icon, title, cls) {
-    var b = document.createElement('span');
-    b.textContent = icon;
-    b.title = title;
-    b.className = 'voice-btn-st' + (cls||'');
-    return b;
-  }
-
-  function attach() {
-    document.querySelectorAll('textarea:not([data-voice-st])').forEach(function(ta){
-      ta.dataset.voiceSt = '1';
-      ta.style.paddingRight = '90px';
-      var wrap = document.createElement('div');
-      wrap.style.cssText = 'position:relative;display:inline-block;width:100%';
-      ta.parentNode.insertBefore(wrap, ta);
-      wrap.appendChild(ta);
-
-      // Speech button
-      if (SR) {
-        var spBtn = makeBtn('🎤', '语音转文字（说英语）');
-        spBtn.onclick = function(e){ e.preventDefault(); toggleSpeech(ta, spBtn); };
-        wrap.appendChild(spBtn);
-      }
-
-      // Record button
-      if (hasRecorder) {
-        var recBtn = makeBtn('🎙️', '录音并上传评分');
-        recBtn.onclick = function(e){ e.preventDefault(); toggleRecord(ta, recBtn); };
-        wrap.appendChild(recBtn);
-      }
-    });
-  }
-
-  function toggleSpeech(ta, btn) {
-    if (btn.dataset.active === '1') {
-      btn.recognition.abort();
-      return;
-    }
-    var r = new SR();
-    r.lang = 'en-US'; r.interimResults = false; r.continuous = false;
-    btn.dataset.active = '1'; btn.textContent = '🔴'; btn.style.color = '#dc2626';
-    r.onresult = function(e){ ta.value = (ta.value + ' ' + e.results[0][0].transcript).trim(); ta.dispatchEvent(new Event('input',{bubbles:true})); };
-    r.onerror = r.onend = function(){ btn.dataset.active = '0'; btn.textContent = '🎤'; btn.style.color = ''; };
-    r.start();
-    btn.recognition = r;
-  }
-
-  function toggleRecord(ta, btn) {
-    if (btn.dataset.active === '1') {
-      if (rec && rec.state === 'recording') rec.stop();
-      return;
-    }
-    targetTA = ta; recordBtn = btn;
-    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      chunks = [];
-      rec = new MediaRecorder(stream, {mimeType: MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/mp4'});
-      rec.ondataavailable = function(e){ if(e.data.size>0) chunks.push(e.data); };
-      rec.onstop = function(){
-        stream.getTracks().forEach(function(t){t.stop();});
-        var blob = new Blob(chunks, {type:rec.mimeType});
-        var reader = new FileReader();
-        reader.onload = function(){
-          // Send to parent Streamlit via fetch to Flask API, then put transcript in textarea
-          var fd = new FormData();
-          fd.append('audio', blob, 'rec.'+(blob.type.includes('webm')?'webm':'m4a'));
-          fd.append('user_response', ta.value);
-          fd.append('save_recording', '1');
-          fd.append('question', ta.placeholder || '口语练习');
-          fetch('/api/speech-score', {method:'POST', body:fd, credentials:'include'})
-            .then(function(r){return r.json();})
-            .then(function(d){
-              btn.dataset.active = '0'; btn.textContent = '🎙️'; btn.style.color = '';
-              if(d.transcript) { ta.value = (ta.value + ' ' + d.transcript).trim(); ta.dispatchEvent(new Event('input',{bubbles:true})); }
-              if(d.score_box) { alert(d.score_box.replace(/<[^>]*>/g,'')); }
-            })
-            .catch(function(){ btn.dataset.active = '0'; btn.textContent = '🎙️'; btn.style.color = ''; });
-        };
-        reader.readAsDataURL(blob);
-      };
-      rec.start();
-      btn.dataset.active = '1'; btn.textContent = '⏺️'; btn.style.color = '#dc2626';
-    }).catch(function(){ alert('无法访问麦克风，请检查浏览器权限。'); });
-  }
-
-  setInterval(attach, 800);
-  attach();
-})();
-</script>
-""", height=0)
-
 # 侧边栏设置
 with st.sidebar:
     st.title("🔧 设置")
@@ -2111,14 +1957,13 @@ with st.sidebar:
 - 🔗 口语串题训练
 - 📝 作文批改（Task 1 + Task 2）
 - 📊 学习分析与练习历史
-- 🎤 语音转文字 + 录音评分
 - 📅 学习记录日历筛选与回练
 - 🔑 多 AI 供应商支持（通义/DeepSeek/自定义）
 - 🔐 跨版本免登录
         """.strip())
 
     st.markdown("---")
-    st.caption("👆 Beta 版额外支持：写作题目导出、参考图表、学习建议 AI 生成")
+    st.caption("👆 Beta 版额外支持：语音朗读、语音输入/录音评分、写作题目图表、学习建议 AI 生成")
     st.caption("版本: 2.0 · Beta: 2.0")
 
 # 主界面
@@ -2530,16 +2375,6 @@ if st.session_state.active_tab.startswith("📊"):
                         st.caption(f"题目/话题：{data['topic']}")
                     if data.get("question"):
                         st.caption(f"练习题：{data['question']}")
-                    if data.get("audio_file"):
-                        st.caption("录音：")
-                        audio_path = os.path.join(os.path.dirname(__file__), data["audio_file"])
-                        if os.path.exists(audio_path):
-                            st.audio(audio_path)
-                        else:
-                            st.audio(f"{flask_url}/{data['audio_file']}")
-                    if data.get("transcript"):
-                        st.caption("转写内容：")
-                        st.text(data["transcript"][:500])
                     if data.get("feedback"):
                         st.caption(f"反馈：{data['feedback']}")
                     if data.get("user_response"):
