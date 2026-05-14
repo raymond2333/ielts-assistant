@@ -1206,6 +1206,6 @@ def logout():
 
 if __name__ == "__main__":
     port = int(os.getenv("WEB_PORT", "8600"))
-    print(f" * 信达雅启动于 http://127.0.0.1:{port}")
+    print(f" * 信达雅启动于 http://0.0.0.0:{port}")
     from waitress import serve
-    serve(app, host="127.0.0.1", port=port)
+    serve(app, host="0.0.0.0", port=port)
