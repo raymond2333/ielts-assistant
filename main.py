@@ -2602,7 +2602,7 @@ if st.session_state.active_tab.startswith("📊"):
                         st.text(data["user_response"][:500])
                     if data.get("essay_content"):
                         st.caption("作文内容：")
-                        st.text(data["essay_content"][:500])
+                        st.text(data["essay_content"])
                     if data.get("chinese_answer"):
                         st.caption(f"中文思路：{data['chinese_answer']}")
                     if data.get("keywords"):
@@ -2636,6 +2636,24 @@ if st.session_state.active_tab.startswith("📊"):
 
         # 弱项分析 - AI 生成
         st.subheader("🎯 重点提升建议")
+
+        if st.session_state.improvement_suggestions is None:
+            for record in reversed(user_progress):
+                if record.get("activity") == "重点提升建议":
+                    suggestion_data = record.get("data", {}) or {}
+                    if not isinstance(suggestion_data, dict):
+                        continue
+                    saved_suggestions = (
+                        suggestion_data.get("suggestions")
+                        or suggestion_data.get("result_data")
+                        or suggestion_data.get("result")
+                    )
+                    if isinstance(saved_suggestions, str):
+                        saved_suggestions = parse_json_response(saved_suggestions)
+                    if saved_suggestions:
+                        st.session_state.improvement_suggestions = saved_suggestions
+                        break
+
         if st.button("🤖 生成提升建议", type="primary"):
             if not st.session_state.tongyi_agent:
                 st.warning("请先在侧边栏配置并保存AI API Key")
@@ -2655,6 +2673,14 @@ if st.session_state.active_tab.startswith("📊"):
                         )
                         parsed = parse_json_response(suggestions) if isinstance(suggestions, str) else suggestions
                         st.session_state.improvement_suggestions = parsed
+                        save_user_progress(
+                            st.session_state.user_profile.get("user_id", "default_user"),
+                            "重点提升建议",
+                            {
+                                "suggestions": parsed,
+                                "raw": suggestions,
+                            },
+                        )
                     except Exception as e:
                         st.error(f"生成建议失败: {e}")
 

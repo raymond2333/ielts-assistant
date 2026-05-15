@@ -49,7 +49,7 @@
         {% if item.data.mode %}<p><strong>模式：</strong>{{ item.data.mode }}</p>{% endif %}
         {% if item.data.topic %}<p><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
         {% if item.data.question %}<p><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
-        {% if item.data.essay_content %}<p><strong>作文内容（前300字）：</strong>{{ item.data.essay_content[:300] }}</p>{% endif %}
+        {% if item.data.essay_content %}<div><strong>作文内容：</strong><div style="white-space:pre-wrap;margin-top:6px">{{ item.data.essay_content }}</div></div>{% endif %}
         {% if item.data.chinese_answer %}<p><strong>中文思路：</strong>{{ item.data.chinese_answer }}</p>{% endif %}
         {% if item.data.score %}<p><strong>得分：</strong>{{ item.data.score }}</p>{% endif %}
         {% if item.data.result_data %}

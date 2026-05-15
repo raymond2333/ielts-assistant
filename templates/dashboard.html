@@ -266,7 +266,7 @@
                   {% if item.data.topic %}<p class="record-meta"><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
                   {% if item.data.question %}<p class="record-meta"><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
                   {% if item.data.user_response %}<p class="record-meta"><strong>你的回答：</strong>{{ item.data.user_response[:200] }}{% if item.data.user_response|length > 200 %}...{% endif %}</p>{% endif %}
-                  {% if item.data.essay_content %}<p class="record-meta"><strong>作文内容（前300字）：</strong>{{ item.data.essay_content[:300] }}{% if item.data.essay_content|length > 300 %}...{% endif %}</p>{% endif %}
+                  {% if item.data.essay_content %}<div class="record-meta"><strong>作文内容：</strong><div style="white-space:pre-wrap;margin-top:6px">{{ item.data.essay_content }}</div></div>{% endif %}
                   {% if item.data.chinese_answer %}<p class="record-meta"><strong>中文思路：</strong>{{ item.data.chinese_answer }}</p>{% endif %}
                   {% if item.data.keywords %}<p class="record-meta"><strong>关键词：</strong>{{ item.data.keywords }}</p>{% endif %}
                   {% if item.data.score %}<p class="record-meta"><strong>得分：</strong>{{ item.data.score }}</p>{% endif %}

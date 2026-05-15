@@ -759,6 +759,63 @@ def calculate_study_plan_inputs(profile, progress):
     return current_level, study_weeks, weak_areas
 
 
+def find_progress_record(user_id, record_id="", timestamp="", limit=500):
+    if not record_id and not timestamp:
+        return None
+    for item in get_progress(user_id, limit=limit):
+        if record_id and str(item.get("id")) == str(record_id):
+            return item
+        if timestamp and item.get("timestamp") == timestamp:
+            return item
+    return None
+
+
+def infer_record_mode(record):
+    data = record.get("data") or {}
+    mode = data.get("mode", "")
+    activity = record.get("activity", "")
+    if mode:
+        return mode
+    if "串题" in activity:
+        return "theme_linking"
+    if "Task 1" in activity:
+        return "task1"
+    if "Task 2" in activity:
+        return "task2"
+    if "作文思路" in activity:
+        return "ideas"
+    if "生成作文题目" in activity:
+        return "generate_topic"
+    if "参考范文" in activity:
+        return "generate_model_answer"
+    if "Part 1" in activity:
+        return "part1"
+    if "Part 2" in activity:
+        return "part2"
+    if "Part 3" in activity:
+        return "part3"
+    if "口语反馈" in activity:
+        return "speaking_feedback"
+    return mode
+
+
+def replay_record_from_args():
+    return find_progress_record(
+        session["user_id"],
+        request.args.get("replay_id", "").strip(),
+        request.args.get("replay_ts", "").strip(),
+    )
+
+
+def result_from_record(record):
+    data = record.get("data") or {}
+    result_data = data.get("result_data")
+    result = data.get("result")
+    if result is None and result_data is not None:
+        result = json.dumps(result_data, ensure_ascii=False)
+    return result, result_data
+
+
 
 def admin_required(view):
     @wraps(view)
@@ -1372,17 +1429,22 @@ def speaking():
             session["speaking_result_data"] = json.dumps(result_data) if result_data is not None else None
             session["speaking_mode"] = mode
     else:
-        cached = session.pop("speaking_result", None)
-        cached_data = session.pop("speaking_result_data", None)
-        cached_mode = session.pop("speaking_mode", "part1")
-        if cached is not None:
-            result = cached
-            mode = cached_mode
-            if cached_data is not None:
-                try:
-                    result_data = json.loads(cached_data)
-                except (TypeError, ValueError):
-                    result_data = None
+        replay_record = replay_record_from_args()
+        if replay_record:
+            mode = infer_record_mode(replay_record) or mode
+            result, result_data = result_from_record(replay_record)
+        else:
+            cached = session.pop("speaking_result", None)
+            cached_data = session.pop("speaking_result_data", None)
+            cached_mode = session.pop("speaking_mode", "part1")
+            if cached is not None:
+                result = cached
+                mode = cached_mode
+                if cached_data is not None:
+                    try:
+                        result_data = json.loads(cached_data)
+                    except (TypeError, ValueError):
+                        result_data = None
     return render_template("speaking.html", result=result, result_data=result_data, mode=mode, **common_context())
 
 
@@ -1420,10 +1482,14 @@ def theme_linking():
             session["theme_linking_result"] = result
             session["theme_linking_result_data"] = result_data
     else:
-        cached = session.pop("theme_linking_result", None)
-        if cached is not None:
-            result = cached
-            result_data = session.pop("theme_linking_result_data", None)
+        replay_record = replay_record_from_args()
+        if replay_record:
+            result, result_data = result_from_record(replay_record)
+        else:
+            cached = session.pop("theme_linking_result", None)
+            if cached is not None:
+                result = cached
+                result_data = session.pop("theme_linking_result_data", None)
     return render_template("theme_linking.html", result=result, result_data=result_data, **common_context())
 
 
@@ -1432,7 +1498,7 @@ def theme_linking():
 def writing():
     result = None
     result_data = None
-    mode = request.form.get("mode", "task1")
+    mode = request.form.get("mode") or request.args.get("mode", "task1")
     assistant, ai_config = current_assistant()
     if request.method == "POST":
         if assistant is None:
@@ -1545,17 +1611,22 @@ def writing():
             session["writing_result_data"] = json.dumps(result_data) if result_data is not None else None
             session["writing_mode"] = mode
     else:
-        cached = session.pop("writing_result", None)
-        cached_data = session.pop("writing_result_data", None)
-        cached_mode = session.pop("writing_mode", "task1")
-        if cached is not None:
-            result = cached
-            mode = cached_mode
-            if cached_data is not None:
-                try:
-                    result_data = json.loads(cached_data)
-                except (TypeError, ValueError):
-                    result_data = None
+        replay_record = replay_record_from_args()
+        if replay_record:
+            mode = infer_record_mode(replay_record) or mode
+            result, result_data = result_from_record(replay_record)
+        else:
+            cached = session.pop("writing_result", None)
+            cached_data = session.pop("writing_result_data", None)
+            cached_mode = session.pop("writing_mode", "task1")
+            if cached is not None:
+                result = cached
+                mode = cached_mode
+                if cached_data is not None:
+                    try:
+                        result_data = json.loads(cached_data)
+                    except (TypeError, ValueError):
+                        result_data = None
 
     # 处理题目导入：从生成题目区域导入到练习区
     import_topic = request.args.get("import_topic", "").strip()
@@ -1822,67 +1893,19 @@ def replay():
     if not ts and not record_id:
         flash("缺少记录标识。", "warning")
         return redirect(url_for("dashboard"))
-    records = get_progress(session["user_id"], limit=500)
-    for item in records:
-        if (record_id and str(item.get("id")) == record_id) or (ts and item.get("timestamp") == ts):
-            data = item.get("data") or {}
-            mode = data.get("mode", "")
-            activity = item.get("activity", "")
-            if not mode:
-                if "串题" in activity:
-                    mode = "theme_linking"
-                elif "Task 1" in activity:
-                    mode = "task1"
-                elif "Task 2" in activity:
-                    mode = "task2"
-            if mode in ("part1", "part2", "part3"):
-                if data.get("result") or data.get("result_data"):
-                    session["speaking_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
-                    session["speaking_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
-                    session["speaking_mode"] = mode
-                return redirect(url_for("speaking", mode=mode))
-            if mode in ("task1", "task2", "generate_topic"):
-                if data.get("result") or data.get("result_data"):
-                    session["writing_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
-                    session["writing_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
-                    session["writing_mode"] = mode
-                    return redirect(url_for("writing"))
-                if mode == "generate_topic" and (data.get("result") or data.get("result_data")):
-                    session["writing_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
-                    session["writing_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
-                    session["writing_mode"] = mode
-                    return redirect(url_for("writing"))
-                task_type_data = data.get("task_type", data.get("chart_type", "Task 2"))
-                if "Task 1" in str(task_type_data):
-                    task_mode = "task1"
-                else:
-                    task_mode = "task2"
-                question = data.get("question", "")
-                if not question and isinstance(data.get("result_data"), dict):
-                    question = data["result_data"].get("question", "")
-                if not question:
-                    question = data.get("essay_content", "")
-                return redirect(url_for("writing", **{
-                    "import_topic": "1",
-                    "import_question": question,
-                    "import_task": "Task 1" if task_mode == "task1" else "Task 2",
-                }))
-            if mode == "ideas":
-                if data.get("result") or data.get("result_data"):
-                    session["writing_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
-                    session["writing_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
-                    session["writing_mode"] = mode
-                return redirect(url_for("writing", **{
-                    "import_topic": "1",
-                    "import_question": data.get("topic", ""),
-                    "import_task": "Task 2",
-                }))
-            if mode in ("theme_linking",):
-                if data.get("result") or data.get("result_data"):
-                    session["theme_linking_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
-                    session["theme_linking_result_data"] = data.get("result_data")
-                return redirect(url_for("theme_linking"))
-            return redirect(url_for("dashboard"))
+    item = find_progress_record(session["user_id"], record_id, ts)
+    if item:
+        mode = infer_record_mode(item)
+        replay_args = {"replay_id": item.get("id")} if item.get("id") else {"replay_ts": item.get("timestamp", "")}
+        if mode in ("part1", "part2", "part3", "speaking_feedback", "keyword_answer", "answer_from_cn", "speaking_recording"):
+            replay_args["mode"] = mode
+            return redirect(url_for("speaking", **replay_args))
+        if mode in ("task1", "task2", "generate_topic", "ideas", "generate_model_answer"):
+            replay_args["mode"] = mode
+            return redirect(url_for("writing", **replay_args))
+        if mode == "theme_linking":
+            return redirect(url_for("theme_linking", **replay_args))
+        return redirect(url_for("dashboard"))
     flash("记录未找到。", "warning")
     return redirect(url_for("dashboard"))
 
