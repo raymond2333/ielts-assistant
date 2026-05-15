@@ -1,4 +1,5 @@
 import hmac
+import html
 import hashlib
 import json
 import os
@@ -1190,8 +1191,8 @@ def writing():
         elif mode == "ideas":
             topic = request.form.get("topic", "").strip()
             question = request.form.get("question", "").strip()
-            chart_data = request.form.get("chart_data", "").strip()
-            table_data = request.form.get("table_data", "").strip()
+            chart_data = html.unescape(request.form.get("chart_data", "").strip())
+            table_data = html.unescape(request.form.get("table_data", "").strip())
             result = assistant.generate_writing_ideas_with_chart(topic, chart_data, question, table_data)
             result_data = parse_model_output(result)
             session["writing_ideas_topic"] = topic
@@ -1250,8 +1251,8 @@ def writing():
             topic = request.form.get("topic", "").strip()
             task_type = request.form.get("task_type", "Task 2")
             chart_type = request.form.get("chart_type", "").strip()
-            chart_data_str = request.form.get("chart_data_json", "").strip()
-            table_data_str = request.form.get("table_data_json", "").strip()
+            chart_data_str = html.unescape(request.form.get("chart_data_json", "").strip())
+            table_data_str = html.unescape(request.form.get("table_data_json", "").strip())
             chart_data = json.loads(chart_data_str) if chart_data_str else None
             table_data = json.loads(table_data_str) if table_data_str else None
             result = assistant.generate_model_answer(task_type, topic, chart_type, chart_data, table_data)

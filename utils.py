@@ -471,6 +471,58 @@ def _setup_matplotlib_font():
     return False
 
 
+def _extract_json_block(text, marker):
+    """Extract a JSON object/array after a marker like '**table_data：**'.
+
+    Uses balanced-brace scanning to handle nested structures correctly,
+    falling back to regex for simple cases.
+    """
+    idx = text.find(marker)
+    if idx == -1:
+        return None
+    tail = text[idx + len(marker):].strip()
+    if not tail:
+        return None
+
+    # Find the opening brace or bracket
+    first_brace = tail.find("{")
+    first_bracket = tail.find("[")
+    if first_brace == -1 and first_bracket == -1:
+        return None
+
+    if first_bracket != -1 and (first_bracket < first_brace or first_brace == -1):
+        open_ch, close_ch = "[", "]"
+        start = first_bracket
+    else:
+        open_ch, close_ch = "{", "}"
+        start = first_brace
+
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(tail)):
+        ch = tail[i]
+        if escape:
+            escape = False
+            continue
+        if ch == '\\':
+            escape = True
+            continue
+        if ch == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if ch == open_ch:
+            depth += 1
+        elif ch == close_ch:
+            depth -= 1
+            if depth == 0:
+                return tail[start:i + 1]
+
+    return None
+
+
 def _render_table_image(data):
     """Render table_data as a styled matplotlib image, saved to data/charts/."""
     td = data.get("table_data")
@@ -540,6 +592,74 @@ def _render_table_image(data):
         data["chart_image"] = ""
 
 
+def _render_flowchart_mpl(data, path):
+    """Render a flowchart using matplotlib as fallback when Graphviz is unavailable."""
+    chart_dot = data.get("chart_dot") or {}
+    nodes = chart_dot.get("nodes", [])
+    edges = chart_dot.get("edges", [])
+
+    import matplotlib.pyplot as plt
+
+    n = len(nodes)
+    fig_height = max(4.0, n * 1.0 + 1.5)
+    fig, ax = plt.subplots(figsize=(7.0, fig_height), dpi=140)
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, fig_height + 0.5)
+    ax.axis("off")
+
+    title = data.get("question", "IELTS Task 1 Flowchart")[:90]
+    ax.set_title(title, fontsize=12, fontweight="bold", pad=12)
+
+    # Layout: vertical stack
+    y_positions = []
+    y = fig_height - 0.5
+    spacing = (fig_height - 1.5) / max(n, 1)
+    for i in range(n):
+        y_positions.append(y)
+        y -= spacing
+
+    # Draw nodes
+    box_width = 7.0
+    box_height = spacing * 0.55
+    node_rects = []
+    for i, node_text in enumerate(nodes):
+        y = y_positions[i]
+        rect = plt.Rectangle(
+            (5 - box_width / 2, y - box_height / 2),
+            box_width, box_height,
+            fill=True, facecolor="#e8f5e9", edgecolor="#4caf50",
+            linewidth=1.5, linestyle="-", zorder=2,
+        )
+        ax.add_patch(rect)
+        ax.text(
+            5, y, str(node_text), ha="center", va="center",
+            fontsize=10, fontweight="medium", zorder=3,
+            wrap=True,
+        )
+        node_rects.append((5, y, box_width, box_height))
+
+    # Draw edges
+    for edge in edges:
+        try:
+            from_idx, to_idx = int(edge[0]), int(edge[1])
+            if 0 <= from_idx < n and 0 <= to_idx < n:
+                x1, y1, _, h1 = node_rects[from_idx]
+                x2, y2, _, h2 = node_rects[to_idx]
+                ax.annotate(
+                    "", xy=(x2, y2 + h2 / 2), xytext=(x1, y1 - h1 / 2),
+                    arrowprops=dict(
+                        arrowstyle="->", color="#555555", lw=1.5,
+                        connectionstyle="arc3,rad=0",
+                    ),
+                )
+        except (IndexError, ValueError, TypeError):
+            pass
+
+    fig.tight_layout()
+    fig.savefig(path, dpi=140, bbox_inches="tight")
+    plt.close(fig)
+
+
 def build_task1_chart_assets(result_data, raw_text=""):
     if not isinstance(result_data, dict) or result_data.get("task_type") != "Task 1":
         return result_data
@@ -549,13 +669,11 @@ def build_task1_chart_assets(result_data, raw_text=""):
     # 表格：解析 table_data JSON 并渲染为图片
     if chart_type == "表格":
         if not data.get("table_data") and raw_text:
-            td_match = re.search(r'\*\*table_data：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
-            if not td_match:
-                td_match = re.search(r'\*\*table_data：\*\*\s*(\{[\s\S]*?\})\s*(?:\n\*\*|\Z)', raw_text)
-            if td_match:
+            json_str = _extract_json_block(raw_text, "**table_data：**")
+            if json_str:
                 try:
-                    data["table_data"] = json.loads(td_match.group(1))
-                except Exception:
+                    data["table_data"] = json.loads(json_str)
+                except json.JSONDecodeError:
                     pass
         _render_table_image(data)
         return data
@@ -572,10 +690,10 @@ def build_task1_chart_assets(result_data, raw_text=""):
     # --- 流程图：Graphviz 渲染 ---
     if "流程" in chart_type:
         if not data.get("chart_dot") and raw_text:
-            dot_match = re.search(r'\*\*chart_dot：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
-            if dot_match:
+            dot_json = _extract_json_block(raw_text, "**chart_dot：**")
+            if dot_json:
                 try:
-                    data["chart_dot"] = json.loads(dot_match.group(1))
+                    data["chart_dot"] = json.loads(dot_json)
                 except Exception:
                     pass
 
@@ -587,6 +705,8 @@ def build_task1_chart_assets(result_data, raw_text=""):
             data["chart_image"] = ""
             return data
 
+        success = False
+        # Try Graphviz first
         try:
             import graphviz
             dot = graphviz.Digraph(format="png")
@@ -609,26 +729,37 @@ def build_task1_chart_assets(result_data, raw_text=""):
             tmp_path = path.replace(".png", "")
             dot.render(tmp_path, cleanup=True)
             data["chart_image"] = f"data/charts/{filename}"
+            success = True
         except Exception as e:
             import traceback
-            print(f"[build_task1_chart_assets] Flowchart rendering failed: {e}")
-            traceback.print_exc()
-            data["chart_image"] = ""
+            print(f"[build_task1_chart_assets] Graphviz failed, trying matplotlib fallback: {e}")
+
+        # Fallback to matplotlib if Graphviz unavailable
+        if not success:
+            try:
+                _setup_matplotlib_font()
+                _render_flowchart_mpl(data, path)
+                data["chart_image"] = f"data/charts/{filename}"
+            except Exception as e:
+                import traceback
+                print(f"[build_task1_chart_assets] Flowchart rendering failed: {e}")
+                traceback.print_exc()
+                data["chart_image"] = ""
         return data
 
     # --- 柱状图 / 线形图 / 饼图：matplotlib + seaborn 美化 ---
     # 尝试从 raw_text 中提取 chart_labels 和 chart_data
     if not data.get("chart_data") and raw_text:
-        labels_match = re.search(r'\*\*chart_labels：\*\*\s*(\[.*?\])\s*\n', raw_text)
-        data_match = re.search(r'\*\*chart_data：\*\*\s*(\[.*?\])\s*\n', raw_text, re.DOTALL)
-        if labels_match:
+        labels_json = _extract_json_block(raw_text, "**chart_labels：**")
+        if labels_json:
             try:
-                data["chart_labels"] = json.loads(labels_match.group(1))
+                data["chart_labels"] = json.loads(labels_json)
             except Exception:
                 pass
-        if data_match:
+        data_json = _extract_json_block(raw_text, "**chart_data：**")
+        if data_json:
             try:
-                data["chart_data"] = json.loads(data_match.group(1))
+                data["chart_data"] = json.loads(data_json)
             except Exception:
                 pass
 
@@ -724,24 +855,24 @@ def parse_generated_topic_md(raw_text, task_type="Task 2"):
             except Exception:
                 pass
 
-        cd = re.search(r'\*\*chart_data：\*\*\s*(\[.*?\])\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+        cd = _extract_json_block(raw_text, "**chart_data：**")
         if cd:
             try:
-                result["chart_data"] = json.loads(cd.group(1))
+                result["chart_data"] = json.loads(cd)
             except Exception:
                 pass
 
-        dot = re.search(r'\*\*chart_dot：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+        dot = _extract_json_block(raw_text, "**chart_dot：**")
         if dot:
             try:
-                result["chart_dot"] = json.loads(dot.group(1))
+                result["chart_dot"] = json.loads(dot)
             except Exception:
                 pass
 
-        td = re.search(r'\*\*table_data：\*\*\s*(\{[\s\S]*?\})\s*(?:\n\*\*|\Z)', raw_text)
+        td = _extract_json_block(raw_text, "**table_data：**")
         if td:
             try:
-                result["table_data"] = json.loads(td.group(1))
+                result["table_data"] = json.loads(td)
             except Exception:
                 pass
 
