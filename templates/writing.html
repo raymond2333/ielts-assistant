@@ -261,36 +261,9 @@
             {% endif %}
             <details class="result-accordion" open><summary>✨ 参考范文</summary><div class="result-body">{{ result | simple_md }}</div></details>
           {% elif result_data and mode == 'task1' %}
-            <details class="result-accordion" open><summary>总分与整体评价</summary><div class="result-body"><p><strong>总分：</strong>{{ result_data.overall_score }}</p><p>{{ result_data.band_description }}</p></div></details>
-            {% for key, label in [('task_achievement','任务完成度'),('coherence_cohesion','连贯与衔接'),('lexical_resource','词汇资源'),('grammatical_range','语法多样性与准确性'),('grammatical_range_accuracy','语法多样性与准确性')] %}
-              {% if result_data[key] %}
-                <details class="result-accordion"><summary>{{ label }} · {{ result_data[key].score }}</summary><div class="result-body"><p>{{ result_data[key].comments or result_data[key].assessment or result_data[key].grammar_analysis }}</p></div></details>
-              {% endif %}
-            {% endfor %}
-            {% if result_data.strengths %}<details class="result-accordion"><summary>优点</summary><div class="result-body"><ul>{% for item in result_data.strengths %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
-            {% if result_data.improvements %}<details class="result-accordion"><summary>改进建议</summary><div class="result-body"><ul>{% for item in result_data.improvements %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
-            {% if result_data.suggested_corrections %}<details class="result-accordion"><summary>修改建议</summary><div class="result-body"><p>{{ result_data.suggested_corrections }}</p></div></details>{% endif %}
-            {% if result_data.model_answer %}<details class="result-accordion"><summary>参考范文</summary><div class="result-body">{{ result_data.model_answer | simple_md }}</div></details>{% endif %}
+            {{ result_data | record_result('写作 Task 1 批改') }}
           {% elif result_data and mode == 'task2' %}
-            <details class="result-accordion" open><summary>总分与整体评价</summary><div class="result-body"><p><strong>总分：</strong>{{ result_data.overall_score }}</p><p>{{ result_data.band_description }}</p></div></details>
-            {% for key, label in [('task_response','任务回应'),('coherence_cohesion','连贯与衔接'),('lexical_resource','词汇资源'),('grammatical_range','语法多样性与准确性'),('grammatical_range_accuracy','语法多样性与准确性')] %}
-              {% if result_data[key] %}
-                <details class="result-accordion">
-                  <summary>{{ label }} · {{ result_data[key].score }}</summary>
-                  <div class="result-body">
-                    <ul>
-                      {% for sub_key, value in result_data[key].items() %}
-                        {% if sub_key != 'score' %}<li><strong>{{ sub_key }}：</strong>{{ value | simple_md if value is string else value }}</li>{% endif %}
-                      {% endfor %}
-                    </ul>
-                  </div>
-                </details>
-              {% endif %}
-            {% endfor %}
-            {% if result_data.strengths %}<details class="result-accordion"><summary>优点</summary><div class="result-body"><ul>{% for item in result_data.strengths %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
-            {% if result_data.improvements %}<details class="result-accordion"><summary>改进建议</summary><div class="result-body"><ul>{% for item in result_data.improvements %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
-            {% if result_data.suggested_corrections %}<details class="result-accordion"><summary>修改建议</summary><div class="result-body"><p>{{ result_data.suggested_corrections | simple_md if result_data.suggested_corrections is string else result_data.suggested_corrections }}</p></div></details>{% endif %}
-            {% if result_data.corrected_essay %}<details class="result-accordion"><summary>修正后作文</summary><div class="result-body">{{ result_data.corrected_essay | simple_md }}</div></details>{% endif %}
+            {{ result_data | record_result('写作 Task 2 批改') }}
           {% else %}
             {% if mode == 'ideas' and (ideas_topic or ideas_question) %}
             <details class="result-accordion" open><summary>你的作文题目</summary><div class="result-body">

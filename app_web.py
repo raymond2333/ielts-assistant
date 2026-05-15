@@ -443,6 +443,56 @@ def record_result_filter(result_data, activity=""):
             f"<div class='result-body'><button class='speak-btn' type='button' data-speak='{escape(model_answer)}'>朗读参考答案</button><p>{escape(model_answer)}</p></div></details>"
         )
 
+    criteria_labels = {
+        "task_achievement": "任务完成度",
+        "task_response": "任务回应",
+        "coherence_cohesion": "连贯与衔接",
+        "lexical_resource": "词汇资源",
+        "grammatical_range": "语法多样性与准确性",
+        "grammatical_range_accuracy": "语法范围与准确性",
+    }
+    sub_labels = {
+        "score": "分数",
+        "comments": "评价",
+        "assessment": "评价",
+        "grammar_analysis": "语法分析",
+        "strengths": "优点",
+        "improvements": "改进建议",
+        "errors": "问题",
+        "suggestions": "建议",
+        "examples": "示例",
+    }
+    for key, label in criteria_labels.items():
+        item = result_data.get(key)
+        if not isinstance(item, dict):
+            continue
+        summary = label
+        if item.get("score") is not None:
+            summary = f"{label} · {escape(item['score'])}"
+        body = []
+        for sub_key, value in item.items():
+            if value in (None, "", [], {}):
+                continue
+            sub_label = sub_labels.get(sub_key, sub_key)
+            if isinstance(value, list):
+                body.append(f"<p><strong>{escape(sub_label)}：</strong></p>{_html_list(value)}")
+            elif isinstance(value, dict):
+                nested = "".join(
+                    f"<li><strong>{escape(str(k))}：</strong>{escape(str(v))}</li>"
+                    for k, v in value.items()
+                    if v not in (None, "", [], {})
+                )
+                if nested:
+                    body.append(f"<p><strong>{escape(sub_label)}：</strong></p><ul>{nested}</ul>")
+            else:
+                content = escape(str(value))
+                body.append(f"<p><strong>{escape(sub_label)}：</strong>{content}</p>")
+        if body:
+            sections.append(
+                f"<details class='result-accordion'><summary>{summary}</summary>"
+                f"<div class='result-body'>{''.join(body)}</div></details>"
+            )
+
     list_labels = {
         "vocabulary_highlight": "高级词汇",
         "grammar_structures": "语法结构",
