@@ -1182,6 +1182,7 @@ def writing():
             result_data = build_task1_chart_assets(result_data, raw_text=result)
             session["generated_topic_text"] = result_data.get("question", "")
             session["generated_topic_task"] = task_type
+            session["generated_result_data"] = json.dumps(result_data, ensure_ascii=False, default=str)
             save_progress(session["user_id"], "生成作文题目", {
                 "mode": mode,
                 "task_type": task_type,
@@ -1191,8 +1192,10 @@ def writing():
         elif mode == "ideas":
             topic = request.form.get("topic", "").strip()
             question = request.form.get("question", "").strip()
-            chart_data = html.unescape(request.form.get("chart_data", "").strip())
-            table_data = html.unescape(request.form.get("table_data", "").strip())
+            stored = session.get("generated_result_data", "")
+            topic_data = json.loads(stored) if stored else {}
+            chart_data = json.dumps(topic_data.get("chart_data"), ensure_ascii=False) if topic_data.get("chart_data") else ""
+            table_data = json.dumps(topic_data.get("table_data"), ensure_ascii=False) if topic_data.get("table_data") else ""
             result = assistant.generate_writing_ideas_with_chart(topic, chart_data, question, table_data)
             result_data = parse_model_output(result)
             session["writing_ideas_topic"] = topic
@@ -1250,11 +1253,12 @@ def writing():
         elif mode == "generate_model_answer":
             topic = request.form.get("topic", "").strip()
             task_type = request.form.get("task_type", "Task 2")
-            chart_type = request.form.get("chart_type", "").strip()
-            chart_data_str = html.unescape(request.form.get("chart_data_json", "").strip())
-            table_data_str = html.unescape(request.form.get("table_data_json", "").strip())
-            chart_data = json.loads(chart_data_str) if chart_data_str else None
-            table_data = json.loads(table_data_str) if table_data_str else None
+            # Retrieve chart/table data from session (generated topic's result_data)
+            stored = session.get("generated_result_data", "")
+            topic_data = json.loads(stored) if stored else {}
+            chart_type = topic_data.get("chart_type", "")
+            chart_data = topic_data.get("chart_data")
+            table_data = topic_data.get("table_data")
             result = assistant.generate_model_answer(task_type, topic, chart_type, chart_data, table_data)
             result_data = None
             save_progress(session["user_id"], "生成参考范文", {

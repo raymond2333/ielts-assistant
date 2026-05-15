@@ -832,7 +832,7 @@ def _render_writing_task1():
     with gen_col1:
         st.caption("点击生成随机小作文题目（含图表），题目将自动填入下方练习区")
     with gen_col2:
-        if st.button("🎲 生成小作文题目", use_container_width=True, key="gen_task1"):
+        if st.button("🎲 生成小作文题目", width='stretch', key="gen_task1"):
             with st.spinner("正在生成小作文题目..."):
                 result = st.session_state.tongyi_agent.generate_writing_topic("Task 1")
                 parsed = parse_generated_topic_md(result, "Task 1")
@@ -861,7 +861,7 @@ def _render_writing_task1():
         if gen.get("table_data"):
             with st.expander("表格数据", expanded=False):
                 td = gen["table_data"]
-                st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), width='stretch', hide_index=True)
         if gen.get("question"):
             st.info(f"📌 **题目：** {gen['question']}")
         if gen.get("key_features"):
@@ -883,7 +883,7 @@ def _render_writing_task1():
                         rename_map["value"] = "数值"
                     if rename_map:
                         df = df.rename(columns=rename_map)
-                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.dataframe(df, width='stretch', hide_index=True)
                 else:
                     st.dataframe(pd.DataFrame(cd))
 
@@ -974,7 +974,7 @@ def _render_writing_task2():
     with gen_col1:
         st.caption("点击生成随机大作文题目，题目将自动填入下方练习区")
     with gen_col2:
-        if st.button("🎲 生成大作文题目", use_container_width=True, key="gen_task2"):
+        if st.button("🎲 生成大作文题目", width='stretch', key="gen_task2"):
             with st.spinner("正在生成大作文题目..."):
                 result = st.session_state.tongyi_agent.generate_writing_topic("Task 2")
                 parsed = parse_generated_topic_md(result, "Task 2")
@@ -1287,7 +1287,7 @@ def _display_record_result_data(result_data):
             if result_data.get("table_data"):
                 with st.expander("表格数据", expanded=False):
                     td = result_data["table_data"]
-                    st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), width='stretch', hide_index=True)
             if result_data.get("topic_category"):
                 st.markdown(f"**话题类别：** {result_data['topic_category']}")
             if result_data.get("essay_type"):
@@ -1315,9 +1315,9 @@ def _display_record_result_data(result_data):
                             rename_map["value"] = "数值"
                         if rename_map:
                             df = df.rename(columns=rename_map)
-                        st.dataframe(df, use_container_width=True, hide_index=True)
+                        st.dataframe(df, width='stretch', hide_index=True)
                     else:
-                        st.dataframe(pd.DataFrame(cd), use_container_width=True)
+                        st.dataframe(pd.DataFrame(cd), width='stretch')
 
     if "overall_score" in result_data:
         with st.expander("写作批改结果", expanded=True):
@@ -1705,7 +1705,7 @@ def _render_login_page():
             st.info("当前未启用 MySQL。可以临时登录体验，但 API Key 无法跨重启持久保存。")
 
     flask_cross_url = f"{_flask_base_url()}?user_id={st.session_state.get('login_user_id', '')}&x_token={_cross_login_token(st.session_state.get('login_user_id', ''))}"
-    st.link_button("进入 Beta 版", flask_cross_url, use_container_width=True)
+    st.link_button("进入 Beta 版", flask_cross_url, width='stretch')
 
     login_tab, register_tab = st.tabs(["登录", "注册"])
 
@@ -1855,8 +1855,8 @@ with st.sidebar:
     st.title("🔐 当前用户")
     st.write(f"用户ID：`{st.session_state.current_user_id}`")
     flask_cross_url = f"{_flask_base_url()}?user_id={st.session_state.current_user_id}&x_token={_cross_login_token(st.session_state.current_user_id)}"
-    st.link_button("进入 Beta 版", flask_cross_url, use_container_width=True)
-    if st.button("退出登录", use_container_width=True):
+    st.link_button("进入 Beta 版", flask_cross_url, width='stretch')
+    if st.button("退出登录", width='stretch'):
         st.query_params.clear()
         st.session_state.authenticated = False
         st.session_state.login_user_id = ""
@@ -1912,7 +1912,7 @@ with st.sidebar:
         placeholder="sk-..."
     )
 
-    if st.button("保存当前用户AI配置", type="primary", use_container_width=True):
+    if st.button("保存当前用户AI配置", type="primary", width='stretch'):
         if not api_key:
             st.warning("请输入API Key后再保存")
         else:
@@ -2028,15 +2028,15 @@ with st.sidebar:
     st.title("💡 快速导航")
 
     # 快速导航按钮
-    if st.button("🎯 口语串题", use_container_width=True):
+    if st.button("🎯 口语串题", width='stretch'):
         st.session_state.active_tab = "🔗 口语串题"
         st.rerun()
 
-    if st.button("📝 作文批改", use_container_width=True):
+    if st.button("📝 作文批改", width='stretch'):
         st.session_state.active_tab = "📝 作文批改"
         st.rerun()
 
-    if st.button("💬 口语练习", use_container_width=True):
+    if st.button("💬 口语练习", width='stretch'):
         st.session_state.active_tab = "💬 口语练习"
         st.rerun()
 
@@ -2072,7 +2072,7 @@ for idx, (col, label) in enumerate(zip(tab_cols, TABS)):
         is_active = st.session_state.active_tab == label
         if st.button(
             label,
-            use_container_width=True,
+            width='stretch',
             type="primary" if is_active else "secondary",
             key=f"tabbtn_{idx}"
         ):
@@ -2115,17 +2115,17 @@ if st.session_state.active_tab.startswith("🏠"):
         st.write("**口语练习**")
         col2a, col2b, col2c = st.columns(3)
         with col2a:
-            if st.button("Part 1", use_container_width=True):
+            if st.button("Part 1", width='stretch'):
                 st.session_state.active_tab = "💬 口语练习"
                 st.session_state.current_speaking_part = "Part 1"
                 st.rerun()
         with col2b:
-            if st.button("Part 2", use_container_width=True):
+            if st.button("Part 2", width='stretch'):
                 st.session_state.active_tab = "💬 口语练习"
                 st.session_state.current_speaking_part = "Part 2"
                 st.rerun()
         with col2c:
-            if st.button("Part 3", use_container_width=True):
+            if st.button("Part 3", width='stretch'):
                 st.session_state.active_tab = "💬 口语练习"
                 st.session_state.current_speaking_part = "Part 3"
                 st.rerun()
@@ -2136,12 +2136,12 @@ if st.session_state.active_tab.startswith("🏠"):
         st.write("**作文批改**")
         col2d, col2e = st.columns(2)
         with col2d:
-            if st.button("小作文", use_container_width=True):
+            if st.button("小作文", width='stretch'):
                 st.session_state.active_tab = "📝 作文批改"
                 st.session_state.writing_task_type = "Task 1"
                 st.rerun()
         with col2e:
-            if st.button("大作文", use_container_width=True):
+            if st.button("大作文", width='stretch'):
                 st.session_state.active_tab = "📝 作文批改"
                 st.session_state.writing_task_type = "Task 2"
                 st.rerun()
@@ -2149,7 +2149,7 @@ if st.session_state.active_tab.startswith("🏠"):
         st.markdown("---")
 
         # 口语串题入口
-        if st.button("🔗 开始口语串题", use_container_width=True):
+        if st.button("🔗 开始口语串题", width='stretch'):
             st.session_state.active_tab = "🔗 口语串题"
             st.rerun()
 
@@ -2165,13 +2165,13 @@ if st.session_state.active_tab.startswith("💬"):
         part_col1, part_col2, part_col3 = st.columns(3)
 
         with part_col1:
-            if st.button("Part 1: 自我介绍", use_container_width=True):
+            if st.button("Part 1: 自我介绍", width='stretch'):
                 st.session_state.current_speaking_part = "Part 1"
         with part_col2:
-            if st.button("Part 2: 个人陈述", use_container_width=True):
+            if st.button("Part 2: 个人陈述", width='stretch'):
                 st.session_state.current_speaking_part = "Part 2"
         with part_col3:
-            if st.button("Part 3: 深入讨论", use_container_width=True):
+            if st.button("Part 3: 深入讨论", width='stretch'):
                 st.session_state.current_speaking_part = "Part 3"
 
         st.markdown(f"### 🎯 当前练习: {st.session_state.current_speaking_part}")
@@ -2383,12 +2383,12 @@ if st.session_state.active_tab.startswith("📝"):
         st.subheader("选择作文类型")
         task_col1, task_col2 = st.columns(2)
         with task_col1:
-            if st.button("📊 Task 1: 小作文", use_container_width=True):
+            if st.button("📊 Task 1: 小作文", width='stretch'):
                 st.session_state.writing_task_type = "Task 1"
                 st.session_state.generated_writing_topic = None
                 st.rerun()
         with task_col2:
-            if st.button("📝 Task 2: 大作文", use_container_width=True):
+            if st.button("📝 Task 2: 大作文", width='stretch'):
                 st.session_state.writing_task_type = "Task 2"
                 st.session_state.generated_writing_topic = None
                 st.rerun()
