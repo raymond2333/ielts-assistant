@@ -90,8 +90,12 @@ class TongyiIELTSAssistant:
         prompt = WRITING_IDEAS_OLD_PROMPT.format(topic=topic, question=question)
         return self.llm.invoke(prompt).content
 
-    def generate_writing_ideas_with_chart(self, topic, chart_data, question):
-        prompt = WRITING_IDEAS_WITH_CHART_PROMPT.format(topic=topic, chart_data=chart_data or "无", question=question)
+    def generate_writing_ideas_with_chart(self, topic, chart_data, question, table_data=None):
+        cd = chart_data or "无"
+        td = table_data or "无"
+        prompt = WRITING_IDEAS_WITH_CHART_PROMPT.format(
+            topic=topic, chart_data=cd, table_data=td, question=question
+        )
         return self.llm.invoke(prompt).content
 
     # ============================================================
@@ -157,8 +161,16 @@ class TongyiIELTSAssistant:
     # ============================================================
     # 生成参考范文
     # ============================================================
-    def generate_model_answer(self, task_type, topic):
-        prompt = GENERATE_MODEL_ANSWER_PROMPT.format(task_type=task_type, topic=topic)
+    def generate_model_answer(self, task_type, topic, chart_type="", chart_data=None, table_data=None):
+        cd = json.dumps(chart_data, ensure_ascii=False) if chart_data else "无"
+        td = json.dumps(table_data, ensure_ascii=False) if table_data else "无"
+        prompt = GENERATE_MODEL_ANSWER_PROMPT.format(
+            task_type=task_type,
+            topic=topic,
+            chart_type=chart_type or "无",
+            chart_data=cd,
+            table_data=td,
+        )
         return self.llm.invoke(prompt).content
 
     # ============================================================

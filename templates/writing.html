@@ -103,12 +103,12 @@
             <div class="result-body">
               <form method="post" class="settings-form">
                 <input type="hidden" name="mode" value="ideas">
+                <input type="hidden" name="chart_data" value="{{ result_data.chart_data | tojson if result_data and result_data.chart_data else '' }}">
+                <input type="hidden" name="table_data" value="{{ result_data.table_data | tojson if result_data and result_data.table_data else '' }}">
                 <label><span>作文题目</span><textarea name="topic" rows="4" placeholder="粘贴雅思小作文题目或图表描述" class="no-voice">{{ generated_topic_text if generated_topic_text and generated_topic_task == 'Task 1' else (import_question if import_topic else '') }}</textarea></label>
                 <label><span>想问 AI 的问题</span><input name="question" placeholder="例如：这道题应该先写哪些关键信息？"></label>
                 <button class="primary-btn" type="submit">向 AI 提问找思路</button>
               </form>
-            </div>
-          </details>
 
           <form method="post" class="settings-form">
             <input type="hidden" name="mode" value="task1">
@@ -221,6 +221,9 @@
                     <input type="hidden" name="mode" value="generate_model_answer">
                     <input type="hidden" name="topic" value="{{ result_data.question }}">
                     <input type="hidden" name="task_type" value="{{ target_task }}">
+                    <input type="hidden" name="chart_type" value="{{ result_data.chart_type or '' }}">
+                    <input type="hidden" name="chart_data_json" value="{{ result_data.chart_data | tojson if result_data.chart_data else '' }}">
+                    <input type="hidden" name="table_data_json" value="{{ result_data.table_data | tojson if result_data.table_data else '' }}">
                     <button class="ghost-btn small" type="submit">✨ 确认生成参考范文</button>
                   </form>
                 </div>

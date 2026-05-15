@@ -1191,7 +1191,8 @@ def writing():
             topic = request.form.get("topic", "").strip()
             question = request.form.get("question", "").strip()
             chart_data = request.form.get("chart_data", "").strip()
-            result = assistant.generate_writing_ideas_with_chart(topic, chart_data, question)
+            table_data = request.form.get("table_data", "").strip()
+            result = assistant.generate_writing_ideas_with_chart(topic, chart_data, question, table_data)
             result_data = parse_model_output(result)
             session["writing_ideas_topic"] = topic
             session["writing_ideas_question"] = question
@@ -1199,6 +1200,7 @@ def writing():
                 "mode": mode,
                 "topic": topic,
                 "chart_data": chart_data,
+                "table_data": table_data,
                 "question": question,
                 "result": result,
                 "result_data": result_data,
@@ -1247,12 +1249,20 @@ def writing():
         elif mode == "generate_model_answer":
             topic = request.form.get("topic", "").strip()
             task_type = request.form.get("task_type", "Task 2")
-            result = assistant.generate_model_answer(task_type, topic)
+            chart_type = request.form.get("chart_type", "").strip()
+            chart_data_str = request.form.get("chart_data_json", "").strip()
+            table_data_str = request.form.get("table_data_json", "").strip()
+            chart_data = json.loads(chart_data_str) if chart_data_str else None
+            table_data = json.loads(table_data_str) if table_data_str else None
+            result = assistant.generate_model_answer(task_type, topic, chart_type, chart_data, table_data)
             result_data = None
             save_progress(session["user_id"], "生成参考范文", {
                 "mode": mode,
                 "topic": topic,
                 "task_type": task_type,
+                "chart_type": chart_type,
+                "chart_data": chart_data,
+                "table_data": table_data,
                 "result": result,
             })
         if result is not None:

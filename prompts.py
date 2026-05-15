@@ -358,13 +358,16 @@ WRITING_IDEAS_WITH_CHART_PROMPT = f"""你是雅思写作教练。请围绕作文
 题目：
 {{topic}}
 
-图表/表格数据（如有）：
-{{chart_data}}（若无数据则填写"无"）
+图表数据 (chart_data)：
+{{chart_data}}
+
+表格数据 (table_data)：
+{{table_data}}
 
 问题：
 {{question}}
 
-请给出题目理解、立场选择、论点、例子、英文表达和提纲。
+请务必根据上面提供的实际数据来回答，引用具体数值。请给出题目理解、立场选择、论点、例子、英文表达和提纲。
 
 # 写作思路
 
@@ -426,11 +429,20 @@ GENERATE_MODEL_ANSWER_PROMPT = f"""你是雅思写作考官。请为以下作文
 作文类型：{{task_type}}
 题目：{{topic}}
 
+图表类型：{{chart_type}}
+
+图表数据 (chart_data)：
+{{chart_data}}
+
+表格数据 (table_data)：
+{{table_data}}
+
 要求：
 - 符合雅思写作规范和字数要求
 - 使用高级词汇和多样的语法结构
 - 结构清晰，逻辑严密
-- 如果是 Task 1 图表描述，请概括数据并突出关键趋势
+- 如果是 Task 1 图表描述，必须根据上面提供的 chart_data 或 table_data 中的实际数据来写作，准确引用数据值，描述趋势、对比和关键特征
+- 如果是 Task 2，请直接根据题目展开论述
 
 请输出完整的参考范文，不需要额外的解释。
 
