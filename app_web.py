@@ -1590,6 +1590,11 @@ def writing():
                 "chart_type": result_data.get("chart_type", ""),
                 "chart_data": result_data.get("chart_data"),
                 "table_data": result_data.get("table_data"),
+                "chart_image": result_data.get("chart_image", ""),
+                "question": result_data.get("question", ""),
+                "task_type": task_type,
+                "topic_category": result_data.get("topic_category", ""),
+                "essay_type": result_data.get("essay_type", ""),
             }, ensure_ascii=False)
             save_progress(session["user_id"], "生成作文题目", {
                 "mode": mode,
@@ -1661,14 +1666,29 @@ def writing():
         elif mode == "generate_model_answer":
             topic = request.form.get("topic", "").strip()
             task_type = request.form.get("task_type", "Task 2")
-            # Retrieve chart/table data from session (generated topic's result_data)
-            stored = session.get("generated_chart_data", "")
-            topic_data = json.loads(stored) if stored else {}
+            context_raw = request.form.get("topic_context", "").strip()
+            if context_raw:
+                try:
+                    topic_data = json.loads(context_raw)
+                except (TypeError, ValueError):
+                    topic_data = {}
+            else:
+                # Retrieve chart/table data from session (generated topic's result_data)
+                stored = session.get("generated_chart_data", "")
+                topic_data = json.loads(stored) if stored else {}
+            topic_data["question"] = topic_data.get("question") or topic
+            topic_data["task_type"] = topic_data.get("task_type") or task_type
             chart_type = topic_data.get("chart_type", "")
             chart_data = topic_data.get("chart_data")
             table_data = topic_data.get("table_data")
             result = assistant.generate_model_answer(task_type, topic, chart_type, chart_data, table_data)
-            result_data = None
+            result_data = {
+                **topic_data,
+                "mode": mode,
+                "topic": topic,
+                "task_type": task_type,
+                "model_answer": result,
+            }
             save_progress(session["user_id"], "生成参考范文", {
                 "mode": mode,
                 "topic": topic,
@@ -1676,7 +1696,10 @@ def writing():
                 "chart_type": chart_type,
                 "chart_data": chart_data,
                 "table_data": table_data,
+                "chart_image": topic_data.get("chart_image", ""),
+                "question": topic_data.get("question", topic),
                 "result": result,
+                "result_data": result_data,
             })
         if result is not None:
             session["writing_result"] = result

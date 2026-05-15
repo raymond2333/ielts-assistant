@@ -2634,6 +2634,8 @@ if st.session_state.active_tab.startswith("📊"):
                                 _rerun_app()
                             else:
                                 st.error("删除失败")
+                    if data.get("mode") == "generate_topic" and (data.get("result_data") or {}).get("question"):
+                        st.link_button("✨ 打开题目生成参考范文", flask_replay, width="stretch")
                     if data.get("mode"):
                         st.caption(f"模式：{data['mode']}")
                     if data.get("task_type"):

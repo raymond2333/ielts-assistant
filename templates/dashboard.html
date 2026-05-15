@@ -291,6 +291,15 @@
                       <summary>{{ item.activity | record_title }}</summary>
                       <div class="result-body">{{ item.data.result_data | record_result(item.activity) }}</div>
                     </details>
+                    {% if item.data.mode == 'generate_topic' and item.data.result_data.question %}
+                      <form method="post" action="{{ url_for('writing') }}" style="margin-top:10px">
+                        <input type="hidden" name="mode" value="generate_model_answer">
+                        <input type="hidden" name="topic" value="{{ item.data.result_data.question }}">
+                        <input type="hidden" name="task_type" value="{{ item.data.result_data.task_type or item.data.task_type or 'Task 2' }}">
+                        <input type="hidden" name="topic_context" value="{{ item.data.result_data | tojson | forceescape }}">
+                        <button class="ghost-btn small" type="submit">✨ 生成参考范文</button>
+                      </form>
+                    {% endif %}
                   {% elif item.data.result %}
                     <details class="result-accordion">
                       <summary>{{ item.activity | record_title }}</summary>
