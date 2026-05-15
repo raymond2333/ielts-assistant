@@ -232,49 +232,36 @@ WRITING_TASK2_CORRECTION_PROMPT = f"""你是专业的雅思写作 Task 2 考官�
 # ============================================================
 # 口语串题
 # ============================================================
-THEME_LINKING_PROMPT = f"""你是雅思口语串题专家，请将以下话题进行有机串联。
+THEME_LINKING_PROMPT = """你是雅思口语串题专家，请将以下话题进行有机串联。
 
-需要串联的话题：{{topics}}
-核心主题：{{main_theme}}
-目标分数：{{target_score}}
+需要串联的话题：{topics}
+核心主题：{main_theme}
+目标分数：{target_score}
 
-请按以下格式输出：
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "unifying_theme": "中文核心主题",
+  "unifying_theme_en": "English core theme",
+  "linked_responses": [
+    {{
+      "topic": "话题名称",
+      "topic_en": "Topic in English",
+      "adapted_response": "适应核心主题的中文回答",
+      "adapted_response_en": "English response adapted to core theme",
+      "key_elements": ["元素1", "元素2"],
+      "transition_phrases": ["短语1", "短语2"]
+    }}
+  ],
+  "versatile_vocabulary": ["中文词汇1", "中文词汇2"],
+  "versatile_vocabulary_en": ["English vocab 1", "English vocab 2"],
+  "practice_strategy": "练习策略建议",
+  "study_plan": "学习计划建议"
+}}
 
-# 串题方案
-
-## 核心主题
-中文核心主题
-**English:** English core theme
-
-## 各话题回答
-
-### 话题 1：[话题名称]
-**English:** [Topic in English]
-**中文回答：** 适应核心主题的回答
-**English Response:** English response
-**关键元素：** 元素1、元素2
-**Key Elements:** Element 1、Element 2
-**过渡短语：** 短语1、短语2
-**Transition Phrases:** Phrase 1、Phrase 2
-
-（重复话题 2、话题 3……）
-
-## 通用词汇
-- 词汇1
-- **English:** Vocabulary1
-
-## 灵活句式
-- 句式1
-- **English:** Sentence 1
-
-## 记忆技巧
-- 技巧1
-- **English:** Memory aid 1
-
-## 练习策略
-策略建议
-
-{OUTPUT_RULES}"""
+要求：
+- 每个话题都必须出现在 linked_responses 中
+- key_elements 和 transition_phrases 必须是数组
+- 只输出 JSON"""
 
 # ============================================================
 # 话题扩展
@@ -573,36 +560,27 @@ IMPROVEMENT_SUGGESTIONS_PROMPT = """你是雅思备考教练。请根据学生�
 最近训练记录：
 {history_text}
 
-请输出格式：
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "summary": "总体评价内容",
+  "priority_areas": ["领域1", "领域2"],
+  "suggestions": [
+    {{
+      "area": "领域名称",
+      "current_issue": "当前问题描述",
+      "action": "具体行动建议",
+      "weekly_goal": "每周目标",
+      "estimated_improvement": "预计提升幅度"
+    }}
+  ],
+  "study_tips": ["技巧1", "技巧2"],
+  "motivation": "鼓励语"
+}}
 
-# 重点提升建议
-
-## 总体评价
-评价内容
-
-## 优先提升领域
-- 领域1
-- 领域2
-
-## 具体建议
-
-### 1. 领域名称
-**当前问题：** 问题描述
-**行动建议：** 具体行动建议
-**每周目标：** 每周目标
-**预计提升：** 预计提升幅度
-
-### 2. 领域名称
-（同上重复）
-
-## 学习技巧
-- 技巧1
-- 技巧2
-
-## 鼓励语
-鼓励内容
-
-{output_rules}"""
+要求：
+- priority_areas 和 study_tips 必须是数组
+- suggestions 中每个对象必须包含 area、current_issue、action、weekly_goal、estimated_improvement 字段
+- 只输出 JSON"""
 
 # ============================================================
 # 作文思路互动（旧版 app_web.py mode="writing_ideas"）

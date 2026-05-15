@@ -105,6 +105,12 @@
         <pre class="ai-output">{{ result }}</pre>
       </section>
       {% endif %}
+      {% if not result and not result_data and request.method == "POST" %}
+      <section class="panel result-panel">
+        <h2>AI 输出</h2>
+        <p class="empty-text">AI 未返回内容，请检查 API Key 是否有效或稍后重试。</p>
+      </section>
+      {% endif %}
     </main>
   </div>
   <script src="{{ url_for('static', filename='app.js') }}"></script>

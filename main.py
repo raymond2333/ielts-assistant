@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import os
 import time
 import hmac
@@ -170,6 +170,32 @@ def _extract_part2_topic_for_discussion(question_data: Dict[str, Any]) -> str:
     return question_data.get("topic") or question_data.get("prompt") or ""
 
 
+_BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def _format_timestamp(ts) -> str:
+    """Format a timestamp string/datetime to readable Beijing time."""
+    if not ts:
+        return ""
+    if isinstance(ts, datetime):
+        dt = ts
+    elif isinstance(ts, str):
+        ts = ts.strip()
+        if not ts:
+            return ""
+        try:
+            dt = datetime.fromisoformat(ts)
+        except (ValueError, TypeError):
+            return ts
+    else:
+        return str(ts)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_BEIJING_TZ)
+    else:
+        dt = dt.astimezone(_BEIJING_TZ)
+    return dt.strftime("%Y-%m-%d %H:%M")
+
+
 def _profile_overall_level(profile: Dict[str, Any]) -> float:
     fallback = float(profile.get("current_level", 5.0))
     levels = [
@@ -282,7 +308,7 @@ def _render_speaking_part1():
                                 "topic": topic,
                                 "difficulty": difficulty,
                                 "result_data": parsed_result,
-                                "timestamp": datetime.now().isoformat(),
+                                "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
                             },
                         )
                         st.success("Part 1题目生成成功！请查看下方题目列表")
@@ -378,7 +404,7 @@ def _render_speaking_part1():
                                         "keywords": keyword_input,
                                         "result": result,
                                         "result_data": st.session_state[answer_key],
-                                        "timestamp": datetime.now().isoformat(),
+                                        "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
                                     },
                                 )
                         if answer_key in st.session_state:
@@ -445,7 +471,7 @@ def _render_speaking_part2():
                             "topic": topic,
                             "cue_type": cue_card_type,
                             "result_data": st.session_state.current_speaking_question,
-                            "timestamp": datetime.now().isoformat(),
+                            "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
                         },
                     )
                     
@@ -730,7 +756,7 @@ def _render_speaking_part3():
                             "topic": part2_topic,
                             "discussion_type": discussion_type,
                             "result_data": parsed_result,
-                            "timestamp": datetime.now().isoformat(),
+                            "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
                         },
                     )
                     
@@ -818,7 +844,7 @@ def _render_speaking_part3():
                                         "keywords": keyword_input,
                                         "result": result,
                                         "result_data": st.session_state[answer_key],
-                                        "timestamp": datetime.now().isoformat(),
+                                        "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
                                     },
                                 )
                         if answer_key in st.session_state:
@@ -843,7 +869,7 @@ def _render_writing_task1():
                     save_user_progress(
                         st.session_state.user_profile.get("user_id", "default_user"),
                         "生成作文题目",
-                        {"mode": "generate_topic", "task_type": "Task 1", "result": result, "result_data": parsed, "timestamp": datetime.now().isoformat()},
+                        {"mode": "generate_topic", "task_type": "Task 1", "result": result, "result_data": parsed, "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat()},
                     )
                     st.rerun()
 
@@ -984,7 +1010,7 @@ def _render_writing_task2():
                     save_user_progress(
                         st.session_state.user_profile.get("user_id", "default_user"),
                         "生成作文题目",
-                        {"mode": "generate_topic", "task_type": "Task 2", "result": result, "result_data": parsed, "timestamp": datetime.now().isoformat()},
+                        {"mode": "generate_topic", "task_type": "Task 2", "result": result, "result_data": parsed, "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat()},
                     )
                     st.rerun()
 
@@ -1115,7 +1141,7 @@ def _display_writing_feedback(feedback_data, task_type):
                     "essay_content": st.session_state.get("current_essay_content", ""),
                     "question": gen_topic.get("question", "") if isinstance(gen_topic, dict) else "",
                     "result_data": feedback_data,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat()
                 }
             )
     except Exception as e:
@@ -1465,7 +1491,7 @@ def _display_speaking_feedback(feedback_data):
                 activity="口语练习",
                 data={
                     "score": formatted_score,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat()
                 }
             )
     except Exception as e:
@@ -2449,7 +2475,7 @@ if st.session_state.active_tab.startswith("📊"):
                 score = record.get("score") or data.get("score", "")
                 timestamp = record.get("timestamp", "")
                 activity = record.get("activity", "学习记录")
-                with st.expander(f"{activity} — {timestamp}" + (f" | 得分：{score}" if score else "")):
+                with st.expander(f"{activity} — {_format_timestamp(timestamp)}" + (f" | 得分：{score}" if score else "")):
                     flask_url = _flask_base_url()
                     user_id = st.session_state.get("login_user_id") or st.session_state.get("current_user_id", "")
                     x_token = _cross_login_token(user_id) if user_id else ""
@@ -2514,29 +2540,33 @@ if st.session_state.active_tab.startswith("📊"):
                         suggestions = st.session_state.tongyi_agent.generate_improvement_suggestions(
                             user_progress, weak_areas, float(target_score), float(current_level)
                         )
-                        st.session_state.improvement_suggestions = suggestions
+                        parsed = parse_json_response(suggestions) if isinstance(suggestions, str) else suggestions
+                        st.session_state.improvement_suggestions = parsed
                     except Exception as e:
                         st.error(f"生成建议失败: {e}")
 
         if st.session_state.get("improvement_suggestions"):
             s = st.session_state.improvement_suggestions
-            st.markdown(f"**{s.get('summary', '')}**")
-            if s.get("priority_areas"):
-                for area in s["priority_areas"]:
-                    st.markdown(f"- 🔴 {area}")
-            if s.get("suggestions"):
-                for item in s["suggestions"]:
-                    with st.expander(f"📌 {item.get('area', '')}"):
-                        st.caption(f"当前问题：{item.get('current_issue', '')}")
-                        st.caption(f"行动建议：{item.get('action', '')}")
-                        st.caption(f"每周目标：{item.get('weekly_goal', '')}")
-                        st.caption(f"预计提升：{item.get('estimated_improvement', '')}")
-            if s.get("study_tips"):
-                st.caption("学习技巧：")
-                for tip in s["study_tips"]:
-                    st.markdown(f"- {tip}")
-            if s.get("motivation"):
-                st.success(s["motivation"])
+            if isinstance(s, str):
+                st.markdown(s)
+            elif isinstance(s, dict):
+                st.markdown(f"**{s.get('summary', '')}**")
+                if s.get("priority_areas"):
+                    for area in s["priority_areas"]:
+                        st.markdown(f"- 🔴 {area}")
+                if s.get("suggestions"):
+                    for item in s["suggestions"]:
+                        with st.expander(f"📌 {item.get('area', '')}"):
+                            st.caption(f"当前问题：{item.get('current_issue', '')}")
+                            st.caption(f"行动建议：{item.get('action', '')}")
+                            st.caption(f"每周目标：{item.get('weekly_goal', '')}")
+                            st.caption(f"预计提升：{item.get('estimated_improvement', '')}")
+                if s.get("study_tips"):
+                    st.caption("学习技巧：")
+                    for tip in s["study_tips"]:
+                        st.markdown(f"- {tip}")
+                if s.get("motivation"):
+                    st.success(s["motivation"])
 
         # 学习计划 — 持久化显示
         st.subheader("📅 个性化学习计划")

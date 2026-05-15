@@ -149,7 +149,7 @@
           <div class="timeline">
             {% for item in records %}
               <details class="timeline-item">
-                <summary><strong>{{ item.activity }}</strong><span>{{ item.user_id }} · {{ item.timestamp }}</span></summary>
+                <summary><strong>{{ item.activity }}</strong><span>{{ item.user_id }} · {{ item.timestamp | beijing_time }}</span></summary>
                 <div class="result-body">
                   <p class="record-meta"><strong>记录ID：</strong>{{ item.id }}</p>
                   <p class="record-meta"><strong>用户：</strong>{{ item.user_id }}</p>

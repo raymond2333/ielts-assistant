@@ -5,8 +5,10 @@ import base64
 import hashlib
 import secrets
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Iterator, List, Optional
+
+_BEIJING_TZ = timezone(timedelta(hours=8))
 
 import mysql.connector
 from mysql.connector import Error
@@ -14,6 +16,19 @@ from mysql.connector import Error
 
 def _env(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
+
+
+def _dt_to_beijing_iso(dt_value) -> str:
+    """Convert a datetime to Beijing time ISO string."""
+    if not dt_value:
+        return ""
+    if isinstance(dt_value, datetime):
+        if dt_value.tzinfo is None:
+            dt_value = dt_value.replace(tzinfo=_BEIJING_TZ)
+        else:
+            dt_value = dt_value.astimezone(_BEIJING_TZ)
+        return dt_value.isoformat()
+    return str(dt_value)
 
 
 def _config(include_database: bool = True) -> Dict[str, Any]:
@@ -652,6 +667,10 @@ def get_progress(user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
 
         timestamp = row["created_at"]
         if isinstance(timestamp, datetime):
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=_BEIJING_TZ)
+            else:
+                timestamp = timestamp.astimezone(_BEIJING_TZ)
             timestamp = timestamp.isoformat()
 
         records.append(
@@ -675,6 +694,10 @@ def _progress_row_to_record(row: Dict[str, Any]) -> Dict[str, Any]:
 
     timestamp = row["created_at"]
     if isinstance(timestamp, datetime):
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=_BEIJING_TZ)
+        else:
+            timestamp = timestamp.astimezone(_BEIJING_TZ)
         timestamp = timestamp.isoformat()
 
     return {
@@ -714,8 +737,8 @@ def list_users() -> List[Dict[str, Any]]:
             "target_score": _round_to_ielts_band(row.get("target_score", 6.5)),
             "is_admin": bool(row.get("is_admin")),
             "record_count": int(row.get("record_count") or 0),
-            "created_at": row["created_at"].isoformat() if isinstance(row.get("created_at"), datetime) else str(row.get("created_at") or ""),
-            "updated_at": row["updated_at"].isoformat() if isinstance(row.get("updated_at"), datetime) else str(row.get("updated_at") or ""),
+            "created_at": _dt_to_beijing_iso(row.get("created_at")),
+            "updated_at": _dt_to_beijing_iso(row.get("updated_at")),
         })
     return users
 
@@ -872,5 +895,9 @@ def get_user_words(user_id: str) -> List[Dict[str, Any]]:
     for row in rows:
         created_at = row.get("created_at")
         if isinstance(created_at, datetime):
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=_BEIJING_TZ)
+            else:
+                created_at = created_at.astimezone(_BEIJING_TZ)
             row["created_at"] = created_at.isoformat()
     return rows

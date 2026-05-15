@@ -104,6 +104,30 @@ def record_title_filter(activity):
     return learning_record_title(activity)
 
 
+@app.template_filter("beijing_time")
+def beijing_time_filter(value):
+    """Format ISO datetime string to Beijing time in readable format."""
+    if not value:
+        return ""
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    _BJ = _tz(_td(hours=8))
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return ""
+        try:
+            dt = _dt.fromisoformat(value)
+        except (ValueError, TypeError):
+            return value
+    else:
+        return str(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_BJ)
+    else:
+        dt = dt.astimezone(_BJ)
+    return dt.strftime("%Y-%m-%d %H:%M")
+
+
 def _html_list(items):
     if not items:
         return ""
@@ -678,12 +702,23 @@ def parse_model_output(raw):
     if not raw:
         return None
     text = raw.strip()
+    # 去除代码块包裹
     if text.startswith("```"):
         text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    # 直接尝试解析
     try:
         return json.loads(text)
     except (TypeError, ValueError):
-        return {"formatted_text": raw, "raw_response": raw}
+        pass
+    # 尝试从文本中提取 JSON 对象（处理 LLM 在 JSON 前后添加文本的情况）
+    first_brace = text.find("{")
+    last_brace = text.rfind("}")
+    if first_brace != -1 and last_brace > first_brace:
+        try:
+            return json.loads(text[first_brace : last_brace + 1])
+        except (TypeError, ValueError):
+            pass
+    return {"formatted_text": raw, "raw_response": raw}
 
 
 
@@ -1144,13 +1179,18 @@ def theme_linking():
             flash("请先在用户中心保存可用的 AI API Key。", "error")
             return redirect(url_for("dashboard"))
         topics = [item.strip() for item in request.form.get("topics", "").splitlines() if item.strip()]
-        result = assistant.link_speaking_themes(
-            topics,
-            request.form.get("main_theme", "个人成长"),
-            float_field("target_score", 6.5),
-        )
+        try:
+            result = assistant.link_speaking_themes(
+                topics,
+                request.form.get("main_theme", "个人成长"),
+                float_field("target_score", 6.5),
+            )
+        except Exception as e:
+            flash(f"AI 调用失败：{e}", "error")
+            result = None
         result_data = parse_model_output(result)
-        save_progress(session["user_id"], "口语串题方案", {"topics": topics, "result": result, "result_data": result_data})
+        if result is not None:
+            save_progress(session["user_id"], "口语串题方案", {"topics": topics, "result": result, "result_data": result_data})
         if result is not None:
             session["theme_linking_result"] = result
             session["theme_linking_result_data"] = result_data

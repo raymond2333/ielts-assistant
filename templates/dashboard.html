@@ -214,7 +214,7 @@
           <div class="timeline">
             {% for item in progress %}
               <details class="timeline-item">
-                <summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp }}</span></summary>
+                <summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp | beijing_time }}</span></summary>
                 <div class="result-body">
                   <p class="record-meta"><strong>记录ID：</strong>{{ item.id }}</p>
                   <a class="primary-btn small" href="{{ url_for('replay', id=item.id) }}" style="margin-bottom:10px;display:inline-block">🔄 重新练习此题</a>
