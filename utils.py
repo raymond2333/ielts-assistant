@@ -416,21 +416,148 @@ def simple_md_filter(text):
     return out
 
 
+def _setup_matplotlib_font():
+    """Configure matplotlib to support Chinese characters.
+
+    Tries installed fonts first, then downloads a CJK font as fallback.
+    Returns True if Chinese rendering is likely to work.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.font_manager as fm
+
+    _cjk_candidates = [
+        "SimHei", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC",
+        "WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "AR PL UMing CN",
+        "Source Han Sans SC", "SimSun", "FangSong", "KaiTi",
+    ]
+    _available = {f.name for f in fm.fontManager.ttflist}
+
+    for _fn in _cjk_candidates:
+        if _fn in _available:
+            plt.rcParams["font.sans-serif"] = [_fn, "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            return True
+
+    # No installed CJK font found — try to download one
+    font_dir = os.path.join(os.path.dirname(__file__), "data", "fonts")
+    os.makedirs(font_dir, exist_ok=True)
+    font_path = os.path.join(font_dir, "NotoSansSC-Regular.ttf")
+
+    if not os.path.exists(font_path):
+        try:
+            import urllib.request
+            url = ("https://github.com/googlefonts/noto-cjk/releases/download/"
+                   "Sans2.004/03_NotoSansCJKsc.zip")
+            # Fallback: use a smaller, direct font URL
+            url = ("https://raw.githubusercontent.com/notofonts/noto-cjk/main/"
+                   "Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf")
+            urllib.request.urlretrieve(url, font_path)
+        except Exception:
+            pass
+
+    if os.path.exists(font_path):
+        try:
+            fm.fontManager.addfont(font_path)
+            plt.rcParams["font.sans-serif"] = ["Noto Sans SC", "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            return True
+        except Exception:
+            pass
+
+    plt.rcParams["font.sans-serif"] = ["DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    return False
+
+
+def _render_table_image(data):
+    """Render table_data as a styled matplotlib image, saved to data/charts/."""
+    td = data.get("table_data")
+    if not td or not isinstance(td, dict):
+        data["chart_image"] = ""
+        return
+
+    headers = td.get("headers", [])
+    rows = td.get("rows", [])
+    if not headers or not rows:
+        data["chart_image"] = ""
+        return
+
+    image_dir = os.path.join(os.path.dirname(__file__), "data", "charts")
+    os.makedirs(image_dir, exist_ok=True)
+    filename = f"task1_{uuid.uuid4().hex[:10]}.png"
+    path = os.path.join(image_dir, filename)
+
+    try:
+        _setup_matplotlib_font()
+        import matplotlib.pyplot as plt
+
+        n_rows = len(rows)
+        n_cols = len(headers)
+
+        fig_width = max(5.5, n_cols * 1.6)
+        fig_height = max(2.5, n_rows * 0.45 + 1.0)
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=140)
+        ax.axis("off")
+
+        title = data.get("question", "IELTS Task 1 Table")[:90]
+        ax.set_title(title, fontsize=12, fontweight="bold", pad=12)
+
+        cell_text = [[str(cell) for cell in row] for row in rows]
+
+        table = ax.table(
+            cellText=cell_text,
+            colLabels=headers,
+            cellLoc="center",
+            loc="center",
+        )
+
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1.0, 1.4)
+
+        for key, cell in table.get_celld().items():
+            cell.set_linewidth(0.6)
+            cell.set_edgecolor("#cccccc")
+            if key[0] == 0:
+                cell.set_facecolor("#4472C4")
+                cell.set_text_props(color="white", fontweight="bold")
+                cell.set_fontsize(9.5)
+            elif key[0] % 2 == 0:
+                cell.set_facecolor("#f2f7fb")
+            else:
+                cell.set_facecolor("#ffffff")
+
+        fig.tight_layout()
+        fig.savefig(path, dpi=140, bbox_inches="tight")
+        plt.close(fig)
+        data["chart_image"] = f"data/charts/{filename}"
+    except Exception as e:
+        import traceback
+        print(f"[build_task1_chart_assets] Table image rendering failed: {e}")
+        traceback.print_exc()
+        data["chart_image"] = ""
+
+
 def build_task1_chart_assets(result_data, raw_text=""):
     if not isinstance(result_data, dict) or result_data.get("task_type") != "Task 1":
         return result_data
     data = dict(result_data)
     chart_type = data.get("chart_type") or "柱状图"
 
-    # 表格：解析 table_data JSON，不生成图片，由前端渲染 HTML 表格
+    # 表格：解析 table_data JSON 并渲染为图片
     if chart_type == "表格":
         if not data.get("table_data") and raw_text:
             td_match = re.search(r'\*\*table_data：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+            if not td_match:
+                td_match = re.search(r'\*\*table_data：\*\*\s*(\{[\s\S]*?\})\s*(?:\n\*\*|\Z)', raw_text)
             if td_match:
                 try:
                     data["table_data"] = json.loads(td_match.group(1))
                 except Exception:
                     pass
+        _render_table_image(data)
         return data
 
     chart_types_with_image = ["柱状图", "线形图", "饼图", "流程图"]
@@ -482,7 +609,10 @@ def build_task1_chart_assets(result_data, raw_text=""):
             tmp_path = path.replace(".png", "")
             dot.render(tmp_path, cleanup=True)
             data["chart_image"] = f"data/charts/{filename}"
-        except Exception:
+        except Exception as e:
+            import traceback
+            print(f"[build_task1_chart_assets] Flowchart rendering failed: {e}")
+            traceback.print_exc()
             data["chart_image"] = ""
         return data
 
@@ -522,9 +652,9 @@ def build_task1_chart_assets(result_data, raw_text=""):
 
     data["chart_labels"] = labels
     try:
-        import matplotlib
-        matplotlib.use("Agg")
+        _setup_matplotlib_font()
         import matplotlib.pyplot as plt
+
         sns.set_theme(style="whitegrid")
         table = data["chart_data"]
         x_labels = [str(item.get("label", "")) for item in table]
@@ -551,7 +681,10 @@ def build_task1_chart_assets(result_data, raw_text=""):
         fig.savefig(path, dpi=140)
         plt.close(fig)
         data["chart_image"] = f"data/charts/{filename}"
-    except Exception:
+    except Exception as e:
+        import traceback
+        print(f"[build_task1_chart_assets] Chart image generation failed: {e}")
+        traceback.print_exc()
         data["chart_image"] = ""
     return data
 
@@ -605,7 +738,7 @@ def parse_generated_topic_md(raw_text, task_type="Task 2"):
             except Exception:
                 pass
 
-        td = re.search(r'\*\*table_data：\*\*\s*(\{.*?\})\s*(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+        td = re.search(r'\*\*table_data：\*\*\s*(\{[\s\S]*?\})\s*(?:\n\*\*|\Z)', raw_text)
         if td:
             try:
                 result["table_data"] = json.loads(td.group(1))

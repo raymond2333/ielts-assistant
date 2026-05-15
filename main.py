@@ -840,12 +840,12 @@ def _render_writing_task1():
                     parsed = build_task1_chart_assets(parsed, raw_text=result)
                     st.session_state.generated_writing_topic = parsed
                     st.session_state.imported_topic_question = parsed.get("question", "")
+                    save_user_progress(
+                        st.session_state.user_profile.get("user_id", "default_user"),
+                        "生成作文题目",
+                        {"mode": "generate_topic", "task_type": "Task 1", "result": result, "result_data": parsed, "timestamp": datetime.now().isoformat()},
+                    )
                     st.rerun()
-                save_user_progress(
-                    st.session_state.user_profile.get("user_id", "default_user"),
-                    "生成作文题目",
-                    {"mode": "generate_topic", "task_type": "Task 1", "result": result, "result_data": parsed, "timestamp": datetime.now().isoformat()},
-                )
 
     # 显示生成的题目结果（含图表图片）
     gen = st.session_state.get("generated_writing_topic")
@@ -853,11 +853,15 @@ def _render_writing_task1():
         if gen.get("chart_type"):
             st.markdown(f"**图表类型：** {gen['chart_type']}")
         if gen.get("chart_image"):
-            st.image(os.path.join(os.path.dirname(__file__), gen["chart_image"]))
+            img_path = os.path.join(os.path.dirname(__file__), gen["chart_image"])
+            if os.path.exists(img_path):
+                st.image(img_path)
+            else:
+                st.warning("图表图片生成失败，请重试生成题目")
         if gen.get("table_data"):
-            import pandas as pd
-            td = gen["table_data"]
-            st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
+            with st.expander("表格数据", expanded=False):
+                td = gen["table_data"]
+                st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
         if gen.get("question"):
             st.info(f"📌 **题目：** {gen['question']}")
         if gen.get("key_features"):
@@ -869,7 +873,19 @@ def _render_writing_task1():
                 st.write(gen["suggested_structure"])
         if gen.get("chart_data"):
             with st.expander("表格数据", expanded=False):
-                st.dataframe(pd.DataFrame(gen["chart_data"]))
+                cd = gen["chart_data"]
+                if isinstance(cd, list) and len(cd) > 0 and isinstance(cd[0], dict):
+                    df = pd.DataFrame(cd)
+                    rename_map = {}
+                    if "label" in df.columns:
+                        rename_map["label"] = "项目"
+                    if "value" in df.columns:
+                        rename_map["value"] = "数值"
+                    if rename_map:
+                        df = df.rename(columns=rename_map)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.dataframe(pd.DataFrame(cd))
 
     # 显示导入的题目
     imported_q = st.session_state.get("imported_topic_question", None)
@@ -907,6 +923,7 @@ def _render_writing_task1():
                             target_score=target_score
                         )
                         st.session_state.current_writing_feedback = parse_json_response(result)
+                        st.session_state.current_essay_content = essay_content
                     except Exception as e:
                         st.error(f"批改作文时出错: {str(e)}")
 
@@ -964,12 +981,12 @@ def _render_writing_task2():
                 if parsed and isinstance(parsed, dict):
                     st.session_state.generated_writing_topic = parsed
                     st.session_state.imported_topic_question = parsed.get("question", "")
+                    save_user_progress(
+                        st.session_state.user_profile.get("user_id", "default_user"),
+                        "生成作文题目",
+                        {"mode": "generate_topic", "task_type": "Task 2", "result": result, "result_data": parsed, "timestamp": datetime.now().isoformat()},
+                    )
                     st.rerun()
-                save_user_progress(
-                    st.session_state.user_profile.get("user_id", "default_user"),
-                    "生成作文题目",
-                    {"mode": "generate_topic", "task_type": "Task 2", "result": result, "result_data": parsed, "timestamp": datetime.now().isoformat()},
-                )
 
     # 显示生成的题目结果
     gen = st.session_state.get("generated_writing_topic")
@@ -1031,6 +1048,7 @@ def _render_writing_task2():
                             target_score=target_score
                         )
                         st.session_state.current_writing_feedback = parse_json_response(result)
+                        st.session_state.current_essay_content = essay_content
                     except Exception as e:
                         st.error(f"批改作文时出错: {str(e)}")
 
@@ -1087,12 +1105,16 @@ def _display_writing_feedback(feedback_data, task_type):
             score = float(feedback_data["overall_score"])
             # 将分数舍入为符合雅思标准的0.5分间隔格式
             formatted_score = round(score * 2) / 2
+            gen_topic = st.session_state.get("generated_writing_topic", {})
             save_user_progress(
                 user_id=user_id,
                 activity=f"写作 {task_type} 练习",
                 data={
                     "score": formatted_score,
                     "task_type": task_type,
+                    "essay_content": st.session_state.get("current_essay_content", ""),
+                    "question": gen_topic.get("question", "") if isinstance(gen_topic, dict) else "",
+                    "result_data": feedback_data,
                     "timestamp": datetime.now().isoformat()
                 }
             )
@@ -1248,13 +1270,24 @@ def _display_record_result_data(result_data):
             if result_data.get("chart_type"):
                 st.markdown(f"**图表类型：** {result_data['chart_type']}")
             if result_data.get("chart_image"):
-                if st.button("显示/隐藏图片", key=f"chart_img_{abs(hash(result_data.get('chart_image','')))}"):
+                img_path = os.path.join(os.path.dirname(__file__), result_data["chart_image"])
+                if not os.path.exists(img_path) and result_data.get("chart_data"):
+                    from utils import build_task1_chart_assets
+                    regenerated = build_task1_chart_assets(dict(result_data))
+                    if regenerated.get("chart_image"):
+                        img_path = os.path.join(os.path.dirname(__file__), regenerated["chart_image"])
+                        result_data["chart_image"] = regenerated["chart_image"]
+                if st.button("显示/隐藏图片", key=f"chart_img_{abs(hash(str(result_data.get('chart_image',''))))}"):
                     st.session_state[f"show_{result_data['chart_image']}"] = not st.session_state.get(f"show_{result_data['chart_image']}", False)
                 if st.session_state.get(f"show_{result_data['chart_image']}", False):
-                    st.image(os.path.join(os.path.dirname(__file__), result_data["chart_image"]))
+                    if os.path.exists(img_path):
+                        st.image(img_path)
+                    else:
+                        st.warning("图片文件已丢失，无法显示")
             if result_data.get("table_data"):
-                td = result_data["table_data"]
-                st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
+                with st.expander("表格数据", expanded=False):
+                    td = result_data["table_data"]
+                    st.dataframe(pd.DataFrame(td.get("rows", []), columns=td.get("headers", [])), use_container_width=True, hide_index=True)
             if result_data.get("topic_category"):
                 st.markdown(f"**话题类别：** {result_data['topic_category']}")
             if result_data.get("essay_type"):
@@ -1272,7 +1305,41 @@ def _display_record_result_data(result_data):
                 st.markdown(f"**建议结构：** {result_data['suggested_structure']}")
             if result_data.get("chart_data"):
                 with st.expander("表格数据（供 AI 互动使用）"):
-                    st.dataframe(pd.DataFrame(result_data["chart_data"]), use_container_width=True)
+                    cd = result_data["chart_data"]
+                    if isinstance(cd, list) and len(cd) > 0 and isinstance(cd[0], dict):
+                        df = pd.DataFrame(cd)
+                        rename_map = {}
+                        if "label" in df.columns:
+                            rename_map["label"] = "项目"
+                        if "value" in df.columns:
+                            rename_map["value"] = "数值"
+                        if rename_map:
+                            df = df.rename(columns=rename_map)
+                        st.dataframe(df, use_container_width=True, hide_index=True)
+                    else:
+                        st.dataframe(pd.DataFrame(cd), use_container_width=True)
+
+    if "overall_score" in result_data:
+        with st.expander("写作批改结果", expanded=True):
+            try:
+                overall = float(result_data["overall_score"])
+                st.metric("总体分数", f"{overall:.1f}/9.0")
+            except (ValueError, TypeError):
+                pass
+            if result_data.get("band_description"):
+                st.write(f"**分数段说明：** {result_data['band_description']}")
+            if result_data.get("strengths"):
+                st.write("**优点：**")
+                for s in result_data["strengths"]:
+                    st.markdown(f"- {s}")
+            if result_data.get("improvements"):
+                st.write("**改进建议：**")
+                for s in result_data["improvements"]:
+                    st.markdown(f"- {s}")
+            if result_data.get("general_comment"):
+                st.write(f"**综合评价：** {result_data['general_comment']}")
+            if result_data.get("overall_feedback"):
+                st.write(f"**整体反馈：** {result_data['overall_feedback']}")
 
     if isinstance(result_data.get("questions"), list):
         for i, item in enumerate(result_data["questions"], 1):
