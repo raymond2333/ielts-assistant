@@ -15,6 +15,7 @@ _BEIJING_TZ = timezone(timedelta(hours=8))
 
 from database import (
     authenticate_user as _authenticate_user,
+    delete_progress_record_by_id as _delete_progress_record_by_id,
     get_database_status as _get_database_status,
     get_progress,
     initialize_database as _initialize_database,
@@ -227,6 +228,30 @@ def get_user_progress(user_id: str) -> List[Dict[str, Any]]:
     if "user_progress" not in st.session_state:
         return []
     return [r for r in st.session_state.user_progress if r.get("user_id") == user_id]
+
+
+def delete_user_progress_record(user_id: str, record_id: Any = None, timestamp: str = "") -> bool:
+    if is_mysql_configured() and record_id:
+        try:
+            return _delete_progress_record_by_id(int(record_id), user_id)
+        except Exception as e:
+            print(f"删除数据库进度记录时出错: {e}")
+            return False
+
+    if "user_progress" not in st.session_state:
+        return False
+    before = len(st.session_state.user_progress)
+    st.session_state.user_progress = [
+        r for r in st.session_state.user_progress
+        if not (
+            r.get("user_id") == user_id
+            and (
+                (record_id and str(r.get("id", "")) == str(record_id))
+                or (timestamp and r.get("timestamp", "") == timestamp)
+            )
+        )
+    ]
+    return len(st.session_state.user_progress) < before
 
 
 def save_user_profile(user_id: str, profile: Dict[str, Any]) -> bool:

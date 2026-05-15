@@ -17,6 +17,7 @@ from utils import (
     create_progress_chart_data,
     create_score_gauge,
     cross_login_token,
+    delete_user_progress_record,
     get_database_status,
     get_user_progress,
     initialize_database,
@@ -195,6 +196,13 @@ def _format_timestamp(ts) -> str:
         pass
     dt = dt.astimezone(_BEIJING_TZ)
     return dt.strftime("%Y-%m-%d %H:%M")
+
+
+def _rerun_app():
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        st.experimental_rerun()
 
 
 def _profile_overall_level(profile: Dict[str, Any]) -> float:
@@ -2541,7 +2549,15 @@ if st.session_state.active_tab.startswith("📊"):
         # Records with mode info can be replayed in Beta version (Flask) via /replay?ts=xxx
 
         if filtered_progress:
-            recent_records = list(reversed(filtered_progress[-15:]))
+            records_per_page = 10
+            total_records = len(filtered_progress)
+            total_pages = max(1, (total_records + records_per_page - 1) // records_per_page)
+            page = int(st.session_state.get("history_page", 1))
+            page = max(1, min(page, total_pages))
+            st.session_state.history_page = page
+            ordered_records = list(reversed(filtered_progress))
+            start = (page - 1) * records_per_page
+            recent_records = ordered_records[start:start + records_per_page]
             for record in recent_records:
                 data = record.get("data", {}) or {}
                 score = record.get("score") or data.get("score", "")
@@ -2558,7 +2574,16 @@ if st.session_state.active_tab.startswith("📊"):
                     else:
                         replay_params["ts"] = timestamp
                     flask_replay = f"{flask_url}/replay?{urlencode(replay_params)}"
-                    st.markdown(f"[🔄 重新练习此题]({flask_replay})")
+                    action_col1, action_col2 = st.columns([1, 1])
+                    with action_col1:
+                        st.markdown(f"[🔄 重新练习此题]({flask_replay})")
+                    with action_col2:
+                        if st.button("删除记录", key=f"delete_record_{record_id or timestamp}"):
+                            if delete_user_progress_record(user_id, record_id=record_id, timestamp=timestamp):
+                                st.success("记录已删除")
+                                _rerun_app()
+                            else:
+                                st.error("删除失败")
                     if data.get("mode"):
                         st.caption(f"模式：{data['mode']}")
                     if data.get("task_type"):
@@ -2595,6 +2620,17 @@ if st.session_state.active_tab.startswith("📊"):
                         record_title = learning_record_title(activity)
                         st.markdown(f"**{record_title}：**")
                         st.markdown(str(data["result"])[:2000])
+            page_cols = st.columns([1, 2, 1])
+            with page_cols[0]:
+                if st.button("上一页", disabled=page <= 1, key="history_prev"):
+                    st.session_state.history_page = page - 1
+                    _rerun_app()
+            with page_cols[1]:
+                st.markdown(f"<p style='text-align:center'>第 {page} / {total_pages} 页 · 共 {total_records} 条</p>", unsafe_allow_html=True)
+            with page_cols[2]:
+                if st.button("下一页", disabled=page >= total_pages, key="history_next"):
+                    st.session_state.history_page = page + 1
+                    _rerun_app()
         else:
             st.info("暂无练习记录。完成口语反馈或作文批改后，这里会自动显示历史数据。")
 
@@ -2624,26 +2660,27 @@ if st.session_state.active_tab.startswith("📊"):
 
         if st.session_state.get("improvement_suggestions"):
             s = st.session_state.improvement_suggestions
-            if isinstance(s, str):
-                st.markdown(s)
-            elif isinstance(s, dict):
-                st.markdown(f"**{s.get('summary', '')}**")
-                if s.get("priority_areas"):
-                    for area in s["priority_areas"]:
-                        st.markdown(f"- 🔴 {area}")
-                if s.get("suggestions"):
-                    for item in s["suggestions"]:
-                        with st.expander(f"📌 {item.get('area', '')}"):
-                            st.caption(f"当前问题：{item.get('current_issue', '')}")
-                            st.caption(f"行动建议：{item.get('action', '')}")
-                            st.caption(f"每周目标：{item.get('weekly_goal', '')}")
-                            st.caption(f"预计提升：{item.get('estimated_improvement', '')}")
-                if s.get("study_tips"):
-                    st.caption("学习技巧：")
-                    for tip in s["study_tips"]:
-                        st.markdown(f"- {tip}")
-                if s.get("motivation"):
-                    st.success(s["motivation"])
+            with st.expander("查看已生成的重点提升建议", expanded=False):
+                if isinstance(s, str):
+                    st.markdown(s)
+                elif isinstance(s, dict):
+                    st.markdown(f"**{s.get('summary', '')}**")
+                    if s.get("priority_areas"):
+                        for area in s["priority_areas"]:
+                            st.markdown(f"- {area}")
+                    if s.get("suggestions"):
+                        for item in s["suggestions"]:
+                            with st.expander(f"{item.get('area', '')}"):
+                                st.caption(f"当前问题：{item.get('current_issue', '')}")
+                                st.caption(f"行动建议：{item.get('action', '')}")
+                                st.caption(f"每周目标：{item.get('weekly_goal', '')}")
+                                st.caption(f"预计提升：{item.get('estimated_improvement', '')}")
+                    if s.get("study_tips"):
+                        st.caption("学习技巧：")
+                        for tip in s["study_tips"]:
+                            st.markdown(f"- {tip}")
+                    if s.get("motivation"):
+                        st.success(s["motivation"])
 
         # 学习计划 — 持久化显示
         st.subheader("📅 个性化学习计划")
@@ -2662,12 +2699,13 @@ if st.session_state.active_tab.startswith("📊"):
 
         # 显示已有计划 + 重新生成按钮
         if st.session_state.saved_study_plan:
-            st.markdown(st.session_state.saved_study_plan)
+            with st.expander("查看已生成的学习计划", expanded=False):
+                st.markdown(st.session_state.saved_study_plan)
             col_a, col_b = st.columns([1, 4])
             with col_a:
-                if st.button("🔄 重新生成"):
+                if st.button("重新生成"):
                     st.session_state.saved_study_plan = None
-                    st.experimental_rerun()
+                    _rerun_app()
         else:
             if st.button("📅 生成详细学习计划", type="primary"):
                 with st.spinner("正在生成个性化学习计划..."):

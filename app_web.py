@@ -219,6 +219,75 @@ def record_result_filter(result_data, activity=""):
 
     sections = []
 
+    if result_data.get("unifying_theme") or isinstance(result_data.get("linked_responses"), list):
+        theme_body = []
+        if result_data.get("unifying_theme"):
+            theme_body.append(f"<p><strong>中文：</strong>{escape(result_data['unifying_theme'])}</p>")
+        if result_data.get("unifying_theme_en"):
+            theme_body.append(f"<p><strong>English：</strong>{escape(result_data['unifying_theme_en'])}</p>")
+        if theme_body:
+            sections.append(
+                "<details class='result-accordion' open><summary>核心主题</summary>"
+                f"<div class='result-body'>{''.join(theme_body)}</div></details>"
+            )
+
+        linked_responses = result_data.get("linked_responses") or []
+        if isinstance(linked_responses, list):
+            for index, item in enumerate(linked_responses, 1):
+                if not isinstance(item, dict):
+                    continue
+                title = item.get("topic") or f"话题 {index}"
+                if item.get("topic_en"):
+                    title = f"{title} / {item.get('topic_en')}"
+                body = []
+                if item.get("adapted_response"):
+                    body.append(f"<p><strong>中文方案：</strong>{escape(item['adapted_response'])}</p>")
+                if item.get("adapted_response_en"):
+                    english = str(item["adapted_response_en"])
+                    body.append(
+                        "<p><strong>English Response：</strong>"
+                        f"<button class='speak-btn' type='button' data-speak='{escape(english)}'>朗读答案</button></p>"
+                        f"<p>{escape(english)}</p>"
+                    )
+                if item.get("possible_questions"):
+                    body.append("<p><strong>可能出现的相关考题：</strong></p>")
+                    body.append(_html_list(item["possible_questions"]))
+                if item.get("key_elements"):
+                    body.append("<p><strong>关键元素：</strong></p>")
+                    body.append(_html_list(item["key_elements"]))
+                if item.get("transition_phrases"):
+                    body.append("<p><strong>过渡短语：</strong></p>")
+                    body.append(_html_list(item["transition_phrases"]))
+                sections.append(
+                    f"<details class='result-accordion nested-answer' {'open' if index == 1 else ''}>"
+                    f"<summary>话题 {index}：{escape(title)}</summary>"
+                    f"<div class='result-body'>{''.join(body)}</div></details>"
+                )
+
+        if result_data.get("versatile_vocabulary") or result_data.get("versatile_vocabulary_en"):
+            vocab_body = []
+            if result_data.get("versatile_vocabulary"):
+                vocab_body.append("<p><strong>中文：</strong></p>")
+                vocab_body.append(_html_list(result_data["versatile_vocabulary"]))
+            if result_data.get("versatile_vocabulary_en"):
+                vocab_body.append("<p><strong>English：</strong></p>")
+                vocab_body.append(_html_list(result_data["versatile_vocabulary_en"]))
+            sections.append(
+                "<details class='result-accordion'><summary>通用词汇</summary>"
+                f"<div class='result-body'>{''.join(vocab_body)}</div></details>"
+            )
+        if result_data.get("practice_strategy"):
+            sections.append(
+                "<details class='result-accordion'><summary>练习策略</summary>"
+                f"<div class='result-body'><p>{escape(result_data['practice_strategy'])}</p></div></details>"
+            )
+        if result_data.get("study_plan"):
+            sections.append(
+                "<details class='result-accordion'><summary>学习计划</summary>"
+                f"<div class='result-body'><p>{escape(result_data['study_plan'])}</p></div></details>"
+            )
+        return Markup("".join(sections))
+
     cue_card = result_data.get("cue_card")
     if cue_card:
         feedback_html = _feedback_html(result_data.get("_feedbacks"))
@@ -489,6 +558,21 @@ def score_options(start=1.0, end=9.0):
         values.append(round(value, 1))
         value += 0.5
     return values
+
+
+def int_query(name, default=1):
+    try:
+        return int(request.args.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def paginate_records(records, page, per_page=10):
+    total = len(records)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    return records[start:start + per_page], page, total_pages, total
 
 
 def current_assistant():
@@ -884,6 +968,7 @@ def auth():
 def dashboard():
     user_id = session["user_id"]
     date_filter = request.args.get("date", "").strip()
+    page = int_query("page", 1)
     all_progress = list(reversed(get_progress(user_id, limit=180)))
     suggestion_record = get_latest_progress_by_activity(user_id, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
     study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
@@ -892,10 +977,13 @@ def dashboard():
     progress = prepare_progress(all_progress)
     if date_filter:
         progress = [p for p in progress if (p.get("timestamp") or "").startswith(date_filter)]
-    progress = progress[:12]
+    progress, page, total_pages, total_records = paginate_records(progress, page, 10)
     return render_template(
         "dashboard.html",
         progress=progress,
+        page=page,
+        total_pages=total_pages,
+        total_records=total_records,
         suggestions=suggestions,
         study_plan=study_plan,
         date_filter=date_filter,
@@ -1498,14 +1586,19 @@ def writing():
 @login_required
 def analysis():
     user_id = session["user_id"]
+    page = int_query("page", 1)
     all_progress = list(reversed(get_progress(user_id, limit=180)))
     study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
     study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
     progress = prepare_progress(all_progress)
+    progress, page, total_pages, total_records = paginate_records(progress, page, 10)
     user_words = get_user_words(user_id)
     return render_template(
         "analysis.html",
         progress=progress,
+        page=page,
+        total_pages=total_pages,
+        total_records=total_records,
         study_plan=study_plan,
         user_words=user_words,
         **common_context(),

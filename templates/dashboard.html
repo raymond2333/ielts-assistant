@@ -165,8 +165,11 @@
           {% endif %}
         </div>
         {% if suggestions %}
+          <details class="result-accordion">
+            <summary>查看已生成的重点提升建议</summary>
+            <div class="result-body">
           {% if suggestions.get('formatted_text') %}
-            <div class="result-body">{{ suggestions.formatted_text | simple_md }}</div>
+            {{ suggestions.formatted_text | simple_md }}
           {% else %}
           <p><strong>{{ suggestions.get('summary', '') }}</strong></p>
           {% if suggestions.get('priority_areas') %}
@@ -194,6 +197,8 @@
           <p class="record-meta" style="color:var(--accent);font-weight:800;text-align:center;font-size:1.05rem">{{ suggestions.motivation }}</p>
           {% endif %}
           {% endif %}
+            </div>
+          </details>
           <form method="post" action="{{ url_for('generate_suggestions') }}" style="margin-top:12px">
             <button class="ghost-btn" type="submit">重新生成</button>
           </form>
@@ -215,7 +220,10 @@
           {% endif %}
         </div>
         {% if study_plan %}
-          <div class="result-body">{{ study_plan | simple_md }}</div>
+          <details class="result-accordion">
+            <summary>查看已生成的学习计划</summary>
+            <div class="result-body">{{ study_plan | simple_md }}</div>
+          </details>
           <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px">
             <button class="ghost-btn" type="submit">重新生成</button>
           </form>
@@ -245,7 +253,7 @@
                   <p class="record-meta"><strong>记录ID：</strong>{{ item.id }}</p>
                   <a class="primary-btn small" href="{{ url_for('replay', id=item.id) }}" style="margin-bottom:10px;display:inline-block">🔄 重新练习此题</a>
                   <form method="post" action="{{ url_for('delete_record', record_id=item.id) }}" style="display:inline-block;margin-left:8px" onsubmit="return confirm('确定删除这条练习记录吗？')">
-                    <input type="hidden" name="next" value="{{ url_for('dashboard', date=date_filter, _anchor='history') }}">
+                    <input type="hidden" name="next" value="{{ url_for('dashboard', date=date_filter, page=page, _anchor='history') }}">
                     <button class="ghost-btn small" type="submit" style="color:var(--danger)">删除记录</button>
                   </form>
                   {% if item.data.mode %}<p class="record-meta"><strong>模式：</strong>{{ item.data.mode }}</p>{% endif %}
@@ -288,6 +296,15 @@
                 </div>
               </details>
             {% endfor %}
+          </div>
+          <div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap">
+            {% if page > 1 %}
+              <a class="ghost-btn small" href="{{ url_for('dashboard', date=date_filter, page=page-1, _anchor='history') }}">上一页</a>
+            {% endif %}
+            <span class="record-meta">第 {{ page }} / {{ total_pages }} 页 · 共 {{ total_records }} 条</span>
+            {% if page < total_pages %}
+              <a class="ghost-btn small" href="{{ url_for('dashboard', date=date_filter, page=page+1, _anchor='history') }}">下一页</a>
+            {% endif %}
           </div>
         {% else %}
           <p class="empty-text">暂无学习记录。完成口语反馈、作文批改或题目练习后会显示在这里。</p>
