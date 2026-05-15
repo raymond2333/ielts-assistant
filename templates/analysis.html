@@ -35,7 +35,7 @@
         {% if study_plan %}
           <details class="result-accordion">
             <summary>查看已生成的学习计划</summary>
-            <div class="result-body">{{ study_plan | simple_md }}</div>
+            <div class="result-body">{{ study_plan | study_plan_result }}</div>
           </details>
           <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px"><button class="ghost-btn" type="submit">重新生成</button></form>
         {% else %}

@@ -1540,6 +1540,52 @@ def _display_record_result_data(result_data):
                     st.write(value)
 
 
+def _display_study_plan(plan):
+    if isinstance(plan, str):
+        parsed = parse_json_response(plan)
+        if isinstance(parsed, dict) and "formatted_text" not in parsed:
+            plan = parsed
+        else:
+            st.markdown(plan)
+            return
+    if not isinstance(plan, dict):
+        st.write(plan)
+        return
+
+    if plan.get("overall_assessment"):
+        with st.expander("总体评价", expanded=True):
+            st.write(plan["overall_assessment"])
+    if plan.get("priority_areas"):
+        with st.expander("优先提升领域"):
+            for area in plan["priority_areas"]:
+                st.markdown(f"- {area}")
+    weekly = plan.get("weekly_schedule")
+    if isinstance(weekly, list):
+        with st.expander("每周安排", expanded=True):
+            for item in weekly:
+                if not isinstance(item, dict):
+                    continue
+                week = item.get("week", "")
+                theme = item.get("theme", "")
+                with st.expander(f"第 {week} 周：{theme}", expanded=False):
+                    if item.get("focus"):
+                        st.markdown(f"**重点：** {item['focus']}")
+                    if item.get("tasks"):
+                        st.markdown("**具体任务：**")
+                        for task in item["tasks"]:
+                            st.markdown(f"- {task}")
+                    if item.get("goal"):
+                        st.markdown(f"**本周目标：** {item['goal']}")
+    if plan.get("study_tips"):
+        with st.expander("学习建议"):
+            for tip in plan["study_tips"]:
+                st.markdown(f"- {tip}")
+    if plan.get("milestones"):
+        with st.expander("阶段检查点"):
+            for milestone in plan["milestones"]:
+                st.markdown(f"- {milestone}")
+
+
 # 显示口语反馈的函数
 def _display_speaking_feedback(feedback_data):
     st.markdown("---")
@@ -2540,10 +2586,14 @@ if st.session_state.active_tab.startswith("📊"):
 
         # Date filter
         filter_date = st.date_input("📅 按日期筛选（清空日期显示全部）", value=None, key="history_date_filter")
-        filtered_progress = user_progress
+        hidden_history_activities = {"重点提升建议", "学习计划"}
+        filtered_progress = [
+            r for r in user_progress
+            if r.get("activity") not in hidden_history_activities
+        ]
         if filter_date:
             date_str = filter_date.strftime("%Y-%m-%d")
-            filtered_progress = [r for r in user_progress if (r.get("timestamp", "") or "").startswith(date_str)]
+            filtered_progress = [r for r in filtered_progress if (r.get("timestamp", "") or "").startswith(date_str)]
 
         # Replay handling from query params — removed (doesn't work with Streamlit auth)
         # Records with mode info can be replayed in Beta version (Flask) via /replay?ts=xxx
@@ -2576,9 +2626,9 @@ if st.session_state.active_tab.startswith("📊"):
                     flask_replay = f"{flask_url}/replay?{urlencode(replay_params)}"
                     action_col1, action_col2 = st.columns([1, 1])
                     with action_col1:
-                        st.markdown(f"[🔄 重新练习此题]({flask_replay})")
+                        st.link_button("🔄 重新练习此题", flask_replay, width="stretch")
                     with action_col2:
-                        if st.button("删除记录", key=f"delete_record_{record_id or timestamp}"):
+                        if st.button("🗑️ 删除记录", key=f"delete_record_{record_id or timestamp}", width="stretch"):
                             if delete_user_progress_record(user_id, record_id=record_id, timestamp=timestamp):
                                 st.success("记录已删除")
                                 _rerun_app()
@@ -2719,14 +2769,20 @@ if st.session_state.active_tab.startswith("📊"):
             for record in user_progress:
                 if record.get("activity") == "学习计划":
                     plan_data = record.get("data", {})
-                    if isinstance(plan_data, dict) and plan_data.get("plan_text"):
-                        st.session_state.saved_study_plan = plan_data["plan_text"]
-                        break
+                    if isinstance(plan_data, dict):
+                        saved_plan = plan_data.get("plan") or plan_data.get("study_plan") or plan_data.get("result_data") or plan_data.get("plan_text")
+                        if isinstance(saved_plan, str):
+                            parsed_plan = parse_json_response(saved_plan)
+                            if isinstance(parsed_plan, dict) and "formatted_text" not in parsed_plan:
+                                saved_plan = parsed_plan
+                        if saved_plan:
+                            st.session_state.saved_study_plan = saved_plan
+                            break
 
         # 显示已有计划 + 重新生成按钮
         if st.session_state.saved_study_plan:
             with st.expander("查看已生成的学习计划", expanded=False):
-                st.markdown(st.session_state.saved_study_plan)
+                _display_study_plan(st.session_state.saved_study_plan)
             col_a, col_b = st.columns([1, 4])
             with col_a:
                 if st.button("重新生成"):
@@ -2775,22 +2831,25 @@ if st.session_state.active_tab.startswith("📊"):
                             if not weak_areas:
                                 weak_areas = st.session_state.user_profile.get("weak_areas", ["口语", "写作"])
 
-                            study_plan = st.session_state.tongyi_agent.generate_study_plan(
+                            raw_study_plan = st.session_state.tongyi_agent.generate_study_plan(
                                 current_level=current_level,
                                 target_score=st.session_state.user_profile["target_score"],
                                 weak_areas=weak_areas,
                                 weeks=study_weeks,
                                 progress_records=user_progress,
                             )
+                            parsed_plan = parse_json_response(raw_study_plan)
+                            study_plan = parsed_plan if isinstance(parsed_plan, dict) and "formatted_text" not in parsed_plan else raw_study_plan
 
                             st.session_state.saved_study_plan = study_plan
-                            st.markdown(study_plan)
+                            _display_study_plan(study_plan)
 
                             # 保存到进度
+                            plan_payload = {"plan": study_plan, "raw": raw_study_plan} if isinstance(study_plan, dict) else {"plan_text": raw_study_plan}
                             save_user_progress(
                                 st.session_state.user_profile.get("user_id", "default_user"),
                                 "学习计划",
-                                {"plan_text": study_plan},
+                                plan_payload,
                             )
                         else:
                             st.error("请先在侧边栏配置 AI API Key")

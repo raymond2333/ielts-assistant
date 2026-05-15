@@ -494,6 +494,69 @@ def record_result_filter(result_data, activity=""):
     return Markup("".join(sections))
 
 
+@app.template_filter("study_plan_result")
+def study_plan_result_filter(plan):
+    if not plan:
+        return Markup("")
+    if isinstance(plan, str):
+        parsed = parse_model_output(plan)
+        if isinstance(parsed, dict) and "formatted_text" not in parsed:
+            plan = parsed
+        else:
+            return Markup(simple_md_filter(plan))
+    if not isinstance(plan, dict):
+        return Markup(f"<pre>{escape(str(plan))}</pre>")
+
+    sections = []
+    if plan.get("overall_assessment"):
+        sections.append(
+            "<details class='result-accordion' open><summary>总体评价</summary>"
+            f"<div class='result-body'><p>{escape(plan['overall_assessment'])}</p></div></details>"
+        )
+    if plan.get("priority_areas"):
+        sections.append(
+            "<details class='result-accordion'><summary>优先提升领域</summary>"
+            f"<div class='result-body'>{_html_list(plan['priority_areas'])}</div></details>"
+        )
+    weekly = plan.get("weekly_schedule")
+    if isinstance(weekly, list):
+        week_blocks = []
+        for item in weekly:
+            if not isinstance(item, dict):
+                continue
+            week = escape(item.get("week", ""))
+            theme = escape(item.get("theme", ""))
+            body = []
+            if item.get("focus"):
+                body.append(f"<p><strong>重点：</strong>{escape(item['focus'])}</p>")
+            if item.get("tasks"):
+                body.append("<p><strong>具体任务：</strong></p>")
+                body.append(_html_list(item["tasks"]))
+            if item.get("goal"):
+                body.append(f"<p><strong>本周目标：</strong>{escape(item['goal'])}</p>")
+            week_blocks.append(
+                f"<details class='result-accordion nested-answer'><summary>第 {week} 周：{theme}</summary>"
+                f"<div class='result-body'>{''.join(body)}</div></details>"
+            )
+        sections.append(
+            "<details class='result-accordion' open><summary>每周安排</summary>"
+            f"<div class='result-body'>{''.join(week_blocks)}</div></details>"
+        )
+    if plan.get("study_tips"):
+        sections.append(
+            "<details class='result-accordion'><summary>学习建议</summary>"
+            f"<div class='result-body'>{_html_list(plan['study_tips'])}</div></details>"
+        )
+    if plan.get("milestones"):
+        sections.append(
+            "<details class='result-accordion'><summary>阶段检查点</summary>"
+            f"<div class='result-body'>{_html_list(plan['milestones'])}</div></details>"
+        )
+    if not sections:
+        sections.append(f"<pre>{escape(json.dumps(plan, ensure_ascii=False, indent=2))}</pre>")
+    return Markup("".join(sections))
+
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -698,7 +761,12 @@ def latest_saved_study_plan(records):
     data = record.get("data", {}) if record else {}
     if not isinstance(data, dict):
         return None
-    return data.get("plan_text") or data.get("study_plan") or data.get("result") or ""
+    plan = data.get("plan") or data.get("study_plan") or data.get("result_data")
+    if isinstance(plan, str):
+        plan = parse_model_output(plan)
+    if isinstance(plan, dict):
+        return plan
+    return data.get("plan_text") or data.get("result") or ""
 
 
 def profile_weak_areas(profile):
@@ -1095,7 +1163,7 @@ def generate_study_plan():
 
     current_level, study_weeks, weak_areas = calculate_study_plan_inputs(profile, progress)
     try:
-        study_plan = assistant.generate_study_plan(
+        raw_study_plan = assistant.generate_study_plan(
             current_level=current_level,
             target_score=float(profile.get("target_score", 6.5)),
             weak_areas=weak_areas,
@@ -1105,7 +1173,11 @@ def generate_study_plan():
     except Exception as exc:
         flash(f"AI 调用失败：{exc}", "error")
         return redirect(request.referrer or url_for("dashboard"))
-    save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan_text": study_plan})
+    study_plan = parse_model_output(raw_study_plan)
+    if isinstance(study_plan, dict) and "formatted_text" not in study_plan:
+        save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan": study_plan, "raw": raw_study_plan})
+    else:
+        save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan_text": raw_study_plan})
     flash("个性化学习计划已生成。", "success")
     return redirect(request.referrer or url_for("dashboard"))
 

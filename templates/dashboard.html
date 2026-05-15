@@ -171,27 +171,31 @@
           {% if suggestions.get('formatted_text') %}
             {{ suggestions.formatted_text | simple_md }}
           {% else %}
-          <p><strong>{{ suggestions.get('summary', '') }}</strong></p>
+          {% if suggestions.get('summary') %}<details class="result-accordion" open><summary>总体建议</summary><div class="result-body"><p><strong>{{ suggestions.get('summary', '') }}</strong></p></div></details>{% endif %}
           {% if suggestions.get('priority_areas') %}
-          <p class="tag-row">
+          <details class="result-accordion"><summary>优先提升领域</summary><div class="result-body"><p class="tag-row">
             {% for area in suggestions.priority_areas %}<span class="tag tag-accent">{{ area }}</span>{% endfor %}
-          </p>
+          </p></div></details>
           {% endif %}
           {% if suggestions.get('suggestions') %}
+          <details class="result-accordion" open><summary>分项提升建议</summary><div class="result-body">
           {% for s in suggestions.suggestions %}
-          <div class="theme-card">
-            <h3>{{ s.get('area', '') }}</h3>
+          <details class="result-accordion nested-answer">
+            <summary>{{ s.get('area', '') }}</summary>
+            <div class="result-body">
             <p class="record-meta"><strong>当前问题：</strong>{{ s.get('current_issue', '') }}</p>
             <p class="record-meta"><strong>行动建议：</strong>{{ s.get('action', '') }}</p>
             <p class="record-meta"><strong>每周目标：</strong>{{ s.get('weekly_goal', '') }}</p>
             <p class="record-meta"><strong>预计提升：</strong>{{ s.get('estimated_improvement', '') }}</p>
-          </div>
+            </div>
+          </details>
           {% endfor %}
+          </div></details>
           {% endif %}
           {% if suggestions.get('study_tips') %}
-          <p class="tag-row"><strong>学习技巧：</strong>
+          <details class="result-accordion"><summary>学习技巧</summary><div class="result-body"><p class="tag-row">
             {% for tip in suggestions.study_tips %}<span class="tag">{{ tip }}</span>{% endfor %}
-          </p>
+          </p></div></details>
           {% endif %}
           {% if suggestions.get('motivation') %}
           <p class="record-meta" style="color:var(--accent);font-weight:800;text-align:center;font-size:1.05rem">{{ suggestions.motivation }}</p>
@@ -222,7 +226,7 @@
         {% if study_plan %}
           <details class="result-accordion">
             <summary>查看已生成的学习计划</summary>
-            <div class="result-body">{{ study_plan | simple_md }}</div>
+            <div class="result-body">{{ study_plan | study_plan_result }}</div>
           </details>
           <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px">
             <button class="ghost-btn" type="submit">重新生成</button>
