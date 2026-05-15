@@ -417,7 +417,7 @@ def _render_speaking_part1():
                                     },
                                 )
                         if answer_key in st.session_state:
-                            _display_record_result_data(st.session_state[answer_key])
+                            _display_record_result_data(st.session_state[answer_key], key_prefix=answer_key)
 
 
 # 口语Part 2界面函数
@@ -857,7 +857,7 @@ def _render_speaking_part3():
                                     },
                                 )
                         if answer_key in st.session_state:
-                            _display_record_result_data(st.session_state[answer_key])
+                            _display_record_result_data(st.session_state[answer_key], key_prefix=answer_key)
 
 
 def _render_writing_task1():
@@ -1282,7 +1282,7 @@ def _display_writing_feedback(feedback_data, task_type):
         st.experimental_rerun()
 
 
-def _display_record_result_data(result_data):
+def _display_record_result_data(result_data, key_prefix=""):
     """Properly render saved result_data from learning records."""
     import pandas as pd
 
@@ -1370,9 +1370,12 @@ def _display_record_result_data(result_data):
                     if regenerated.get("chart_image"):
                         img_path = os.path.join(os.path.dirname(__file__), regenerated["chart_image"])
                         result_data["chart_image"] = regenerated["chart_image"]
-                if st.button("显示/隐藏图片", key=f"chart_img_{abs(hash(str(result_data.get('chart_image',''))))}"):
-                    st.session_state[f"show_{result_data['chart_image']}"] = not st.session_state.get(f"show_{result_data['chart_image']}", False)
-                if st.session_state.get(f"show_{result_data['chart_image']}", False):
+                image_key_seed = f"{key_prefix}_{result_data.get('chart_image', '')}_{result_data.get('question', '')}"
+                image_key = f"chart_img_{abs(hash(image_key_seed))}"
+                show_key = f"show_{image_key}"
+                if st.button("显示/隐藏图片", key=image_key):
+                    st.session_state[show_key] = not st.session_state.get(show_key, False)
+                if st.session_state.get(show_key, False):
                     if os.path.exists(img_path):
                         st.image(img_path)
                     else:
@@ -2667,7 +2670,8 @@ if st.session_state.active_tab.startswith("📊"):
                     if result_data and isinstance(result_data, dict):
                         record_title = learning_record_title(activity)
                         st.markdown(f"**{record_title}：**")
-                        _display_record_result_data(result_data)
+                        record_key = record_id or timestamp or str(abs(hash(str(data))))
+                        _display_record_result_data(result_data, key_prefix=f"history_{record_key}")
                     elif data.get("result"):
                         record_title = learning_record_title(activity)
                         st.markdown(f"**{record_title}：**")
