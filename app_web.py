@@ -5,6 +5,7 @@ import json
 import os
 import random
 import uuid
+from datetime import datetime
 from functools import wraps
 from urllib.parse import urlsplit, urlunsplit
 import ipaddress
@@ -19,6 +20,7 @@ from database import (
     delete_user,
     get_all_progress,
     get_database_status,
+    get_latest_progress_by_activity,
     get_progress,
     get_user_words,
     get_vocab_progress,
@@ -89,6 +91,9 @@ AI_PROVIDERS = {
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "ielts-dev-secret-key")
 
+STUDY_PLAN_ACTIVITY = "学习计划"
+IMPROVEMENT_SUGGESTIONS_ACTIVITY = "重点提升建议"
+
 
 def build_task1_chart_assets(result_data, raw_text=""):
     return _build_task1_chart_assets(result_data, raw_text)
@@ -122,9 +127,10 @@ def beijing_time_filter(value):
     else:
         return str(value)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=_BJ)
+        dt = dt.replace(tzinfo=_tz.utc)
     else:
-        dt = dt.astimezone(_BJ)
+        pass
+    dt = dt.astimezone(_BJ)
     return dt.strftime("%Y-%m-%d %H:%M")
 
 
@@ -572,7 +578,8 @@ def attach_speaking_feedback(records):
 def visible_progress(records):
     return [
         record for record in records
-        if record.get("activity") != "学习计划" and not is_speaking_feedback_record(record)
+        if record.get("activity") not in {STUDY_PLAN_ACTIVITY, IMPROVEMENT_SUGGESTIONS_ACTIVITY}
+        and not is_speaking_feedback_record(record)
     ]
 
 
@@ -582,6 +589,90 @@ def prepare_progress(records):
 
 def prepare_feedback_context(records):
     return attach_speaking_feedback(records)
+
+
+def latest_activity_record(records, activity):
+    matched = [record for record in records if record.get("activity") == activity]
+    if not matched:
+        return None
+    return max(matched, key=lambda record: record.get("timestamp") or "")
+
+
+def latest_saved_suggestions(records):
+    record = latest_activity_record(records, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
+    data = record.get("data", {}) if record else {}
+    if not isinstance(data, dict):
+        return None
+    suggestions = data.get("suggestions") or data.get("result_data")
+    if isinstance(suggestions, str):
+        suggestions = parse_model_output(suggestions)
+    return suggestions if isinstance(suggestions, dict) else None
+
+
+def latest_saved_study_plan(records):
+    record = latest_activity_record(records, STUDY_PLAN_ACTIVITY)
+    data = record.get("data", {}) if record else {}
+    if not isinstance(data, dict):
+        return None
+    return data.get("plan_text") or data.get("study_plan") or data.get("result") or ""
+
+
+def profile_weak_areas(profile):
+    weak_areas = profile.get("weak_areas", [])
+    if isinstance(weak_areas, str):
+        try:
+            weak_areas = json.loads(weak_areas)
+        except (TypeError, ValueError):
+            weak_areas = [weak_areas] if weak_areas else []
+    return weak_areas
+
+
+def calculate_study_plan_inputs(profile, progress):
+    speaking_scores = []
+    writing_scores = []
+    for record in progress:
+        data = record.get("data", {}) if isinstance(record, dict) else {}
+        if not isinstance(data, dict):
+            continue
+        score = record.get("score") if record.get("score") is not None else data.get("score")
+        if score in (None, ""):
+            continue
+        try:
+            score = float(score)
+        except (TypeError, ValueError):
+            continue
+        activity = record.get("activity", "")
+        if "口语" in activity:
+            speaking_scores.append(score)
+        elif "写作" in activity:
+            writing_scores.append(score)
+
+    profile_level = float(profile.get("current_level", 5.0))
+    avg_speaking = (
+        sum(speaking_scores) / len(speaking_scores)
+        if speaking_scores else float(profile.get("speaking_level", profile_level))
+    )
+    avg_writing = (
+        sum(writing_scores) / len(writing_scores)
+        if writing_scores else float(profile.get("writing_level", profile_level))
+    )
+    current_level = (avg_speaking + avg_writing) / 2 if (speaking_scores or writing_scores) else profile_level
+
+    try:
+        exam_date = profile.get("exam_date") or ""
+        study_weeks = max(1, int((datetime.strptime(exam_date, "%Y-%m-%d") - datetime.now()).days / 7)) if exam_date else 12
+    except (TypeError, ValueError):
+        study_weeks = 12
+
+    weak_areas = []
+    if speaking_scores and avg_speaking < float(profile.get("speaking_level", 6.0)):
+        weak_areas.append("口语")
+    if writing_scores and avg_writing < float(profile.get("writing_level", 6.0)):
+        weak_areas.append("写作")
+    if not weak_areas:
+        weak_areas = profile_weak_areas(profile) or ["口语", "写作"]
+
+    return current_level, study_weeks, weak_areas
 
 
 
@@ -793,15 +884,20 @@ def auth():
 def dashboard():
     user_id = session["user_id"]
     date_filter = request.args.get("date", "").strip()
-    progress = prepare_progress(list(reversed(get_progress(user_id, limit=160))))
+    all_progress = list(reversed(get_progress(user_id, limit=180)))
+    suggestion_record = get_latest_progress_by_activity(user_id, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
+    study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
+    suggestions = latest_saved_suggestions([suggestion_record] if suggestion_record else [])
+    study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
+    progress = prepare_progress(all_progress)
     if date_filter:
         progress = [p for p in progress if (p.get("timestamp") or "").startswith(date_filter)]
     progress = progress[:12]
-    suggestions = session.pop("improvement_suggestions", None)
     return render_template(
         "dashboard.html",
         progress=progress,
         suggestions=suggestions,
+        study_plan=study_plan,
         date_filter=date_filter,
         score_options=score_options(),
         target_options=score_options(4.0, 9.0),
@@ -819,20 +915,54 @@ def generate_suggestions():
     if assistant is None:
         flash("请先保存可用的 AI API Key。", "error")
         return redirect(url_for("dashboard"))
-    weak_areas = profile.get("weak_areas", [])
-    if isinstance(weak_areas, str):
-        try:
-            weak_areas = json.loads(weak_areas)
-        except (TypeError, ValueError):
-            weak_areas = [weak_areas] if weak_areas else []
+    weak_areas = profile_weak_areas(profile)
     target_score = profile.get("target_score", 6.5)
     current_level = profile.get("current_level", 5.0)
-    suggestions = assistant.generate_improvement_suggestions(
-        progress, weak_areas, float(target_score), float(current_level)
+    try:
+        raw_suggestions = assistant.generate_improvement_suggestions(
+            progress, weak_areas, float(target_score), float(current_level)
+        )
+    except Exception as exc:
+        flash(f"AI 调用失败：{exc}", "error")
+        return redirect(url_for("dashboard"))
+    suggestions = parse_model_output(raw_suggestions)
+    if not isinstance(suggestions, dict):
+        suggestions = {"formatted_text": raw_suggestions}
+    save_progress(
+        user_id,
+        IMPROVEMENT_SUGGESTIONS_ACTIVITY,
+        {"suggestions": suggestions, "raw": raw_suggestions},
     )
-    session["improvement_suggestions"] = suggestions
     flash("重点提升建议已生成。", "success")
     return redirect(url_for("dashboard"))
+
+
+@app.post("/generate-study-plan")
+@login_required
+def generate_study_plan():
+    user_id = session["user_id"]
+    profile = load_user_profile(user_id) or default_profile(user_id)
+    progress = prepare_progress(list(reversed(get_progress(user_id, limit=100))))
+    assistant, _ = current_assistant()
+    if assistant is None:
+        flash("请先保存可用的 AI API Key。", "error")
+        return redirect(url_for("dashboard"))
+
+    current_level, study_weeks, weak_areas = calculate_study_plan_inputs(profile, progress)
+    try:
+        study_plan = assistant.generate_study_plan(
+            current_level=current_level,
+            target_score=float(profile.get("target_score", 6.5)),
+            weak_areas=weak_areas,
+            weeks=study_weeks,
+            progress_records=progress,
+        )
+    except Exception as exc:
+        flash(f"AI 调用失败：{exc}", "error")
+        return redirect(request.referrer or url_for("dashboard"))
+    save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan_text": study_plan})
+    flash("个性化学习计划已生成。", "success")
+    return redirect(request.referrer or url_for("dashboard"))
 
 
 @app.post("/profile")
@@ -1190,7 +1320,14 @@ def theme_linking():
             result = None
         result_data = parse_model_output(result)
         if result is not None:
-            save_progress(session["user_id"], "口语串题方案", {"topics": topics, "result": result, "result_data": result_data})
+            save_progress(session["user_id"], "口语串题方案", {
+                "mode": "theme_linking",
+                "topics": topics,
+                "main_theme": request.form.get("main_theme", "个人成长"),
+                "target_score": float_field("target_score", 6.5),
+                "result": result,
+                "result_data": result_data,
+            })
         if result is not None:
             session["theme_linking_result"] = result
             session["theme_linking_result_data"] = result_data
@@ -1361,11 +1498,15 @@ def writing():
 @login_required
 def analysis():
     user_id = session["user_id"]
-    progress = prepare_progress(list(reversed(get_progress(user_id, limit=160))))
+    all_progress = list(reversed(get_progress(user_id, limit=180)))
+    study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
+    study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
+    progress = prepare_progress(all_progress)
     user_words = get_user_words(user_id)
     return render_template(
         "analysis.html",
         progress=progress,
+        study_plan=study_plan,
         user_words=user_words,
         **common_context(),
     )
@@ -1593,6 +1734,14 @@ def replay():
         if (record_id and str(item.get("id")) == record_id) or (ts and item.get("timestamp") == ts):
             data = item.get("data") or {}
             mode = data.get("mode", "")
+            activity = item.get("activity", "")
+            if not mode:
+                if "串题" in activity:
+                    mode = "theme_linking"
+                elif "Task 1" in activity:
+                    mode = "task1"
+                elif "Task 2" in activity:
+                    mode = "task2"
             if mode in ("part1", "part2", "part3"):
                 if data.get("result") or data.get("result_data"):
                     session["speaking_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
@@ -1600,6 +1749,11 @@ def replay():
                     session["speaking_mode"] = mode
                 return redirect(url_for("speaking", mode=mode))
             if mode in ("task1", "task2", "generate_topic"):
+                if data.get("result") or data.get("result_data"):
+                    session["writing_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
+                    session["writing_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
+                    session["writing_mode"] = mode
+                    return redirect(url_for("writing"))
                 if mode == "generate_topic" and (data.get("result") or data.get("result_data")):
                     session["writing_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
                     session["writing_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
@@ -1631,9 +1785,10 @@ def replay():
                     "import_task": "Task 2",
                 }))
             if mode in ("theme_linking",):
-                return redirect(url_for("theme_linking", **{
-                    "preset_topics": data.get("topics", ""),
-                }))
+                if data.get("result") or data.get("result_data"):
+                    session["theme_linking_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
+                    session["theme_linking_result_data"] = data.get("result_data")
+                return redirect(url_for("theme_linking"))
             return redirect(url_for("dashboard"))
     flash("记录未找到。", "warning")
     return redirect(url_for("dashboard"))

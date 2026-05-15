@@ -24,9 +24,10 @@ def _dt_to_beijing_iso(dt_value) -> str:
         return ""
     if isinstance(dt_value, datetime):
         if dt_value.tzinfo is None:
-            dt_value = dt_value.replace(tzinfo=_BEIJING_TZ)
+            dt_value = dt_value.replace(tzinfo=timezone.utc)
         else:
-            dt_value = dt_value.astimezone(_BEIJING_TZ)
+            pass
+        dt_value = dt_value.astimezone(_BEIJING_TZ)
         return dt_value.isoformat()
     return str(dt_value)
 
@@ -53,6 +54,9 @@ def is_mysql_configured() -> bool:
 def mysql_connection(use_database: bool = True) -> Iterator[mysql.connector.MySQLConnection]:
     connection = mysql.connector.connect(**_config(include_database=use_database))
     try:
+        cursor = connection.cursor()
+        cursor.execute("SET time_zone = '+00:00'")
+        cursor.close()
         yield connection
     finally:
         connection.close()
@@ -668,9 +672,10 @@ def get_progress(user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
         timestamp = row["created_at"]
         if isinstance(timestamp, datetime):
             if timestamp.tzinfo is None:
-                timestamp = timestamp.replace(tzinfo=_BEIJING_TZ)
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
             else:
-                timestamp = timestamp.astimezone(_BEIJING_TZ)
+                pass
+            timestamp = timestamp.astimezone(_BEIJING_TZ)
             timestamp = timestamp.isoformat()
 
         records.append(
@@ -687,6 +692,25 @@ def get_progress(user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
     return records
 
 
+def get_latest_progress_by_activity(user_id: str, activity: str) -> Optional[Dict[str, Any]]:
+    with mysql_connection() as connection:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT id, user_id, activity, score, data, created_at
+            FROM study_progress
+            WHERE user_id = %s AND activity = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (user_id, activity),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+
+    return _progress_row_to_record(row) if row else None
+
+
 def _progress_row_to_record(row: Dict[str, Any]) -> Dict[str, Any]:
     data = row["data"]
     if isinstance(data, str):
@@ -695,9 +719,10 @@ def _progress_row_to_record(row: Dict[str, Any]) -> Dict[str, Any]:
     timestamp = row["created_at"]
     if isinstance(timestamp, datetime):
         if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=_BEIJING_TZ)
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
         else:
-            timestamp = timestamp.astimezone(_BEIJING_TZ)
+            pass
+        timestamp = timestamp.astimezone(_BEIJING_TZ)
         timestamp = timestamp.isoformat()
 
     return {
@@ -896,8 +921,9 @@ def get_user_words(user_id: str) -> List[Dict[str, Any]]:
         created_at = row.get("created_at")
         if isinstance(created_at, datetime):
             if created_at.tzinfo is None:
-                created_at = created_at.replace(tzinfo=_BEIJING_TZ)
+                created_at = created_at.replace(tzinfo=timezone.utc)
             else:
-                created_at = created_at.astimezone(_BEIJING_TZ)
+                pass
+            created_at = created_at.astimezone(_BEIJING_TZ)
             row["created_at"] = created_at.isoformat()
     return rows

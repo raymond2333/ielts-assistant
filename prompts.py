@@ -248,6 +248,7 @@ THEME_LINKING_PROMPT = """你是雅思口语串题专家，请将以下话题进
       "topic_en": "Topic in English",
       "adapted_response": "适应核心主题的中文回答",
       "adapted_response_en": "English response adapted to core theme",
+      "possible_questions": ["Possible IELTS Part 2 question 1", "Possible IELTS Part 2 question 2"],
       "key_elements": ["元素1", "元素2"],
       "transition_phrases": ["短语1", "短语2"]
     }}
@@ -260,6 +261,7 @@ THEME_LINKING_PROMPT = """你是雅思口语串题专家，请将以下话题进
 
 要求：
 - 每个话题都必须出现在 linked_responses 中
+- possible_questions 必须是数组，列出 2-4 个与该答案高度相关、考场上可能出现的英文雅思口语题
 - key_elements 和 transition_phrases 必须是数组
 - 只输出 JSON"""
 

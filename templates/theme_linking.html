@@ -31,12 +31,12 @@
         </form>
       </section>
       {% if result_data and result_data.get('unifying_theme') %}
-      <section class="panel result-panel">
+      <section class="panel result-panel ai-output">
         <details class="result-accordion" open>
           <summary>🎯 核心主题</summary>
           <div class="result-body">
-            <p><strong>🇨🇳</strong> {{ result_data.get('unifying_theme', '') }}</p>
-            {% if result_data.get('unifying_theme_en') %}<p><strong>🇬🇧</strong> {{ result_data.get('unifying_theme_en', '') }}</p>{% endif %}
+            <p><strong>中文</strong> {{ result_data.get('unifying_theme', '') }}</p>
+            {% if result_data.get('unifying_theme_en') %}<p><strong>English</strong> {{ result_data.get('unifying_theme_en', '') }}</p>{% endif %}
           </div>
         </details>
 
@@ -51,10 +51,24 @@
               <details class="result-accordion nested-answer">
                 <summary>查看中英文方案</summary>
                 <div class="result-body">
-                  {% if item.get('adapted_response') %}<p><strong>🇨🇳 中文方案：</strong>{{ item.get('adapted_response', '') }}</p>{% endif %}
-                  {% if item.get('adapted_response_en') %}<p><strong>🇬🇧 English Response：</strong>{{ item.get('adapted_response_en', '') }}</p>{% endif %}
+                  {% if item.get('adapted_response') %}<p><strong>中文方案：</strong>{{ item.get('adapted_response', '') }}</p>{% endif %}
+                  {% if item.get('adapted_response_en') %}
+                    <p>
+                      <strong>English Response：</strong>
+                      <button class="speak-btn" type="button" data-speak="{{ item.get('adapted_response_en', '')|e }}">朗读答案</button>
+                    </p>
+                    <p>{{ item.get('adapted_response_en', '') }}</p>
+                  {% endif %}
                 </div>
               </details>
+              {% if item.get('possible_questions') %}
+              <details class="result-accordion nested-answer">
+                <summary>可能出现的相关考题</summary>
+                <div class="result-body">
+                  <ul>{% for q in item.possible_questions %}<li>{{ q }}</li>{% endfor %}</ul>
+                </div>
+              </details>
+              {% endif %}
               {% if item.get('key_elements') %}
               <p class="tag-row"><strong>关键元素：</strong>
                 {% for el in item.key_elements %}<span class="tag">{{ el }}</span>{% endfor %}
@@ -76,8 +90,8 @@
           <summary>📚 通用词汇</summary>
           <div class="result-body">
             <div class="two-col">
-              {% if result_data.get('versatile_vocabulary') %}<div><p class="eyebrow">🇨🇳</p>{% for v in result_data.versatile_vocabulary %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
-              {% if result_data.get('versatile_vocabulary_en') %}<div><p class="eyebrow">🇬🇧</p>{% for v in result_data.versatile_vocabulary_en %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
+              {% if result_data.get('versatile_vocabulary') %}<div><p class="eyebrow">中文</p>{% for v in result_data.versatile_vocabulary %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
+              {% if result_data.get('versatile_vocabulary_en') %}<div><p class="eyebrow">English</p>{% for v in result_data.versatile_vocabulary_en %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
             </div>
           </div>
         </details>
@@ -99,7 +113,7 @@
       </section>
 
       {% elif result %}
-      <section class="panel result-panel">
+      <section class="panel result-panel ai-output">
         <h2>AI 输出</h2>
         <p class="empty-text">模型未返回标准格式，以下是原始输出：</p>
         <pre class="ai-output">{{ result }}</pre>

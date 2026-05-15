@@ -25,6 +25,20 @@
         <div class="metric-card"><span>学习记录</span><strong>{{ progress|length }}</strong></div>
         <div class="metric-card"><span>生词本</span><strong>{{ user_words|length }}</strong></div>
       </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Study Plan</p><h2>个性化学习计划</h2></div>
+          {% if not study_plan %}
+          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin:0"><button class="primary-btn" type="submit">生成详细学习计划</button></form>
+          {% endif %}
+        </div>
+        {% if study_plan %}
+          <div class="result-body">{{ study_plan | simple_md }}</div>
+          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px"><button class="ghost-btn" type="submit">重新生成</button></form>
+        {% else %}
+          <p class="empty-text">生成后会自动保存；之后每次打开页面都会显示最新一次计划，直到你重新生成。</p>
+        {% endif %}
+      </section>
       <section class="panel"><h2>最近学习记录</h2>{% if progress %}<div class="timeline">{% for item in progress %}<details class="timeline-item detail-record"><summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp | beijing_time }}</span></summary><div class="result-body">
         <p><strong>记录ID：</strong>{{ item.id }}</p>
         <a class="primary-btn small" href="{{ url_for('replay', id=item.id) }}" style="margin-bottom:10px;display:inline-block">重新练习此题</a>

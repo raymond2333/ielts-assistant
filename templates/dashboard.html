@@ -165,6 +165,9 @@
           {% endif %}
         </div>
         {% if suggestions %}
+          {% if suggestions.get('formatted_text') %}
+            <div class="result-body">{{ suggestions.formatted_text | simple_md }}</div>
+          {% else %}
           <p><strong>{{ suggestions.get('summary', '') }}</strong></p>
           {% if suggestions.get('priority_areas') %}
           <p class="tag-row">
@@ -190,11 +193,34 @@
           {% if suggestions.get('motivation') %}
           <p class="record-meta" style="color:var(--accent);font-weight:800;text-align:center;font-size:1.05rem">{{ suggestions.motivation }}</p>
           {% endif %}
+          {% endif %}
           <form method="post" action="{{ url_for('generate_suggestions') }}" style="margin-top:12px">
             <button class="ghost-btn" type="submit">重新生成</button>
           </form>
         {% else %}
           <p class="empty-text">点击上方按钮，AI 会根据你的训练记录和弱项生成个性化提升建议。</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Study Plan</p>
+            <h2>个性化学习计划</h2>
+          </div>
+          {% if not study_plan %}
+          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin:0">
+            <button class="primary-btn" type="submit">生成详细学习计划</button>
+          </form>
+          {% endif %}
+        </div>
+        {% if study_plan %}
+          <div class="result-body">{{ study_plan | simple_md }}</div>
+          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px">
+            <button class="ghost-btn" type="submit">重新生成</button>
+          </form>
+        {% else %}
+          <p class="empty-text">生成后会自动保存；之后每次打开页面都会显示最新一次计划，直到你重新生成。</p>
         {% endif %}
       </section>
 

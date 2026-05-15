@@ -8,8 +8,10 @@ import pandas as pd
 import seaborn as sns
 from typing import Dict, Any, List, Tuple
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
+
+_BEIJING_TZ = timezone(timedelta(hours=8))
 
 from database import (
     authenticate_user as _authenticate_user,
@@ -205,7 +207,7 @@ def save_user_progress(user_id: str, activity: str, data: Dict[str, Any]):
             st.session_state.user_progress = []
         progress_record = {
             "user_id": user_id,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(_BEIJING_TZ).isoformat(),
             "activity": activity,
             "data": data
         }

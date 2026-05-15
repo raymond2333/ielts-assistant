@@ -8,7 +8,7 @@ import hmac
 import hashlib
 import random
 import uuid
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlencode, urlsplit, urlunsplit
 import ipaddress
 from agents import TongyiIELTSAssistant
 from utils import (
@@ -190,9 +190,10 @@ def _format_timestamp(ts) -> str:
     else:
         return str(ts)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=_BEIJING_TZ)
+        dt = dt.replace(tzinfo=timezone.utc)
     else:
-        dt = dt.astimezone(_BEIJING_TZ)
+        pass
+    dt = dt.astimezone(_BEIJING_TZ)
     return dt.strftime("%Y-%m-%d %H:%M")
 
 
@@ -1281,6 +1282,64 @@ def _display_record_result_data(result_data):
         st.text(str(result_data))
         return
 
+    if result_data.get("unifying_theme") or isinstance(result_data.get("linked_responses"), list):
+        with st.expander("核心主题", expanded=True):
+            if result_data.get("unifying_theme"):
+                st.markdown(f"**中文：** {result_data['unifying_theme']}")
+            if result_data.get("unifying_theme_en"):
+                st.markdown(f"**English：** {result_data['unifying_theme_en']}")
+
+        linked_responses = result_data.get("linked_responses") or []
+        for i, response in enumerate(linked_responses, 1):
+            if not isinstance(response, dict):
+                continue
+            topic_title = response.get("topic") or f"话题 {i}"
+            topic_title_en = response.get("topic_en", "")
+            title = f"话题 {i}: {topic_title}"
+            if topic_title_en:
+                title += f" / {topic_title_en}"
+            with st.expander(title, expanded=i == 1):
+                if response.get("adapted_response"):
+                    st.markdown("**中文方案：**")
+                    st.write(response["adapted_response"])
+                if response.get("adapted_response_en"):
+                    st.markdown("**English Response：**")
+                    st.write(response["adapted_response_en"])
+                if response.get("possible_questions"):
+                    st.markdown("**可能出现的相关考题：**")
+                    for question in response["possible_questions"]:
+                        st.markdown(f"- {question}")
+                if response.get("key_elements"):
+                    st.markdown("**关键元素：**")
+                    for element in response["key_elements"]:
+                        st.markdown(f"- {element}")
+                if response.get("transition_phrases"):
+                    st.markdown("**过渡短语：**")
+                    for phrase in response["transition_phrases"]:
+                        st.markdown(f"- {phrase}")
+
+        if result_data.get("versatile_vocabulary") or result_data.get("versatile_vocabulary_en"):
+            with st.expander("通用词汇"):
+                col_cn, col_en = st.columns(2)
+                with col_cn:
+                    if result_data.get("versatile_vocabulary"):
+                        st.markdown("**中文：**")
+                        for word in result_data["versatile_vocabulary"]:
+                            st.markdown(f"- {word}")
+                with col_en:
+                    if result_data.get("versatile_vocabulary_en"):
+                        st.markdown("**English：**")
+                        for word in result_data["versatile_vocabulary_en"]:
+                            st.markdown(f"- {word}")
+
+        if result_data.get("practice_strategy"):
+            with st.expander("练习策略"):
+                st.write(result_data["practice_strategy"])
+        if result_data.get("study_plan"):
+            with st.expander("学习计划"):
+                st.write(result_data["study_plan"])
+        return
+
     if result_data.get("cue_card"):
         with st.expander("题目卡", expanded=True):
             st.markdown(result_data["cue_card"])
@@ -2255,8 +2314,21 @@ if st.session_state.active_tab.startswith("🔗"):
                             target_score=target_score
                         )
 
-                        st.session_state.theme_linking_result = parse_json_response(result)
+                        parsed_result = parse_json_response(result)
+                        st.session_state.theme_linking_result = parsed_result
                         st.session_state.theme_linking_topics = selected_topics
+                        save_user_progress(
+                            st.session_state.user_profile.get("user_id", "default_user"),
+                            "口语串题方案",
+                            {
+                                "mode": "theme_linking",
+                                "topics": selected_topics,
+                                "main_theme": main_theme,
+                                "target_score": target_score,
+                                "result": result,
+                                "result_data": parsed_result,
+                            },
+                        )
 
                     except Exception as e:
                         st.error(f"生成串题方案时出错: {str(e)}")
@@ -2480,7 +2552,12 @@ if st.session_state.active_tab.startswith("📊"):
                     user_id = st.session_state.get("login_user_id") or st.session_state.get("current_user_id", "")
                     x_token = _cross_login_token(user_id) if user_id else ""
                     record_id = record.get("id", "")
-                    flask_replay = f"{flask_url}/replay?id={record_id}&user_id={user_id}&x_token={x_token}" if record_id else f"{flask_url}/replay?ts={timestamp}&user_id={user_id}&x_token={x_token}"
+                    replay_params = {"user_id": user_id, "x_token": x_token}
+                    if record_id:
+                        replay_params["id"] = record_id
+                    else:
+                        replay_params["ts"] = timestamp
+                    flask_replay = f"{flask_url}/replay?{urlencode(replay_params)}"
                     st.markdown(f"[🔄 重新练习此题]({flask_replay})")
                     if data.get("mode"):
                         st.caption(f"模式：{data['mode']}")
