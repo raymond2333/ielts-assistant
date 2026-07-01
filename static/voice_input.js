@@ -55,7 +55,7 @@
       var recBtn = document.createElement("button");
       recBtn.type = "button";
       recBtn.className = "voice-btn rec-btn";
-      recBtn.title = "录音上传：先本地转文字，再提交评分";
+      recBtn.title = "录音：完成后点击“获取 AI 批改反馈”自动上传";
       recBtn.innerHTML = "🎙️";
       recBtn.addEventListener("click", function (e) { e.preventDefault(); toggleRecord(textarea, recBtn); });
       btnBar.appendChild(recBtn);
@@ -267,16 +267,12 @@
     var preview = document.createElement("div");
     preview.className = "recording-preview";
     preview.innerHTML =
-      "<div class='recording-preview-head'><strong>本次录音</strong><span>先试听，满意后上传评分</span></div>" +
+      "<div class='recording-preview-head'><strong>本次录音</strong><span>点击下方“获取 AI 批改反馈”按钮提交</span></div>" +
       "<audio controls preload='metadata' src='" + pendingRecording.objectUrl + "'></audio>" +
       "<div class='recording-preview-actions'>" +
-      "<button type='button' class='primary-btn small recording-upload-btn'>上传并评分</button>" +
       "<button type='button' class='ghost-btn small recording-redo-btn'>重新录制</button>" +
       "</div>";
     wrapper.appendChild(preview);
-    preview.querySelector(".recording-upload-btn").addEventListener("click", function () {
-      uploadPendingRecording();
-    });
     preview.querySelector(".recording-redo-btn").addEventListener("click", function () {
       var textarea = pendingRecording && pendingRecording.textarea;
       var recBtn = pendingRecording && pendingRecording.btn;
@@ -486,4 +482,57 @@
   });
   observer.observe(document.body, { childList: true, subtree: true });
   document.querySelectorAll("textarea:not(.no-voice)").forEach(createBtn);
+
+  // ---- Capture：点击“获取 AI 批改反馈”且有录音在排队时，先上传录音再提交 ----
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (form.tagName !== 'FORM') return;
+    var modeInput = form.querySelector('input[name="mode"]');
+    if (!modeInput || modeInput.value !== 'speaking_feedback') return;
+    if (!pendingRecording || !pendingRecording.blob || uploading) return;
+    e.preventDefault();
+    var textarea = pendingRecording.textarea;
+    var btn = pendingRecording.btn;
+    var blob = pendingRecording.blob;
+    uploading = true;
+    if (btn) { btn.innerHTML = '⏳'; btn.title = '正在上传录音…'; }
+    setVoiceStatus('正在上传录音并转写，完成后将自动提交评分…');
+    var fd = new FormData();
+    fd.append('audio', blob, 'recording.' + (blob.type.includes('webm') ? 'webm' : 'm4a'));
+    var q = form.querySelector("input[name='question'], textarea[name='question']");
+    var t = form.querySelector("input[name='target_score']");
+    var sm = form.querySelector("input[name='source_mode']");
+    var sd = form.querySelector("input[name='source_result_data']");
+    if (q) fd.append('question', q.value || '');
+    if (t) fd.append('target_score', t.value || '6.5');
+    if (sm) fd.append('source_mode', sm.value || '');
+    if (sd) fd.append('source_result_data', sd.value || '');
+    fetch('/api/speech-score', { method: 'POST', body: fd })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var d = {}; try { d = t ? JSON.parse(t) : {}; } catch (e) { throw new Error('服务异常'); }
+          if (!r.ok) throw new Error(d.error || ('请求失败 ' + r.status));
+          return d;
+        });
+      })
+      .then(function (data) {
+        uploading = false;
+        if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
+        setRecordingState('');
+        clearRecordingPreview(textarea);
+        setVoiceStatus('');
+        if (data.error) { alert('上传失败: ' + data.error); return; }
+        if (data.transcript && textarea) {
+          textarea.value = data.transcript.trim();
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        form.submit();
+      })
+      .catch(function (err) {
+        uploading = false;
+        if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
+        setRecordingState('');
+        alert(err && err.message ? err.message : '录音上传失败');
+      });
+  }, true);
 })();

@@ -260,8 +260,6 @@
                       {% endif %}
                     </div>
                   </details>
-                    {% set feedbacks = item.get('_feedbacks', []) %}
-                    {% include '_speaking_feedback_history.html' %}
                   {% endif %}
                 </div>
               </details>
@@ -395,8 +393,6 @@
                 {% endif %}
               </div>
             </details>
-              {% set feedbacks = result_data.get('_feedbacks', []) %}
-              {% include '_speaking_feedback_history.html' %}
             {% endif %}
           
           {% elif result_data and mode == 'part3' and result_data.discussion_questions %}
@@ -486,8 +482,6 @@
                       {% endif %}
                     </div>
                   </details>
-                    {% set feedbacks = item.get('_feedbacks', []) %}
-                    {% include '_speaking_feedback_history.html' %}
                   {% endif %}
                 </div>
               </details>

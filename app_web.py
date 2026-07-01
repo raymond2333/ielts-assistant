@@ -1023,6 +1023,8 @@ def latest_feedback_inline(feedbacks):
         "recorded_at": latest.get("recorded_at") or latest.get("timestamp", ""),
         "transcript_source": latest.get("transcript_source", ""),
         "score": latest_score,
+        "chinese_answer": "",
+        "keywords": "",
     }
 
 
@@ -2210,6 +2212,18 @@ def speaking():
             result_data, _score_warning = normalize_speaking_scores(result_data if isinstance(result_data, dict) else None)
             result_data = calibrate_reference_answer_scores(result_data, reference_note)
             score_value = result_data.get("overall_score") if isinstance(result_data, dict) else None
+            # Look for a pending audio file from the most recent voice recording
+            audio_file = ""
+            try:
+                recent = get_progress(session["user_id"], limit=20)
+                for r in recent:
+                    rd = (r.get("data") or {}) if isinstance(r, dict) else {}
+                    af = rd.get("audio_file", "")
+                    if af and (rd.get("mode") == "speaking_recording" or rd.get("audio_file")):
+                        audio_file = af
+                        break
+            except Exception:
+                pass
             save_progress(session["user_id"], "口语反馈", {
                 "mode": mode,
                 "question": question,
@@ -2217,6 +2231,7 @@ def speaking():
                 "score": score_value,
                 "result": result,
                 "result_data": result_data,
+                "audio_file": audio_file,
             })
             refresh_user_level_tracking(session["user_id"])
             parent_with_inline = attach_inline_speaking_result(
@@ -2226,7 +2241,10 @@ def speaking():
                 question,
                 result,
                 result_data,
-                {"score": score_value},
+                {"score": score_value,
+                 "audio_file": audio_file,
+                 "user_response": user_response,
+                },
             )
             if parent_with_inline is not None:
                 render_result = json.dumps(parent_with_inline, ensure_ascii=False)
@@ -2288,17 +2306,19 @@ def speaking():
                 render_result_data = parent_with_inline
                 render_mode = source_mode
         if result is not None:
-            session["speaking_result"] = render_result if render_result is not None else result
-            session["speaking_result_data"] = (
-                json.dumps(render_result_data, ensure_ascii=False)
-                if render_result_data is not None
-                else (json.dumps(result_data, ensure_ascii=False) if result_data is not None else None)
-            )
-            session["speaking_mode"] = render_mode or mode
             if render_result is not None:
-                result = render_result
-                result_data = render_result_data
-                mode = render_mode or mode
+                # Inline-result action (feedback / keyword / cn-answer).
+                # Redirect to GET without session data.  GET reloads the parent
+                # questions from the DB so the score always matches what the
+                # learning-record view shows, and the session cookie never
+                # blows past the ~4 KB browser limit.
+                return redirect(url_for("speaking", mode=render_mode or mode))
+            session["speaking_result"] = result
+            session["speaking_result_data"] = (
+                json.dumps(result_data, ensure_ascii=False)
+                if result_data is not None else None
+            )
+            session["speaking_mode"] = mode
     else:
         replay_record = replay_record_from_args()
         if replay_record:
@@ -2309,6 +2329,19 @@ def speaking():
             else:
                 mode = replay_mode
                 result, result_data = result_from_record(replay_record)
+        elif result is None and result_data is None:
+            # POST returned an inline result — reload the most recent question
+            # generation record from DB so the display matches the learning record.
+            activity_map = {
+                "part1": "口语Part 1题目生成",
+                "part2": "口语Part 2题目生成",
+                "part3": "口语Part 3题目生成",
+            }
+            activity = activity_map.get(mode, activity_map["part1"])
+            latest = get_latest_progress_by_activity(session["user_id"], activity)
+            if latest:
+                mode = infer_record_mode(latest) or mode
+                result, result_data = result_from_record(latest)
         else:
             cached = session.pop("speaking_result", None)
             cached_data = session.pop("speaking_result_data", None)
