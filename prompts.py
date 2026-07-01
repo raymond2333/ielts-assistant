@@ -232,38 +232,49 @@ WRITING_TASK2_CORRECTION_PROMPT = f"""你是专业的雅思写作 Task 2 考官�
 # ============================================================
 # 口语串题
 # ============================================================
-THEME_LINKING_PROMPT = """你是雅思口语串题专家，请将以下话题进行有机串联。
+THEME_LINKING_PROMPT = f"""你是雅思口语串题专家，请将以下话题进行有机串联。
 
-需要串联的话题：{topics}
-核心主题：{main_theme}
-目标分数：{target_score}
+需要串联的话题：{{topics}}
+核心主题：{{main_theme}}
+目标分数：{{target_score}}
 
-请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
-{{
-  "unifying_theme": "中文核心主题",
-  "unifying_theme_en": "English core theme",
-  "linked_responses": [
-    {{
-      "topic": "话题名称",
-      "topic_en": "Topic in English",
-      "adapted_response": "适应核心主题的中文回答",
-      "adapted_response_en": "English response adapted to core theme",
-      "possible_questions": ["Possible IELTS Part 2 question 1", "Possible IELTS Part 2 question 2"],
-      "key_elements": ["元素1", "元素2"],
-      "transition_phrases": ["短语1", "短语2"]
-    }}
-  ],
-  "versatile_vocabulary": ["中文词汇1", "中文词汇2"],
-  "versatile_vocabulary_en": ["English vocab 1", "English vocab 2"],
-  "practice_strategy": "练习策略建议",
-  "study_plan": "学习计划建议"
-}}
+请按以下格式输出：
 
-要求：
-- 每个话题都必须出现在 linked_responses 中
-- possible_questions 必须是数组，列出 2-4 个与该答案高度相关、考场上可能出现的英文雅思口语题
-- key_elements 和 transition_phrases 必须是数组
-- 只输出 JSON"""
+# 串题方案
+
+## 核心主题
+中文核心主题
+**English:** English core theme
+
+## 各话题回答
+
+### 话题 1：[话题名称]
+**English:** [Topic in English]
+**中文回答：** 适应核心主题的回答
+**English Response:** English response
+**关键元素：** 元素1、元素2
+**Key Elements:** Element 1、Element 2
+**过渡短语：** 短语1、短语2
+**Transition Phrases:** Phrase 1、Phrase 2
+
+（重复话题 2、话题 3……）
+
+## 通用词汇
+- 词汇1
+- **English:** Vocabulary1
+
+## 灵活句式
+- 句式1
+- **English:** Sentence 1
+
+## 记忆技巧
+- 技巧1
+- **English:** Memory aid 1
+
+## 练习策略
+策略建议
+
+{OUTPUT_RULES}"""
 
 # ============================================================
 # 话题扩展
@@ -562,27 +573,36 @@ IMPROVEMENT_SUGGESTIONS_PROMPT = """你是雅思备考教练。请根据学生�
 最近训练记录：
 {history_text}
 
-请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
-{{
-  "summary": "总体评价内容",
-  "priority_areas": ["领域1", "领域2"],
-  "suggestions": [
-    {{
-      "area": "领域名称",
-      "current_issue": "当前问题描述",
-      "action": "具体行动建议",
-      "weekly_goal": "每周目标",
-      "estimated_improvement": "预计提升幅度"
-    }}
-  ],
-  "study_tips": ["技巧1", "技巧2"],
-  "motivation": "鼓励语"
-}}
+请输出格式：
 
-要求：
-- priority_areas 和 study_tips 必须是数组
-- suggestions 中每个对象必须包含 area、current_issue、action、weekly_goal、estimated_improvement 字段
-- 只输出 JSON"""
+# 重点提升建议
+
+## 总体评价
+评价内容
+
+## 优先提升领域
+- 领域1
+- 领域2
+
+## 具体建议
+
+### 1. 领域名称
+**当前问题：** 问题描述
+**行动建议：** 具体行动建议
+**每周目标：** 每周目标
+**预计提升：** 预计提升幅度
+
+### 2. 领域名称
+（同上重复）
+
+## 学习技巧
+- 技巧1
+- 技巧2
+
+## 鼓励语
+鼓励内容
+
+{output_rules}"""
 
 # ============================================================
 # 作文思路互动（旧版 app_web.py mode="writing_ideas"）
@@ -612,7 +632,7 @@ WORD_EXPLANATION_PROMPT_FULL = """请解释雅思学习中这个英文词/短语
 # ============================================================
 # 生成学习计划
 # ============================================================
-STUDY_PLAN_PROMPT = """你是雅思备考教练。请根据以下学生信息，生成一份个性化学习计划。
+STUDY_PLAN_PROMPT = f"""你是雅思备考教练。请根据以下学生信息，生成一份个性化学习计划。
 
 学生情况：
 - 当前综合水平：{{current_level}}
@@ -624,25 +644,31 @@ STUDY_PLAN_PROMPT = """你是雅思备考教练。请根据以下学生信息，
 最近训练记录：
 {{history_text}}
 
-请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
-{{
-  "title": "学习计划",
-  "overall_assessment": "总体评价内容",
-  "priority_areas": ["优先提升领域1", "优先提升领域2"],
-  "weekly_schedule": [
-    {{
-      "week": 1,
-      "theme": "本周主题",
-      "focus": "本周重点",
-      "tasks": ["具体任务1", "具体任务2", "具体任务3"],
-      "goal": "本周目标"
-    }}
-  ],
-  "study_tips": ["学习建议1", "学习建议2"],
-  "milestones": ["阶段性检查点1", "阶段性检查点2"]
-}}
+请按以下格式输出（Markdown 格式，禁止使用 ```json 或 ``` 代码块）：
 
-要求：
-- weekly_schedule 必须按实际学习周期列出，从第 1 周到第 {{weeks}} 周
-- priority_areas、tasks、study_tips、milestones 必须是数组
-- 只输出 JSON"""
+# 学习计划
+
+## 总体评价
+评价内容
+
+## 优先提升领域
+- 领域1
+- 领域2
+
+## 每周安排
+
+### 第 1 周：[主题]
+**重点：** 重点内容
+**具体任务：**
+- 任务1
+- 任务2
+- 任务3
+**本周目标：** 目标描述
+
+（第 2 周、第 3 周……按实际周数依次列出）
+
+## 学习建议
+- 建议1
+- 建议2
+
+{OUTPUT_RULES}"""

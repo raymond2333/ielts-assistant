@@ -8,14 +8,11 @@ import pandas as pd
 import seaborn as sns
 from typing import Dict, Any, List, Tuple
 import streamlit as st
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import os
-
-_BEIJING_TZ = timezone(timedelta(hours=8))
 
 from database import (
     authenticate_user as _authenticate_user,
-    delete_progress_record_by_id as _delete_progress_record_by_id,
     get_database_status as _get_database_status,
     get_progress,
     initialize_database as _initialize_database,
@@ -208,7 +205,7 @@ def save_user_progress(user_id: str, activity: str, data: Dict[str, Any]):
             st.session_state.user_progress = []
         progress_record = {
             "user_id": user_id,
-            "timestamp": datetime.now(_BEIJING_TZ).isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "activity": activity,
             "data": data
         }
@@ -228,30 +225,6 @@ def get_user_progress(user_id: str) -> List[Dict[str, Any]]:
     if "user_progress" not in st.session_state:
         return []
     return [r for r in st.session_state.user_progress if r.get("user_id") == user_id]
-
-
-def delete_user_progress_record(user_id: str, record_id: Any = None, timestamp: str = "") -> bool:
-    if is_mysql_configured() and record_id:
-        try:
-            return _delete_progress_record_by_id(int(record_id), user_id)
-        except Exception as e:
-            print(f"删除数据库进度记录时出错: {e}")
-            return False
-
-    if "user_progress" not in st.session_state:
-        return False
-    before = len(st.session_state.user_progress)
-    st.session_state.user_progress = [
-        r for r in st.session_state.user_progress
-        if not (
-            r.get("user_id") == user_id
-            and (
-                (record_id and str(r.get("id", "")) == str(record_id))
-                or (timestamp and r.get("timestamp", "") == timestamp)
-            )
-        )
-    ]
-    return len(st.session_state.user_progress) < before
 
 
 def save_user_profile(user_id: str, profile: Dict[str, Any]) -> bool:
@@ -696,7 +669,7 @@ def build_task1_chart_assets(result_data, raw_text=""):
     # 表格：解析 table_data JSON 并渲染为图片
     if chart_type == "表格":
         if not data.get("table_data") and raw_text:
-            json_str = _flexible_marker_search(raw_text, "**table_data：**")
+            json_str = _extract_json_block(raw_text, "**table_data：**")
             if json_str:
                 try:
                     data["table_data"] = json.loads(json_str)
@@ -717,7 +690,7 @@ def build_task1_chart_assets(result_data, raw_text=""):
     # --- 流程图：Graphviz 渲染 ---
     if "流程" in chart_type:
         if not data.get("chart_dot") and raw_text:
-            dot_json = _flexible_marker_search(raw_text, "**chart_dot：**")
+            dot_json = _extract_json_block(raw_text, "**chart_dot：**")
             if dot_json:
                 try:
                     data["chart_dot"] = json.loads(dot_json)
@@ -851,32 +824,12 @@ def parse_model_output(raw):
     if not raw:
         return None
     text = raw.strip()
-    # 去除代码块包裹
     if text.startswith("```"):
         text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    # 直接尝试解析
     try:
         return json.loads(text)
     except (TypeError, ValueError):
-        pass
-    # 尝试从文本中提取 JSON 对象（处理 LLM 在 JSON 前后添加文本的情况）
-    first_brace = text.find("{")
-    last_brace = text.rfind("}")
-    if first_brace != -1 and last_brace > first_brace:
-        try:
-            return json.loads(text[first_brace : last_brace + 1])
-        except (TypeError, ValueError):
-            pass
-    return None
-
-
-def _flexible_marker_search(text, marker_base):
-    """Try to find a marker with both Chinese and English colons."""
-    for variant in [marker_base, marker_base.replace("：", ":")]:
-        result = _extract_json_block(text, variant)
-        if result:
-            return result
-    return None
+        return None
 
 
 def parse_generated_topic_md(raw_text, task_type="Task 2"):
@@ -885,65 +838,65 @@ def parse_generated_topic_md(raw_text, task_type="Task 2"):
     if not raw_text:
         return result
 
-    # 提取 question（**题目：** 或 **题目:** 后面的内容）
-    q_match = re.search(r'\*\*题目[：:]\*\*\s*(.+?)(?:\n\*\*|\Z)', raw_text, re.DOTALL)
+    # 提取 question（**题目：** ... 后面的内容）
+    q_match = re.search(r'\*\*题目：\*\*\s*(.+?)(?:\n\*\*|\Z)', raw_text, re.DOTALL)
     if q_match:
         result["question"] = q_match.group(1).strip()
 
     if task_type == "Task 1":
-        ct = re.search(r'\*\*图表类型[：:]\*\*\s*(.+?)(?:\n|$)', raw_text)
+        ct = re.search(r'\*\*图表类型：\*\*\s*(.+?)(?:\n|$)', raw_text)
         if ct:
             result["chart_type"] = ct.group(1).strip()
 
-        lbs = re.search(r'\*\*chart_labels[：:]\*\*\s*(\[.*?\])\s*', raw_text)
+        lbs = re.search(r'\*\*chart_labels：\*\*\s*(\[.*?\])\s*', raw_text)
         if lbs:
             try:
                 result["chart_labels"] = json.loads(lbs.group(1))
             except Exception:
                 pass
 
-        cd = _flexible_marker_search(raw_text, "**chart_data：**")
+        cd = _extract_json_block(raw_text, "**chart_data：**")
         if cd:
             try:
                 result["chart_data"] = json.loads(cd)
             except Exception:
                 pass
 
-        dot = _flexible_marker_search(raw_text, "**chart_dot：**")
+        dot = _extract_json_block(raw_text, "**chart_dot：**")
         if dot:
             try:
                 result["chart_dot"] = json.loads(dot)
             except Exception:
                 pass
 
-        td = _flexible_marker_search(raw_text, "**table_data：**")
+        td = _extract_json_block(raw_text, "**table_data：**")
         if td:
             try:
                 result["table_data"] = json.loads(td)
             except Exception:
                 pass
 
-        kf = re.search(r'\*\*关键特征[：:]\*\*\s*((?:- .+\n?)+)', raw_text)
+        kf = re.search(r'\*\*关键特征：\*\*\s*((?:- .+\n?)+)', raw_text)
         if kf:
             result["key_features"] = [x.strip("- ").strip() for x in kf.group(1).strip().split("\n") if x.strip().startswith("-")]
 
-        ss = re.search(r'\*\*建议结构[：:]\*\*\s*(.+?)(?:\n\*\*|\Z)', raw_text)
+        ss = re.search(r'\*\*建议结构：\*\*\s*(.+?)(?:\n\*\*|\Z)', raw_text)
         if ss:
             result["suggested_structure"] = ss.group(1).strip()
     else:
-        tc = re.search(r'\*\*话题类别[：:]\*\*\s*(.+?)(?:\n|$)', raw_text)
+        tc = re.search(r'\*\*话题类别：\*\*\s*(.+?)(?:\n|$)', raw_text)
         if tc:
             result["topic_category"] = tc.group(1).strip()
 
-        et = re.search(r'\*\*作文类型[：:]\*\*\s*(.+?)(?:\n|$)', raw_text)
+        et = re.search(r'\*\*作文类型：\*\*\s*(.+?)(?:\n|$)', raw_text)
         if et:
             result["essay_type"] = et.group(1).strip()
 
-        kp = re.search(r'\*\*关键论点[：:]\*\*\s*((?:- .+\n?)+)', raw_text)
+        kp = re.search(r'\*\*关键论点：\*\*\s*((?:- .+\n?)+)', raw_text)
         if kp:
             result["key_points"] = [x.strip("- ").strip() for x in kp.group(1).strip().split("\n") if x.strip().startswith("-")]
 
-        ss = re.search(r'\*\*建议结构[：:]\*\*\s*(.+?)(?:\n\*\*|\Z)', raw_text)
+        ss = re.search(r'\*\*建议结构：\*\*\s*(.+?)(?:\n\*\*|\Z)', raw_text)
         if ss:
             result["suggested_structure"] = ss.group(1).strip()
 

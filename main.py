@@ -1,14 +1,14 @@
 import streamlit as st
 import json
 import pandas as pd
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import os
 import time
 import hmac
 import hashlib
 import random
 import uuid
-from urllib.parse import urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 import ipaddress
 from agents import TongyiIELTSAssistant
 from utils import (
@@ -17,7 +17,6 @@ from utils import (
     create_progress_chart_data,
     create_score_gauge,
     cross_login_token,
-    delete_user_progress_record,
     get_database_status,
     get_user_progress,
     initialize_database,
@@ -171,40 +170,6 @@ def _extract_part2_topic_for_discussion(question_data: Dict[str, Any]) -> str:
     return question_data.get("topic") or question_data.get("prompt") or ""
 
 
-_BEIJING_TZ = timezone(timedelta(hours=8))
-
-
-def _format_timestamp(ts) -> str:
-    """Format a timestamp string/datetime to readable Beijing time."""
-    if not ts:
-        return ""
-    if isinstance(ts, datetime):
-        dt = ts
-    elif isinstance(ts, str):
-        ts = ts.strip()
-        if not ts:
-            return ""
-        try:
-            dt = datetime.fromisoformat(ts)
-        except (ValueError, TypeError):
-            return ts
-    else:
-        return str(ts)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    else:
-        pass
-    dt = dt.astimezone(_BEIJING_TZ)
-    return dt.strftime("%Y-%m-%d %H:%M")
-
-
-def _rerun_app():
-    if hasattr(st, "rerun"):
-        st.rerun()
-    else:
-        st.experimental_rerun()
-
-
 def _profile_overall_level(profile: Dict[str, Any]) -> float:
     fallback = float(profile.get("current_level", 5.0))
     levels = [
@@ -317,7 +282,7 @@ def _render_speaking_part1():
                                 "topic": topic,
                                 "difficulty": difficulty,
                                 "result_data": parsed_result,
-                                "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+                                "timestamp": datetime.now().isoformat(),
                             },
                         )
                         st.success("Part 1题目生成成功！请查看下方题目列表")
@@ -413,11 +378,11 @@ def _render_speaking_part1():
                                         "keywords": keyword_input,
                                         "result": result,
                                         "result_data": st.session_state[answer_key],
-                                        "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+                                        "timestamp": datetime.now().isoformat(),
                                     },
                                 )
                         if answer_key in st.session_state:
-                            _display_record_result_data(st.session_state[answer_key], key_prefix=answer_key)
+                            _display_record_result_data(st.session_state[answer_key])
 
 
 # 口语Part 2界面函数
@@ -480,7 +445,7 @@ def _render_speaking_part2():
                             "topic": topic,
                             "cue_type": cue_card_type,
                             "result_data": st.session_state.current_speaking_question,
-                            "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+                            "timestamp": datetime.now().isoformat(),
                         },
                     )
                     
@@ -765,7 +730,7 @@ def _render_speaking_part3():
                             "topic": part2_topic,
                             "discussion_type": discussion_type,
                             "result_data": parsed_result,
-                            "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+                            "timestamp": datetime.now().isoformat(),
                         },
                     )
                     
@@ -853,11 +818,11 @@ def _render_speaking_part3():
                                         "keywords": keyword_input,
                                         "result": result,
                                         "result_data": st.session_state[answer_key],
-                                        "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+                                        "timestamp": datetime.now().isoformat(),
                                     },
                                 )
                         if answer_key in st.session_state:
-                            _display_record_result_data(st.session_state[answer_key], key_prefix=answer_key)
+                            _display_record_result_data(st.session_state[answer_key])
 
 
 def _render_writing_task1():
@@ -878,7 +843,7 @@ def _render_writing_task1():
                     save_user_progress(
                         st.session_state.user_profile.get("user_id", "default_user"),
                         "生成作文题目",
-                        {"mode": "generate_topic", "task_type": "Task 1", "result": result, "result_data": parsed, "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat()},
+                        {"mode": "generate_topic", "task_type": "Task 1", "result": result, "result_data": parsed, "timestamp": datetime.now().isoformat()},
                     )
                     st.rerun()
 
@@ -1019,7 +984,7 @@ def _render_writing_task2():
                     save_user_progress(
                         st.session_state.user_profile.get("user_id", "default_user"),
                         "生成作文题目",
-                        {"mode": "generate_topic", "task_type": "Task 2", "result": result, "result_data": parsed, "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat()},
+                        {"mode": "generate_topic", "task_type": "Task 2", "result": result, "result_data": parsed, "timestamp": datetime.now().isoformat()},
                     )
                     st.rerun()
 
@@ -1150,7 +1115,7 @@ def _display_writing_feedback(feedback_data, task_type):
                     "essay_content": st.session_state.get("current_essay_content", ""),
                     "question": gen_topic.get("question", "") if isinstance(gen_topic, dict) else "",
                     "result_data": feedback_data,
-                    "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat()
+                    "timestamp": datetime.now().isoformat()
                 }
             )
     except Exception as e:
@@ -1282,70 +1247,12 @@ def _display_writing_feedback(feedback_data, task_type):
         st.experimental_rerun()
 
 
-def _display_record_result_data(result_data, key_prefix=""):
+def _display_record_result_data(result_data):
     """Properly render saved result_data from learning records."""
     import pandas as pd
 
     if not isinstance(result_data, dict):
         st.text(str(result_data))
-        return
-
-    if result_data.get("unifying_theme") or isinstance(result_data.get("linked_responses"), list):
-        with st.expander("核心主题", expanded=True):
-            if result_data.get("unifying_theme"):
-                st.markdown(f"**中文：** {result_data['unifying_theme']}")
-            if result_data.get("unifying_theme_en"):
-                st.markdown(f"**English：** {result_data['unifying_theme_en']}")
-
-        linked_responses = result_data.get("linked_responses") or []
-        for i, response in enumerate(linked_responses, 1):
-            if not isinstance(response, dict):
-                continue
-            topic_title = response.get("topic") or f"话题 {i}"
-            topic_title_en = response.get("topic_en", "")
-            title = f"话题 {i}: {topic_title}"
-            if topic_title_en:
-                title += f" / {topic_title_en}"
-            with st.expander(title, expanded=i == 1):
-                if response.get("adapted_response"):
-                    st.markdown("**中文方案：**")
-                    st.write(response["adapted_response"])
-                if response.get("adapted_response_en"):
-                    st.markdown("**English Response：**")
-                    st.write(response["adapted_response_en"])
-                if response.get("possible_questions"):
-                    st.markdown("**可能出现的相关考题：**")
-                    for question in response["possible_questions"]:
-                        st.markdown(f"- {question}")
-                if response.get("key_elements"):
-                    st.markdown("**关键元素：**")
-                    for element in response["key_elements"]:
-                        st.markdown(f"- {element}")
-                if response.get("transition_phrases"):
-                    st.markdown("**过渡短语：**")
-                    for phrase in response["transition_phrases"]:
-                        st.markdown(f"- {phrase}")
-
-        if result_data.get("versatile_vocabulary") or result_data.get("versatile_vocabulary_en"):
-            with st.expander("通用词汇"):
-                col_cn, col_en = st.columns(2)
-                with col_cn:
-                    if result_data.get("versatile_vocabulary"):
-                        st.markdown("**中文：**")
-                        for word in result_data["versatile_vocabulary"]:
-                            st.markdown(f"- {word}")
-                with col_en:
-                    if result_data.get("versatile_vocabulary_en"):
-                        st.markdown("**English：**")
-                        for word in result_data["versatile_vocabulary_en"]:
-                            st.markdown(f"- {word}")
-
-        if result_data.get("practice_strategy"):
-            with st.expander("练习策略"):
-                st.write(result_data["practice_strategy"])
-        if result_data.get("study_plan"):
-            with st.expander("学习计划"):
-                st.write(result_data["study_plan"])
         return
 
     if result_data.get("cue_card"):
@@ -1370,12 +1277,9 @@ def _display_record_result_data(result_data, key_prefix=""):
                     if regenerated.get("chart_image"):
                         img_path = os.path.join(os.path.dirname(__file__), regenerated["chart_image"])
                         result_data["chart_image"] = regenerated["chart_image"]
-                image_key_seed = f"{key_prefix}_{result_data.get('chart_image', '')}_{result_data.get('question', '')}"
-                image_key = f"chart_img_{abs(hash(image_key_seed))}"
-                show_key = f"show_{image_key}"
-                if st.button("显示/隐藏图片", key=image_key):
-                    st.session_state[show_key] = not st.session_state.get(show_key, False)
-                if st.session_state.get(show_key, False):
+                if st.button("显示/隐藏图片", key=f"chart_img_{abs(hash(str(result_data.get('chart_image',''))))}"):
+                    st.session_state[f"show_{result_data['chart_image']}"] = not st.session_state.get(f"show_{result_data['chart_image']}", False)
+                if st.session_state.get(f"show_{result_data['chart_image']}", False):
                     if os.path.exists(img_path):
                         st.image(img_path)
                     else:
@@ -1543,52 +1447,6 @@ def _display_record_result_data(result_data, key_prefix=""):
                     st.write(value)
 
 
-def _display_study_plan(plan):
-    if isinstance(plan, str):
-        parsed = parse_json_response(plan)
-        if isinstance(parsed, dict) and "formatted_text" not in parsed:
-            plan = parsed
-        else:
-            st.markdown(plan)
-            return
-    if not isinstance(plan, dict):
-        st.write(plan)
-        return
-
-    if plan.get("overall_assessment"):
-        with st.expander("总体评价", expanded=True):
-            st.write(plan["overall_assessment"])
-    if plan.get("priority_areas"):
-        with st.expander("优先提升领域"):
-            for area in plan["priority_areas"]:
-                st.markdown(f"- {area}")
-    weekly = plan.get("weekly_schedule")
-    if isinstance(weekly, list):
-        with st.expander("每周安排", expanded=True):
-            for item in weekly:
-                if not isinstance(item, dict):
-                    continue
-                week = item.get("week", "")
-                theme = item.get("theme", "")
-                with st.expander(f"第 {week} 周：{theme}", expanded=False):
-                    if item.get("focus"):
-                        st.markdown(f"**重点：** {item['focus']}")
-                    if item.get("tasks"):
-                        st.markdown("**具体任务：**")
-                        for task in item["tasks"]:
-                            st.markdown(f"- {task}")
-                    if item.get("goal"):
-                        st.markdown(f"**本周目标：** {item['goal']}")
-    if plan.get("study_tips"):
-        with st.expander("学习建议"):
-            for tip in plan["study_tips"]:
-                st.markdown(f"- {tip}")
-    if plan.get("milestones"):
-        with st.expander("阶段检查点"):
-            for milestone in plan["milestones"]:
-                st.markdown(f"- {milestone}")
-
-
 # 显示口语反馈的函数
 def _display_speaking_feedback(feedback_data):
     st.markdown("---")
@@ -1607,7 +1465,7 @@ def _display_speaking_feedback(feedback_data):
                 activity="口语练习",
                 data={
                     "score": formatted_score,
-                    "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat()
+                    "timestamp": datetime.now().isoformat()
                 }
             )
     except Exception as e:
@@ -2371,21 +2229,8 @@ if st.session_state.active_tab.startswith("🔗"):
                             target_score=target_score
                         )
 
-                        parsed_result = parse_json_response(result)
-                        st.session_state.theme_linking_result = parsed_result
+                        st.session_state.theme_linking_result = parse_json_response(result)
                         st.session_state.theme_linking_topics = selected_topics
-                        save_user_progress(
-                            st.session_state.user_profile.get("user_id", "default_user"),
-                            "口语串题方案",
-                            {
-                                "mode": "theme_linking",
-                                "topics": selected_topics,
-                                "main_theme": main_theme,
-                                "target_score": target_score,
-                                "result": result,
-                                "result_data": parsed_result,
-                            },
-                        )
 
                     except Exception as e:
                         st.error(f"生成串题方案时出错: {str(e)}")
@@ -2589,56 +2434,28 @@ if st.session_state.active_tab.startswith("📊"):
 
         # Date filter
         filter_date = st.date_input("📅 按日期筛选（清空日期显示全部）", value=None, key="history_date_filter")
-        hidden_history_activities = {"重点提升建议", "学习计划"}
-        filtered_progress = [
-            r for r in user_progress
-            if r.get("activity") not in hidden_history_activities
-        ]
+        filtered_progress = user_progress
         if filter_date:
             date_str = filter_date.strftime("%Y-%m-%d")
-            filtered_progress = [r for r in filtered_progress if (r.get("timestamp", "") or "").startswith(date_str)]
+            filtered_progress = [r for r in user_progress if (r.get("timestamp", "") or "").startswith(date_str)]
 
         # Replay handling from query params — removed (doesn't work with Streamlit auth)
         # Records with mode info can be replayed in Beta version (Flask) via /replay?ts=xxx
 
         if filtered_progress:
-            records_per_page = 10
-            total_records = len(filtered_progress)
-            total_pages = max(1, (total_records + records_per_page - 1) // records_per_page)
-            page = int(st.session_state.get("history_page", 1))
-            page = max(1, min(page, total_pages))
-            st.session_state.history_page = page
-            ordered_records = list(reversed(filtered_progress))
-            start = (page - 1) * records_per_page
-            recent_records = ordered_records[start:start + records_per_page]
+            recent_records = list(reversed(filtered_progress[-15:]))
             for record in recent_records:
                 data = record.get("data", {}) or {}
                 score = record.get("score") or data.get("score", "")
                 timestamp = record.get("timestamp", "")
                 activity = record.get("activity", "学习记录")
-                with st.expander(f"{activity} — {_format_timestamp(timestamp)}" + (f" | 得分：{score}" if score else "")):
+                with st.expander(f"{activity} — {timestamp}" + (f" | 得分：{score}" if score else "")):
                     flask_url = _flask_base_url()
                     user_id = st.session_state.get("login_user_id") or st.session_state.get("current_user_id", "")
                     x_token = _cross_login_token(user_id) if user_id else ""
                     record_id = record.get("id", "")
-                    replay_params = {"user_id": user_id, "x_token": x_token}
-                    if record_id:
-                        replay_params["id"] = record_id
-                    else:
-                        replay_params["ts"] = timestamp
-                    flask_replay = f"{flask_url}/replay?{urlencode(replay_params)}"
-                    action_col1, action_col2 = st.columns([1, 1])
-                    with action_col1:
-                        st.link_button("🔄 重新练习此题", flask_replay, width="stretch")
-                    with action_col2:
-                        if st.button("🗑️ 删除记录", key=f"delete_record_{record_id or timestamp}", width="stretch"):
-                            if delete_user_progress_record(user_id, record_id=record_id, timestamp=timestamp):
-                                st.success("记录已删除")
-                                _rerun_app()
-                            else:
-                                st.error("删除失败")
-                    if data.get("mode") == "generate_topic" and (data.get("result_data") or {}).get("question"):
-                        st.link_button("✨ 打开题目生成参考范文", flask_replay, width="stretch")
+                    flask_replay = f"{flask_url}/replay?id={record_id}&user_id={user_id}&x_token={x_token}" if record_id else f"{flask_url}/replay?ts={timestamp}&user_id={user_id}&x_token={x_token}"
+                    st.markdown(f"[🔄 重新练习此题]({flask_replay})")
                     if data.get("mode"):
                         st.caption(f"模式：{data['mode']}")
                     if data.get("task_type"):
@@ -2657,7 +2474,7 @@ if st.session_state.active_tab.startswith("📊"):
                         st.text(data["user_response"][:500])
                     if data.get("essay_content"):
                         st.caption("作文内容：")
-                        st.text(data["essay_content"])
+                        st.text(data["essay_content"][:500])
                     if data.get("chinese_answer"):
                         st.caption(f"中文思路：{data['chinese_answer']}")
                     if data.get("keywords"):
@@ -2670,46 +2487,16 @@ if st.session_state.active_tab.startswith("📊"):
                     if result_data and isinstance(result_data, dict):
                         record_title = learning_record_title(activity)
                         st.markdown(f"**{record_title}：**")
-                        record_key = record_id or timestamp or str(abs(hash(str(data))))
-                        _display_record_result_data(result_data, key_prefix=f"history_{record_key}")
+                        _display_record_result_data(result_data)
                     elif data.get("result"):
                         record_title = learning_record_title(activity)
                         st.markdown(f"**{record_title}：**")
                         st.markdown(str(data["result"])[:2000])
-            page_cols = st.columns([1, 2, 1])
-            with page_cols[0]:
-                if st.button("上一页", disabled=page <= 1, key="history_prev"):
-                    st.session_state.history_page = page - 1
-                    _rerun_app()
-            with page_cols[1]:
-                st.markdown(f"<p style='text-align:center'>第 {page} / {total_pages} 页 · 共 {total_records} 条</p>", unsafe_allow_html=True)
-            with page_cols[2]:
-                if st.button("下一页", disabled=page >= total_pages, key="history_next"):
-                    st.session_state.history_page = page + 1
-                    _rerun_app()
         else:
             st.info("暂无练习记录。完成口语反馈或作文批改后，这里会自动显示历史数据。")
 
         # 弱项分析 - AI 生成
         st.subheader("🎯 重点提升建议")
-
-        if st.session_state.improvement_suggestions is None:
-            for record in reversed(user_progress):
-                if record.get("activity") == "重点提升建议":
-                    suggestion_data = record.get("data", {}) or {}
-                    if not isinstance(suggestion_data, dict):
-                        continue
-                    saved_suggestions = (
-                        suggestion_data.get("suggestions")
-                        or suggestion_data.get("result_data")
-                        or suggestion_data.get("result")
-                    )
-                    if isinstance(saved_suggestions, str):
-                        saved_suggestions = parse_json_response(saved_suggestions)
-                    if saved_suggestions:
-                        st.session_state.improvement_suggestions = saved_suggestions
-                        break
-
         if st.button("🤖 生成提升建议", type="primary"):
             if not st.session_state.tongyi_agent:
                 st.warning("请先在侧边栏配置并保存AI API Key")
@@ -2727,42 +2514,29 @@ if st.session_state.active_tab.startswith("📊"):
                         suggestions = st.session_state.tongyi_agent.generate_improvement_suggestions(
                             user_progress, weak_areas, float(target_score), float(current_level)
                         )
-                        parsed = parse_json_response(suggestions) if isinstance(suggestions, str) else suggestions
-                        st.session_state.improvement_suggestions = parsed
-                        save_user_progress(
-                            st.session_state.user_profile.get("user_id", "default_user"),
-                            "重点提升建议",
-                            {
-                                "suggestions": parsed,
-                                "raw": suggestions,
-                            },
-                        )
+                        st.session_state.improvement_suggestions = suggestions
                     except Exception as e:
                         st.error(f"生成建议失败: {e}")
 
         if st.session_state.get("improvement_suggestions"):
             s = st.session_state.improvement_suggestions
-            with st.expander("查看已生成的重点提升建议", expanded=False):
-                if isinstance(s, str):
-                    st.markdown(s)
-                elif isinstance(s, dict):
-                    st.markdown(f"**{s.get('summary', '')}**")
-                    if s.get("priority_areas"):
-                        for area in s["priority_areas"]:
-                            st.markdown(f"- {area}")
-                    if s.get("suggestions"):
-                        for item in s["suggestions"]:
-                            with st.expander(f"{item.get('area', '')}"):
-                                st.caption(f"当前问题：{item.get('current_issue', '')}")
-                                st.caption(f"行动建议：{item.get('action', '')}")
-                                st.caption(f"每周目标：{item.get('weekly_goal', '')}")
-                                st.caption(f"预计提升：{item.get('estimated_improvement', '')}")
-                    if s.get("study_tips"):
-                        st.caption("学习技巧：")
-                        for tip in s["study_tips"]:
-                            st.markdown(f"- {tip}")
-                    if s.get("motivation"):
-                        st.success(s["motivation"])
+            st.markdown(f"**{s.get('summary', '')}**")
+            if s.get("priority_areas"):
+                for area in s["priority_areas"]:
+                    st.markdown(f"- 🔴 {area}")
+            if s.get("suggestions"):
+                for item in s["suggestions"]:
+                    with st.expander(f"📌 {item.get('area', '')}"):
+                        st.caption(f"当前问题：{item.get('current_issue', '')}")
+                        st.caption(f"行动建议：{item.get('action', '')}")
+                        st.caption(f"每周目标：{item.get('weekly_goal', '')}")
+                        st.caption(f"预计提升：{item.get('estimated_improvement', '')}")
+            if s.get("study_tips"):
+                st.caption("学习技巧：")
+                for tip in s["study_tips"]:
+                    st.markdown(f"- {tip}")
+            if s.get("motivation"):
+                st.success(s["motivation"])
 
         # 学习计划 — 持久化显示
         st.subheader("📅 个性化学习计划")
@@ -2775,25 +2549,18 @@ if st.session_state.active_tab.startswith("📊"):
             for record in user_progress:
                 if record.get("activity") == "学习计划":
                     plan_data = record.get("data", {})
-                    if isinstance(plan_data, dict):
-                        saved_plan = plan_data.get("plan") or plan_data.get("study_plan") or plan_data.get("result_data") or plan_data.get("plan_text")
-                        if isinstance(saved_plan, str):
-                            parsed_plan = parse_json_response(saved_plan)
-                            if isinstance(parsed_plan, dict) and "formatted_text" not in parsed_plan:
-                                saved_plan = parsed_plan
-                        if saved_plan:
-                            st.session_state.saved_study_plan = saved_plan
-                            break
+                    if isinstance(plan_data, dict) and plan_data.get("plan_text"):
+                        st.session_state.saved_study_plan = plan_data["plan_text"]
+                        break
 
         # 显示已有计划 + 重新生成按钮
         if st.session_state.saved_study_plan:
-            with st.expander("查看已生成的学习计划", expanded=False):
-                _display_study_plan(st.session_state.saved_study_plan)
+            st.markdown(st.session_state.saved_study_plan)
             col_a, col_b = st.columns([1, 4])
             with col_a:
-                if st.button("重新生成"):
+                if st.button("🔄 重新生成"):
                     st.session_state.saved_study_plan = None
-                    _rerun_app()
+                    st.experimental_rerun()
         else:
             if st.button("📅 生成详细学习计划", type="primary"):
                 with st.spinner("正在生成个性化学习计划..."):
@@ -2837,25 +2604,22 @@ if st.session_state.active_tab.startswith("📊"):
                             if not weak_areas:
                                 weak_areas = st.session_state.user_profile.get("weak_areas", ["口语", "写作"])
 
-                            raw_study_plan = st.session_state.tongyi_agent.generate_study_plan(
+                            study_plan = st.session_state.tongyi_agent.generate_study_plan(
                                 current_level=current_level,
                                 target_score=st.session_state.user_profile["target_score"],
                                 weak_areas=weak_areas,
                                 weeks=study_weeks,
                                 progress_records=user_progress,
                             )
-                            parsed_plan = parse_json_response(raw_study_plan)
-                            study_plan = parsed_plan if isinstance(parsed_plan, dict) and "formatted_text" not in parsed_plan else raw_study_plan
 
                             st.session_state.saved_study_plan = study_plan
-                            _display_study_plan(study_plan)
+                            st.markdown(study_plan)
 
                             # 保存到进度
-                            plan_payload = {"plan": study_plan, "raw": raw_study_plan} if isinstance(study_plan, dict) else {"plan_text": raw_study_plan}
                             save_user_progress(
                                 st.session_state.user_profile.get("user_id", "default_user"),
                                 "学习计划",
-                                plan_payload,
+                                {"plan_text": study_plan},
                             )
                         else:
                             st.error("请先在侧边栏配置 AI API Key")

@@ -5,7 +5,6 @@ import json
 import os
 import random
 import uuid
-from datetime import datetime
 from functools import wraps
 from urllib.parse import urlsplit, urlunsplit
 import ipaddress
@@ -20,7 +19,6 @@ from database import (
     delete_user,
     get_all_progress,
     get_database_status,
-    get_latest_progress_by_activity,
     get_progress,
     get_user_words,
     get_vocab_progress,
@@ -91,9 +89,6 @@ AI_PROVIDERS = {
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "ielts-dev-secret-key")
 
-STUDY_PLAN_ACTIVITY = "学习计划"
-IMPROVEMENT_SUGGESTIONS_ACTIVITY = "重点提升建议"
-
 
 def build_task1_chart_assets(result_data, raw_text=""):
     return _build_task1_chart_assets(result_data, raw_text)
@@ -107,31 +102,6 @@ def simple_md_filter(text):
 @app.template_filter("record_title")
 def record_title_filter(activity):
     return learning_record_title(activity)
-
-
-@app.template_filter("beijing_time")
-def beijing_time_filter(value):
-    """Format ISO datetime string to Beijing time in readable format."""
-    if not value:
-        return ""
-    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-    _BJ = _tz(_td(hours=8))
-    if isinstance(value, str):
-        value = value.strip()
-        if not value:
-            return ""
-        try:
-            dt = _dt.fromisoformat(value)
-        except (ValueError, TypeError):
-            return value
-    else:
-        return str(value)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=_tz.utc)
-    else:
-        pass
-    dt = dt.astimezone(_BJ)
-    return dt.strftime("%Y-%m-%d %H:%M")
 
 
 def _html_list(items):
@@ -218,75 +188,6 @@ def record_result_filter(result_data, activity=""):
         return Markup(f"<pre>{escape(str(result_data or ''))}</pre>")
 
     sections = []
-
-    if result_data.get("unifying_theme") or isinstance(result_data.get("linked_responses"), list):
-        theme_body = []
-        if result_data.get("unifying_theme"):
-            theme_body.append(f"<p><strong>中文：</strong>{escape(result_data['unifying_theme'])}</p>")
-        if result_data.get("unifying_theme_en"):
-            theme_body.append(f"<p><strong>English：</strong>{escape(result_data['unifying_theme_en'])}</p>")
-        if theme_body:
-            sections.append(
-                "<details class='result-accordion' open><summary>核心主题</summary>"
-                f"<div class='result-body'>{''.join(theme_body)}</div></details>"
-            )
-
-        linked_responses = result_data.get("linked_responses") or []
-        if isinstance(linked_responses, list):
-            for index, item in enumerate(linked_responses, 1):
-                if not isinstance(item, dict):
-                    continue
-                title = item.get("topic") or f"话题 {index}"
-                if item.get("topic_en"):
-                    title = f"{title} / {item.get('topic_en')}"
-                body = []
-                if item.get("adapted_response"):
-                    body.append(f"<p><strong>中文方案：</strong>{escape(item['adapted_response'])}</p>")
-                if item.get("adapted_response_en"):
-                    english = str(item["adapted_response_en"])
-                    body.append(
-                        "<p><strong>English Response：</strong>"
-                        f"<button class='speak-btn' type='button' data-speak='{escape(english)}'>朗读答案</button></p>"
-                        f"<p>{escape(english)}</p>"
-                    )
-                if item.get("possible_questions"):
-                    body.append("<p><strong>可能出现的相关考题：</strong></p>")
-                    body.append(_html_list(item["possible_questions"]))
-                if item.get("key_elements"):
-                    body.append("<p><strong>关键元素：</strong></p>")
-                    body.append(_html_list(item["key_elements"]))
-                if item.get("transition_phrases"):
-                    body.append("<p><strong>过渡短语：</strong></p>")
-                    body.append(_html_list(item["transition_phrases"]))
-                sections.append(
-                    f"<details class='result-accordion nested-answer' {'open' if index == 1 else ''}>"
-                    f"<summary>话题 {index}：{escape(title)}</summary>"
-                    f"<div class='result-body'>{''.join(body)}</div></details>"
-                )
-
-        if result_data.get("versatile_vocabulary") or result_data.get("versatile_vocabulary_en"):
-            vocab_body = []
-            if result_data.get("versatile_vocabulary"):
-                vocab_body.append("<p><strong>中文：</strong></p>")
-                vocab_body.append(_html_list(result_data["versatile_vocabulary"]))
-            if result_data.get("versatile_vocabulary_en"):
-                vocab_body.append("<p><strong>English：</strong></p>")
-                vocab_body.append(_html_list(result_data["versatile_vocabulary_en"]))
-            sections.append(
-                "<details class='result-accordion'><summary>通用词汇</summary>"
-                f"<div class='result-body'>{''.join(vocab_body)}</div></details>"
-            )
-        if result_data.get("practice_strategy"):
-            sections.append(
-                "<details class='result-accordion'><summary>练习策略</summary>"
-                f"<div class='result-body'><p>{escape(result_data['practice_strategy'])}</p></div></details>"
-            )
-        if result_data.get("study_plan"):
-            sections.append(
-                "<details class='result-accordion'><summary>学习计划</summary>"
-                f"<div class='result-body'><p>{escape(result_data['study_plan'])}</p></div></details>"
-            )
-        return Markup("".join(sections))
 
     cue_card = result_data.get("cue_card")
     if cue_card:
@@ -443,56 +344,6 @@ def record_result_filter(result_data, activity=""):
             f"<div class='result-body'><button class='speak-btn' type='button' data-speak='{escape(model_answer)}'>朗读参考答案</button><p>{escape(model_answer)}</p></div></details>"
         )
 
-    criteria_labels = {
-        "task_achievement": "任务完成度",
-        "task_response": "任务回应",
-        "coherence_cohesion": "连贯与衔接",
-        "lexical_resource": "词汇资源",
-        "grammatical_range": "语法多样性与准确性",
-        "grammatical_range_accuracy": "语法范围与准确性",
-    }
-    sub_labels = {
-        "score": "分数",
-        "comments": "评价",
-        "assessment": "评价",
-        "grammar_analysis": "语法分析",
-        "strengths": "优点",
-        "improvements": "改进建议",
-        "errors": "问题",
-        "suggestions": "建议",
-        "examples": "示例",
-    }
-    for key, label in criteria_labels.items():
-        item = result_data.get(key)
-        if not isinstance(item, dict):
-            continue
-        summary = label
-        if item.get("score") is not None:
-            summary = f"{label} · {escape(item['score'])}"
-        body = []
-        for sub_key, value in item.items():
-            if value in (None, "", [], {}):
-                continue
-            sub_label = sub_labels.get(sub_key, sub_key)
-            if isinstance(value, list):
-                body.append(f"<p><strong>{escape(sub_label)}：</strong></p>{_html_list(value)}")
-            elif isinstance(value, dict):
-                nested = "".join(
-                    f"<li><strong>{escape(str(k))}：</strong>{escape(str(v))}</li>"
-                    for k, v in value.items()
-                    if v not in (None, "", [], {})
-                )
-                if nested:
-                    body.append(f"<p><strong>{escape(sub_label)}：</strong></p><ul>{nested}</ul>")
-            else:
-                content = escape(str(value))
-                body.append(f"<p><strong>{escape(sub_label)}：</strong>{content}</p>")
-        if body:
-            sections.append(
-                f"<details class='result-accordion'><summary>{summary}</summary>"
-                f"<div class='result-body'>{''.join(body)}</div></details>"
-            )
-
     list_labels = {
         "vocabulary_highlight": "高级词汇",
         "grammar_structures": "语法结构",
@@ -541,69 +392,6 @@ def record_result_filter(result_data, activity=""):
     if not sections:
         sections.append(f"<pre>{escape(json.dumps(result_data, ensure_ascii=False, indent=2))}</pre>")
 
-    return Markup("".join(sections))
-
-
-@app.template_filter("study_plan_result")
-def study_plan_result_filter(plan):
-    if not plan:
-        return Markup("")
-    if isinstance(plan, str):
-        parsed = parse_model_output(plan)
-        if isinstance(parsed, dict) and "formatted_text" not in parsed:
-            plan = parsed
-        else:
-            return Markup(simple_md_filter(plan))
-    if not isinstance(plan, dict):
-        return Markup(f"<pre>{escape(str(plan))}</pre>")
-
-    sections = []
-    if plan.get("overall_assessment"):
-        sections.append(
-            "<details class='result-accordion' open><summary>总体评价</summary>"
-            f"<div class='result-body'><p>{escape(plan['overall_assessment'])}</p></div></details>"
-        )
-    if plan.get("priority_areas"):
-        sections.append(
-            "<details class='result-accordion'><summary>优先提升领域</summary>"
-            f"<div class='result-body'>{_html_list(plan['priority_areas'])}</div></details>"
-        )
-    weekly = plan.get("weekly_schedule")
-    if isinstance(weekly, list):
-        week_blocks = []
-        for item in weekly:
-            if not isinstance(item, dict):
-                continue
-            week = escape(item.get("week", ""))
-            theme = escape(item.get("theme", ""))
-            body = []
-            if item.get("focus"):
-                body.append(f"<p><strong>重点：</strong>{escape(item['focus'])}</p>")
-            if item.get("tasks"):
-                body.append("<p><strong>具体任务：</strong></p>")
-                body.append(_html_list(item["tasks"]))
-            if item.get("goal"):
-                body.append(f"<p><strong>本周目标：</strong>{escape(item['goal'])}</p>")
-            week_blocks.append(
-                f"<details class='result-accordion nested-answer'><summary>第 {week} 周：{theme}</summary>"
-                f"<div class='result-body'>{''.join(body)}</div></details>"
-            )
-        sections.append(
-            "<details class='result-accordion' open><summary>每周安排</summary>"
-            f"<div class='result-body'>{''.join(week_blocks)}</div></details>"
-        )
-    if plan.get("study_tips"):
-        sections.append(
-            "<details class='result-accordion'><summary>学习建议</summary>"
-            f"<div class='result-body'>{_html_list(plan['study_tips'])}</div></details>"
-        )
-    if plan.get("milestones"):
-        sections.append(
-            "<details class='result-accordion'><summary>阶段检查点</summary>"
-            f"<div class='result-body'>{_html_list(plan['milestones'])}</div></details>"
-        )
-    if not sections:
-        sections.append(f"<pre>{escape(json.dumps(plan, ensure_ascii=False, indent=2))}</pre>")
     return Markup("".join(sections))
 
 
@@ -671,21 +459,6 @@ def score_options(start=1.0, end=9.0):
         values.append(round(value, 1))
         value += 0.5
     return values
-
-
-def int_query(name, default=1):
-    try:
-        return int(request.args.get(name, default))
-    except (TypeError, ValueError):
-        return default
-
-
-def paginate_records(records, page, per_page=10):
-    total = len(records)
-    total_pages = max(1, (total + per_page - 1) // per_page)
-    page = max(1, min(page, total_pages))
-    start = (page - 1) * per_page
-    return records[start:start + per_page], page, total_pages, total
 
 
 def current_assistant():
@@ -775,8 +548,7 @@ def attach_speaking_feedback(records):
 def visible_progress(records):
     return [
         record for record in records
-        if record.get("activity") not in {STUDY_PLAN_ACTIVITY, IMPROVEMENT_SUGGESTIONS_ACTIVITY}
-        and not is_speaking_feedback_record(record)
+        if record.get("activity") != "学习计划" and not is_speaking_feedback_record(record)
     ]
 
 
@@ -786,152 +558,6 @@ def prepare_progress(records):
 
 def prepare_feedback_context(records):
     return attach_speaking_feedback(records)
-
-
-def latest_activity_record(records, activity):
-    matched = [record for record in records if record.get("activity") == activity]
-    if not matched:
-        return None
-    return max(matched, key=lambda record: record.get("timestamp") or "")
-
-
-def latest_saved_suggestions(records):
-    record = latest_activity_record(records, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
-    data = record.get("data", {}) if record else {}
-    if not isinstance(data, dict):
-        return None
-    suggestions = data.get("suggestions") or data.get("result_data")
-    if isinstance(suggestions, str):
-        suggestions = parse_model_output(suggestions)
-    return suggestions if isinstance(suggestions, dict) else None
-
-
-def latest_saved_study_plan(records):
-    record = latest_activity_record(records, STUDY_PLAN_ACTIVITY)
-    data = record.get("data", {}) if record else {}
-    if not isinstance(data, dict):
-        return None
-    plan = data.get("plan") or data.get("study_plan") or data.get("result_data")
-    if isinstance(plan, str):
-        plan = parse_model_output(plan)
-    if isinstance(plan, dict):
-        return plan
-    return data.get("plan_text") or data.get("result") or ""
-
-
-def profile_weak_areas(profile):
-    weak_areas = profile.get("weak_areas", [])
-    if isinstance(weak_areas, str):
-        try:
-            weak_areas = json.loads(weak_areas)
-        except (TypeError, ValueError):
-            weak_areas = [weak_areas] if weak_areas else []
-    return weak_areas
-
-
-def calculate_study_plan_inputs(profile, progress):
-    speaking_scores = []
-    writing_scores = []
-    for record in progress:
-        data = record.get("data", {}) if isinstance(record, dict) else {}
-        if not isinstance(data, dict):
-            continue
-        score = record.get("score") if record.get("score") is not None else data.get("score")
-        if score in (None, ""):
-            continue
-        try:
-            score = float(score)
-        except (TypeError, ValueError):
-            continue
-        activity = record.get("activity", "")
-        if "口语" in activity:
-            speaking_scores.append(score)
-        elif "写作" in activity:
-            writing_scores.append(score)
-
-    profile_level = float(profile.get("current_level", 5.0))
-    avg_speaking = (
-        sum(speaking_scores) / len(speaking_scores)
-        if speaking_scores else float(profile.get("speaking_level", profile_level))
-    )
-    avg_writing = (
-        sum(writing_scores) / len(writing_scores)
-        if writing_scores else float(profile.get("writing_level", profile_level))
-    )
-    current_level = (avg_speaking + avg_writing) / 2 if (speaking_scores or writing_scores) else profile_level
-
-    try:
-        exam_date = profile.get("exam_date") or ""
-        study_weeks = max(1, int((datetime.strptime(exam_date, "%Y-%m-%d") - datetime.now()).days / 7)) if exam_date else 12
-    except (TypeError, ValueError):
-        study_weeks = 12
-
-    weak_areas = []
-    if speaking_scores and avg_speaking < float(profile.get("speaking_level", 6.0)):
-        weak_areas.append("口语")
-    if writing_scores and avg_writing < float(profile.get("writing_level", 6.0)):
-        weak_areas.append("写作")
-    if not weak_areas:
-        weak_areas = profile_weak_areas(profile) or ["口语", "写作"]
-
-    return current_level, study_weeks, weak_areas
-
-
-def find_progress_record(user_id, record_id="", timestamp="", limit=500):
-    if not record_id and not timestamp:
-        return None
-    for item in get_progress(user_id, limit=limit):
-        if record_id and str(item.get("id")) == str(record_id):
-            return item
-        if timestamp and item.get("timestamp") == timestamp:
-            return item
-    return None
-
-
-def infer_record_mode(record):
-    data = record.get("data") or {}
-    mode = data.get("mode", "")
-    activity = record.get("activity", "")
-    if mode:
-        return mode
-    if "串题" in activity:
-        return "theme_linking"
-    if "Task 1" in activity:
-        return "task1"
-    if "Task 2" in activity:
-        return "task2"
-    if "作文思路" in activity:
-        return "ideas"
-    if "生成作文题目" in activity:
-        return "generate_topic"
-    if "参考范文" in activity:
-        return "generate_model_answer"
-    if "Part 1" in activity:
-        return "part1"
-    if "Part 2" in activity:
-        return "part2"
-    if "Part 3" in activity:
-        return "part3"
-    if "口语反馈" in activity:
-        return "speaking_feedback"
-    return mode
-
-
-def replay_record_from_args():
-    return find_progress_record(
-        session["user_id"],
-        request.args.get("replay_id", "").strip(),
-        request.args.get("replay_ts", "").strip(),
-    )
-
-
-def result_from_record(record):
-    data = record.get("data") or {}
-    result_data = data.get("result_data")
-    result = data.get("result")
-    if result is None and result_data is not None:
-        result = json.dumps(result_data, ensure_ascii=False)
-    return result, result_data
 
 
 
@@ -1052,23 +678,12 @@ def parse_model_output(raw):
     if not raw:
         return None
     text = raw.strip()
-    # 去除代码块包裹
     if text.startswith("```"):
         text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    # 直接尝试解析
     try:
         return json.loads(text)
     except (TypeError, ValueError):
-        pass
-    # 尝试从文本中提取 JSON 对象（处理 LLM 在 JSON 前后添加文本的情况）
-    first_brace = text.find("{")
-    last_brace = text.rfind("}")
-    if first_brace != -1 and last_brace > first_brace:
-        try:
-            return json.loads(text[first_brace : last_brace + 1])
-        except (TypeError, ValueError):
-            pass
-    return {"formatted_text": raw, "raw_response": raw}
+        return {"formatted_text": raw, "raw_response": raw}
 
 
 
@@ -1143,24 +758,15 @@ def auth():
 def dashboard():
     user_id = session["user_id"]
     date_filter = request.args.get("date", "").strip()
-    page = int_query("page", 1)
-    all_progress = list(reversed(get_progress(user_id, limit=180)))
-    suggestion_record = get_latest_progress_by_activity(user_id, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
-    study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
-    suggestions = latest_saved_suggestions([suggestion_record] if suggestion_record else [])
-    study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
-    progress = prepare_progress(all_progress)
+    progress = prepare_progress(list(reversed(get_progress(user_id, limit=160))))
     if date_filter:
         progress = [p for p in progress if (p.get("timestamp") or "").startswith(date_filter)]
-    progress, page, total_pages, total_records = paginate_records(progress, page, 10)
+    progress = progress[:12]
+    suggestions = session.pop("improvement_suggestions", None)
     return render_template(
         "dashboard.html",
         progress=progress,
-        page=page,
-        total_pages=total_pages,
-        total_records=total_records,
         suggestions=suggestions,
-        study_plan=study_plan,
         date_filter=date_filter,
         score_options=score_options(),
         target_options=score_options(4.0, 9.0),
@@ -1178,58 +784,20 @@ def generate_suggestions():
     if assistant is None:
         flash("请先保存可用的 AI API Key。", "error")
         return redirect(url_for("dashboard"))
-    weak_areas = profile_weak_areas(profile)
+    weak_areas = profile.get("weak_areas", [])
+    if isinstance(weak_areas, str):
+        try:
+            weak_areas = json.loads(weak_areas)
+        except (TypeError, ValueError):
+            weak_areas = [weak_areas] if weak_areas else []
     target_score = profile.get("target_score", 6.5)
     current_level = profile.get("current_level", 5.0)
-    try:
-        raw_suggestions = assistant.generate_improvement_suggestions(
-            progress, weak_areas, float(target_score), float(current_level)
-        )
-    except Exception as exc:
-        flash(f"AI 调用失败：{exc}", "error")
-        return redirect(url_for("dashboard"))
-    suggestions = parse_model_output(raw_suggestions)
-    if not isinstance(suggestions, dict):
-        suggestions = {"formatted_text": raw_suggestions}
-    save_progress(
-        user_id,
-        IMPROVEMENT_SUGGESTIONS_ACTIVITY,
-        {"suggestions": suggestions, "raw": raw_suggestions},
+    suggestions = assistant.generate_improvement_suggestions(
+        progress, weak_areas, float(target_score), float(current_level)
     )
+    session["improvement_suggestions"] = suggestions
     flash("重点提升建议已生成。", "success")
     return redirect(url_for("dashboard"))
-
-
-@app.post("/generate-study-plan")
-@login_required
-def generate_study_plan():
-    user_id = session["user_id"]
-    profile = load_user_profile(user_id) or default_profile(user_id)
-    progress = prepare_progress(list(reversed(get_progress(user_id, limit=100))))
-    assistant, _ = current_assistant()
-    if assistant is None:
-        flash("请先保存可用的 AI API Key。", "error")
-        return redirect(url_for("dashboard"))
-
-    current_level, study_weeks, weak_areas = calculate_study_plan_inputs(profile, progress)
-    try:
-        raw_study_plan = assistant.generate_study_plan(
-            current_level=current_level,
-            target_score=float(profile.get("target_score", 6.5)),
-            weak_areas=weak_areas,
-            weeks=study_weeks,
-            progress_records=progress,
-        )
-    except Exception as exc:
-        flash(f"AI 调用失败：{exc}", "error")
-        return redirect(request.referrer or url_for("dashboard"))
-    study_plan = parse_model_output(raw_study_plan)
-    if isinstance(study_plan, dict) and "formatted_text" not in study_plan:
-        save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan": study_plan, "raw": raw_study_plan})
-    else:
-        save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan_text": raw_study_plan})
-    flash("个性化学习计划已生成。", "success")
-    return redirect(request.referrer or url_for("dashboard"))
 
 
 @app.post("/profile")
@@ -1551,22 +1119,17 @@ def speaking():
             session["speaking_result_data"] = json.dumps(result_data) if result_data is not None else None
             session["speaking_mode"] = mode
     else:
-        replay_record = replay_record_from_args()
-        if replay_record:
-            mode = infer_record_mode(replay_record) or mode
-            result, result_data = result_from_record(replay_record)
-        else:
-            cached = session.pop("speaking_result", None)
-            cached_data = session.pop("speaking_result_data", None)
-            cached_mode = session.pop("speaking_mode", "part1")
-            if cached is not None:
-                result = cached
-                mode = cached_mode
-                if cached_data is not None:
-                    try:
-                        result_data = json.loads(cached_data)
-                    except (TypeError, ValueError):
-                        result_data = None
+        cached = session.pop("speaking_result", None)
+        cached_data = session.pop("speaking_result_data", None)
+        cached_mode = session.pop("speaking_mode", "part1")
+        if cached is not None:
+            result = cached
+            mode = cached_mode
+            if cached_data is not None:
+                try:
+                    result_data = json.loads(cached_data)
+                except (TypeError, ValueError):
+                    result_data = None
     return render_template("speaking.html", result=result, result_data=result_data, mode=mode, **common_context())
 
 
@@ -1581,37 +1144,21 @@ def theme_linking():
             flash("请先在用户中心保存可用的 AI API Key。", "error")
             return redirect(url_for("dashboard"))
         topics = [item.strip() for item in request.form.get("topics", "").splitlines() if item.strip()]
-        try:
-            result = assistant.link_speaking_themes(
-                topics,
-                request.form.get("main_theme", "个人成长"),
-                float_field("target_score", 6.5),
-            )
-        except Exception as e:
-            flash(f"AI 调用失败：{e}", "error")
-            result = None
+        result = assistant.link_speaking_themes(
+            topics,
+            request.form.get("main_theme", "个人成长"),
+            float_field("target_score", 6.5),
+        )
         result_data = parse_model_output(result)
-        if result is not None:
-            save_progress(session["user_id"], "口语串题方案", {
-                "mode": "theme_linking",
-                "topics": topics,
-                "main_theme": request.form.get("main_theme", "个人成长"),
-                "target_score": float_field("target_score", 6.5),
-                "result": result,
-                "result_data": result_data,
-            })
+        save_progress(session["user_id"], "口语串题方案", {"topics": topics, "result": result, "result_data": result_data})
         if result is not None:
             session["theme_linking_result"] = result
             session["theme_linking_result_data"] = result_data
     else:
-        replay_record = replay_record_from_args()
-        if replay_record:
-            result, result_data = result_from_record(replay_record)
-        else:
-            cached = session.pop("theme_linking_result", None)
-            if cached is not None:
-                result = cached
-                result_data = session.pop("theme_linking_result_data", None)
+        cached = session.pop("theme_linking_result", None)
+        if cached is not None:
+            result = cached
+            result_data = session.pop("theme_linking_result_data", None)
     return render_template("theme_linking.html", result=result, result_data=result_data, **common_context())
 
 
@@ -1620,7 +1167,7 @@ def theme_linking():
 def writing():
     result = None
     result_data = None
-    mode = request.form.get("mode") or request.args.get("mode", "task1")
+    mode = request.form.get("mode", "task1")
     assistant, ai_config = current_assistant()
     if request.method == "POST":
         if assistant is None:
@@ -1640,11 +1187,6 @@ def writing():
                 "chart_type": result_data.get("chart_type", ""),
                 "chart_data": result_data.get("chart_data"),
                 "table_data": result_data.get("table_data"),
-                "chart_image": result_data.get("chart_image", ""),
-                "question": result_data.get("question", ""),
-                "task_type": task_type,
-                "topic_category": result_data.get("topic_category", ""),
-                "essay_type": result_data.get("essay_type", ""),
             }, ensure_ascii=False)
             save_progress(session["user_id"], "生成作文题目", {
                 "mode": mode,
@@ -1716,29 +1258,14 @@ def writing():
         elif mode == "generate_model_answer":
             topic = request.form.get("topic", "").strip()
             task_type = request.form.get("task_type", "Task 2")
-            context_raw = request.form.get("topic_context", "").strip()
-            if context_raw:
-                try:
-                    topic_data = json.loads(context_raw)
-                except (TypeError, ValueError):
-                    topic_data = {}
-            else:
-                # Retrieve chart/table data from session (generated topic's result_data)
-                stored = session.get("generated_chart_data", "")
-                topic_data = json.loads(stored) if stored else {}
-            topic_data["question"] = topic_data.get("question") or topic
-            topic_data["task_type"] = topic_data.get("task_type") or task_type
+            # Retrieve chart/table data from session (generated topic's result_data)
+            stored = session.get("generated_chart_data", "")
+            topic_data = json.loads(stored) if stored else {}
             chart_type = topic_data.get("chart_type", "")
             chart_data = topic_data.get("chart_data")
             table_data = topic_data.get("table_data")
             result = assistant.generate_model_answer(task_type, topic, chart_type, chart_data, table_data)
-            result_data = {
-                **topic_data,
-                "mode": mode,
-                "topic": topic,
-                "task_type": task_type,
-                "model_answer": result,
-            }
+            result_data = None
             save_progress(session["user_id"], "生成参考范文", {
                 "mode": mode,
                 "topic": topic,
@@ -1746,32 +1273,24 @@ def writing():
                 "chart_type": chart_type,
                 "chart_data": chart_data,
                 "table_data": table_data,
-                "chart_image": topic_data.get("chart_image", ""),
-                "question": topic_data.get("question", topic),
                 "result": result,
-                "result_data": result_data,
             })
         if result is not None:
             session["writing_result"] = result
             session["writing_result_data"] = json.dumps(result_data) if result_data is not None else None
             session["writing_mode"] = mode
     else:
-        replay_record = replay_record_from_args()
-        if replay_record:
-            mode = infer_record_mode(replay_record) or mode
-            result, result_data = result_from_record(replay_record)
-        else:
-            cached = session.pop("writing_result", None)
-            cached_data = session.pop("writing_result_data", None)
-            cached_mode = session.pop("writing_mode", "task1")
-            if cached is not None:
-                result = cached
-                mode = cached_mode
-                if cached_data is not None:
-                    try:
-                        result_data = json.loads(cached_data)
-                    except (TypeError, ValueError):
-                        result_data = None
+        cached = session.pop("writing_result", None)
+        cached_data = session.pop("writing_result_data", None)
+        cached_mode = session.pop("writing_mode", "task1")
+        if cached is not None:
+            result = cached
+            mode = cached_mode
+            if cached_data is not None:
+                try:
+                    result_data = json.loads(cached_data)
+                except (TypeError, ValueError):
+                    result_data = None
 
     # 处理题目导入：从生成题目区域导入到练习区
     import_topic = request.args.get("import_topic", "").strip()
@@ -1802,20 +1321,11 @@ def writing():
 @login_required
 def analysis():
     user_id = session["user_id"]
-    page = int_query("page", 1)
-    all_progress = list(reversed(get_progress(user_id, limit=180)))
-    study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
-    study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
-    progress = prepare_progress(all_progress)
-    progress, page, total_pages, total_records = paginate_records(progress, page, 10)
+    progress = prepare_progress(list(reversed(get_progress(user_id, limit=160))))
     user_words = get_user_words(user_id)
     return render_template(
         "analysis.html",
         progress=progress,
-        page=page,
-        total_pages=total_pages,
-        total_records=total_records,
-        study_plan=study_plan,
         user_words=user_words,
         **common_context(),
     )
@@ -2038,19 +1548,53 @@ def replay():
     if not ts and not record_id:
         flash("缺少记录标识。", "warning")
         return redirect(url_for("dashboard"))
-    item = find_progress_record(session["user_id"], record_id, ts)
-    if item:
-        mode = infer_record_mode(item)
-        replay_args = {"replay_id": item.get("id")} if item.get("id") else {"replay_ts": item.get("timestamp", "")}
-        if mode in ("part1", "part2", "part3", "speaking_feedback", "keyword_answer", "answer_from_cn", "speaking_recording"):
-            replay_args["mode"] = mode
-            return redirect(url_for("speaking", **replay_args))
-        if mode in ("task1", "task2", "generate_topic", "ideas", "generate_model_answer"):
-            replay_args["mode"] = mode
-            return redirect(url_for("writing", **replay_args))
-        if mode == "theme_linking":
-            return redirect(url_for("theme_linking", **replay_args))
-        return redirect(url_for("dashboard"))
+    records = get_progress(session["user_id"], limit=500)
+    for item in records:
+        if (record_id and str(item.get("id")) == record_id) or (ts and item.get("timestamp") == ts):
+            data = item.get("data") or {}
+            mode = data.get("mode", "")
+            if mode in ("part1", "part2", "part3"):
+                if data.get("result") or data.get("result_data"):
+                    session["speaking_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
+                    session["speaking_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
+                    session["speaking_mode"] = mode
+                return redirect(url_for("speaking", mode=mode))
+            if mode in ("task1", "task2", "generate_topic"):
+                if mode == "generate_topic" and (data.get("result") or data.get("result_data")):
+                    session["writing_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
+                    session["writing_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
+                    session["writing_mode"] = mode
+                    return redirect(url_for("writing"))
+                task_type_data = data.get("task_type", data.get("chart_type", "Task 2"))
+                if "Task 1" in str(task_type_data):
+                    task_mode = "task1"
+                else:
+                    task_mode = "task2"
+                question = data.get("question", "")
+                if not question and isinstance(data.get("result_data"), dict):
+                    question = data["result_data"].get("question", "")
+                if not question:
+                    question = data.get("essay_content", "")
+                return redirect(url_for("writing", **{
+                    "import_topic": "1",
+                    "import_question": question,
+                    "import_task": "Task 1" if task_mode == "task1" else "Task 2",
+                }))
+            if mode == "ideas":
+                if data.get("result") or data.get("result_data"):
+                    session["writing_result"] = data.get("result") or json.dumps(data.get("result_data"), ensure_ascii=False)
+                    session["writing_result_data"] = json.dumps(data.get("result_data")) if data.get("result_data") is not None else None
+                    session["writing_mode"] = mode
+                return redirect(url_for("writing", **{
+                    "import_topic": "1",
+                    "import_question": data.get("topic", ""),
+                    "import_task": "Task 2",
+                }))
+            if mode in ("theme_linking",):
+                return redirect(url_for("theme_linking", **{
+                    "preset_topics": data.get("topics", ""),
+                }))
+            return redirect(url_for("dashboard"))
     flash("记录未找到。", "warning")
     return redirect(url_for("dashboard"))
 
