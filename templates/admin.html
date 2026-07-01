@@ -14,6 +14,11 @@
         <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
       </div>
       <nav>
+        <a href="{{ url_for('dashboard') }}" title="学习总览">🏠 <span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
         <a href="{{ url_for('admin_panel') }}" title="用户管理">🛡️ <span class="nav-text">用户管理</span></a>
       </nav>
     </aside>
@@ -25,6 +30,10 @@
           <details class="user-dropdown">
             <summary><span class="user-chip">管理员 · {{ user_id }}</span></summary>
             <div class="drop-menu" onclick="event.stopPropagation()">
+              <a href="{{ url_for('dashboard') }}">返回学习总览</a>
+              <a href="{{ url_for('speaking') }}">进入口语练习</a>
+              <a href="{{ url_for('writing') }}">进入作文批改</a>
+              <div class="drop-divider"></div>
               <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
             </div>
           </details>
@@ -57,7 +66,7 @@
                   {% if u.full_name %}<p class="record-meta"><strong>姓名：</strong>{{ u.full_name }}</p>{% endif %}
                   {% if u.email %}<p class="record-meta"><strong>邮箱：</strong>{{ u.email }}</p>{% endif %}
                   <p class="record-meta"><strong>当前水平：</strong>{{ '%.1f'|format(u.current_level) }} · <strong>目标：</strong>{{ '%.1f'|format(u.target_score) }}</p>
-                  <p class="record-meta"><strong>创建时间：</strong>{{ u.created_at }}</p>
+                  <p class="record-meta"><strong>创建时间：</strong>{{ u.created_at | beijing_time }}</p>
                   <a class="primary-btn small" href="{{ url_for('admin_panel', user_id=u.user_id) }}">打开用户详情</a>
                   {% if u.user_id != user_id %}
                     <form method="post" action="{{ url_for('admin_update_user_role', target_user=u.user_id) }}" style="display:inline-block;margin-left:8px">

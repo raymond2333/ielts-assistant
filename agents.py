@@ -48,14 +48,20 @@ class TongyiIELTSAssistant:
     # ============================================================
     # 口语反馈
     # ============================================================
-    def get_speaking_feedback(self, question, user_response, target_score):
-        return self._get_feedback("Part 2", question, user_response, target_score)
+    def get_speaking_feedback(self, question, user_response, target_score, reference_answer_note="无"):
+        return self._get_feedback("Part 2", question, user_response, target_score, reference_answer_note)
 
-    def get_speaking_feedback_direct(self, question, user_response, target_score):
-        return self._get_feedback("Part 1", question, user_response, target_score)
+    def get_speaking_feedback_direct(self, question, user_response, target_score, part="Part 1", reference_answer_note="无"):
+        return self._get_feedback(part, question, user_response, target_score, reference_answer_note)
 
-    def _get_feedback(self, part, question, user_response, target_score):
-        prompt = SPEAKING_FEEDBACK_SIMPLE_PROMPT.format(part=part, question=question, user_response=user_response, target_score=target_score)
+    def _get_feedback(self, part, question, user_response, target_score, reference_answer_note="无"):
+        prompt = SPEAKING_FEEDBACK_SIMPLE_PROMPT.format(
+            part=part,
+            question=question,
+            user_response=user_response,
+            target_score=target_score,
+            reference_answer_note=reference_answer_note or "无",
+        )
         return self.llm.invoke(prompt).content
 
     # ============================================================

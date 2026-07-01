@@ -1068,14 +1068,67 @@ nav a:hover {
   background: #fde68a;
 }
 
-.voice-score-box {
-  margin-top: 8px;
-  padding: 10px 14px;
-  background: #f0fdf4;
-  border: 1px solid #86efac;
+.voice-input-wrapper.recording-active textarea {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.12);
+}
+
+.voice-input-wrapper.recording-active .rec-btn {
+  background: #dc2626;
+  color: white;
+  animation: pulse 0.8s infinite;
+}
+
+.voice-input-wrapper.recording-active .voice-status {
+  display: block;
+  color: #991b1b;
+  font-weight: 800;
+}
+
+.voice-input-wrapper.recording-uploading .voice-status {
+  display: block;
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.voice-input-wrapper.recording-previewing textarea {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.recording-preview {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
   border-radius: 8px;
-  font-size: 0.9rem;
-  animation: fadeIn 0.3s;
+  background: #eff6ff;
+}
+
+.recording-preview-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #1e3a8a;
+}
+
+.recording-preview-head span {
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.recording-preview audio {
+  width: 100%;
+  max-width: 420px;
+  display: block;
+}
+
+.recording-preview-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
 }
 
 .voice-status {
@@ -1083,6 +1136,44 @@ nav a:hover {
   margin-top: 6px;
   color: var(--text-dim);
   font-size: 0.82rem;
+}
+
+.feedback-focus-flash {
+  outline: 3px solid rgba(15, 123, 99, 0.28);
+  box-shadow: 0 0 0 8px rgba(15, 123, 99, 0.08);
+  transition: outline-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.score-encouragement {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.score-encouragement.excellent {
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+}
+
+.score-encouragement.good {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+}
+
+.score-encouragement.steady {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.score-encouragement.warm {
+  color: #9f1239;
+  background: #ffe4e6;
+  border: 1px solid #fda4af;
 }
 
 @keyframes fadeIn {

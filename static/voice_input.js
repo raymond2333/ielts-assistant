@@ -18,6 +18,10 @@
   var restartTimer = null;
   var noResultTimer = null;
   var restartCount = 0;
+  var recordTimer = null;
+  var recordStartedAt = 0;
+  var uploading = false;
+  var pendingRecording = null;
 
   function createBtn(textarea) {
     if (textarea.dataset.voiceReady === "1") return;
@@ -57,7 +61,7 @@
       btnBar.appendChild(recBtn);
     }
 
-    restoreVoiceResult(textarea);
+    clearLegacyVoiceResult(textarea);
   }
 
   function toggleSpeech(textarea, btn) {
@@ -186,9 +190,13 @@
   }
 
   function toggleRecord(textarea, btn) {
+    if (uploading) return;
     if (recording) {
       stopRecord(btn);
       return;
+    }
+    if (pendingRecording && pendingRecording.textarea === textarea) {
+      clearRecordingPreview(textarea);
     }
     if (listening) { recognition.abort(); stopSpeech(null); }
     currentTarget = textarea;
@@ -199,6 +207,7 @@
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
       recording = true;
       audioChunks = [];
+      recordStartedAt = Date.now();
       var mimeType = "";
       if (window.MediaRecorder && MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
         mimeType = "audio/webm;codecs=opus";
@@ -212,12 +221,15 @@
       mediaRecorder.onstop = function () {
         stream.getTracks().forEach(function (t) { t.stop(); });
         var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-        uploadAudio(blob, btn);
+        showRecordingPreview(blob, btn);
       };
       mediaRecorder.start();
       btn.classList.add("listening");
       btn.innerHTML = "⏺️";
       btn.title = "录音中…点击停止";
+      setRecordingState("active");
+      updateRecordStatus();
+      recordTimer = setInterval(updateRecordStatus, 250);
     }).catch(function () {
       alert("无法访问麦克风，请检查浏览器权限设置。");
     });
@@ -226,15 +238,84 @@
   function stopRecord(btn) {
     if (!recording) return;
     recording = false;
+    clearInterval(recordTimer);
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
     }
     btn.classList.remove("listening");
-    btn.innerHTML = "⏳";
-      btn.title = "正在上传录音并转文字...";
+    btn.innerHTML = "🎙️";
+    btn.title = "重新录音";
+    setRecordingState("preview");
+    setVoiceStatus("录音已结束。请先试听，满意后再上传评分。");
+  }
+
+  function showRecordingPreview(blob, btn) {
+    if (!currentTarget || !blob || !blob.size) {
+      setVoiceStatus("没有录到有效声音，请重新录制。");
+      return;
+    }
+    pendingRecording = {
+      blob: blob,
+      btn: btn,
+      textarea: currentTarget,
+      objectUrl: URL.createObjectURL(blob)
+    };
+    var wrapper = currentTarget.closest(".voice-input-wrapper");
+    if (!wrapper) return;
+    var old = wrapper.querySelector(".recording-preview");
+    if (old) old.remove();
+    var preview = document.createElement("div");
+    preview.className = "recording-preview";
+    preview.innerHTML =
+      "<div class='recording-preview-head'><strong>本次录音</strong><span>先试听，满意后上传评分</span></div>" +
+      "<audio controls preload='metadata' src='" + pendingRecording.objectUrl + "'></audio>" +
+      "<div class='recording-preview-actions'>" +
+      "<button type='button' class='primary-btn small recording-upload-btn'>上传并评分</button>" +
+      "<button type='button' class='ghost-btn small recording-redo-btn'>重新录制</button>" +
+      "</div>";
+    wrapper.appendChild(preview);
+    preview.querySelector(".recording-upload-btn").addEventListener("click", function () {
+      uploadPendingRecording();
+    });
+    preview.querySelector(".recording-redo-btn").addEventListener("click", function () {
+      var textarea = pendingRecording && pendingRecording.textarea;
+      var recBtn = pendingRecording && pendingRecording.btn;
+      clearRecordingPreview(textarea);
+      if (textarea && recBtn) {
+        currentTarget = textarea;
+        startRecord(recBtn);
+      }
+    });
+  }
+
+  function clearRecordingPreview(textarea) {
+    var target = textarea || (pendingRecording && pendingRecording.textarea);
+    if (target) {
+      var wrapper = target.closest(".voice-input-wrapper");
+      var preview = wrapper && wrapper.querySelector(".recording-preview");
+      if (preview) preview.remove();
+    }
+    if (pendingRecording && pendingRecording.objectUrl) {
+      try { URL.revokeObjectURL(pendingRecording.objectUrl); } catch (e) {}
+    }
+    pendingRecording = null;
+    setRecordingState("");
+  }
+
+  function uploadPendingRecording() {
+    if (!pendingRecording || uploading) return;
+    currentTarget = pendingRecording.textarea;
+    uploadAudio(pendingRecording.blob, pendingRecording.btn);
   }
 
   function uploadAudio(blob, btn) {
+    uploading = true;
+    if (btn) {
+      btn.innerHTML = "⏳";
+      btn.title = "正在上传录音并转文字...";
+    }
+    setRecordingState("uploading");
+    setVoiceStatus("正在上传录音、转写并评分...");
     var formData = new FormData();
     formData.append("audio", blob, "recording." + (blob.type.includes("webm") ? "webm" : "m4a"));
     formData.append("user_response", currentTarget ? currentTarget.value : "");
@@ -244,10 +325,12 @@
       var targetInput = form.querySelector("input[name='target_score'], select[name='target_score']");
       var sourceModeInput = form.querySelector("input[name='source_mode']");
       var sourceDataInput = form.querySelector("input[name='source_result_data']");
+      var questionIndexInput = form.querySelector("input[name='question_index']");
       if (questionInput) formData.append("question", questionInput.value || "");
       if (targetInput) formData.append("target_score", targetInput.value || "6.5");
       if (sourceModeInput) formData.append("source_mode", sourceModeInput.value || "");
       if (sourceDataInput) formData.append("source_result_data", sourceDataInput.value || "");
+      if (questionIndexInput) formData.append("question_index", questionIndexInput.value || "");
     }
 
     fetch("/api/speech-score", {
@@ -267,9 +350,12 @@
       });
     })
     .then(function (data) {
+      uploading = false;
       btn.classList.remove("listening");
       btn.innerHTML = "🎙️";
       btn.title = "录音上传：先本地转文字，再提交评分";
+      setRecordingState("");
+      clearRecordingPreview(currentTarget);
       if (data.error) {
         alert("评分失败: " + data.error);
         return;
@@ -284,30 +370,67 @@
         }
         currentTarget.dispatchEvent(new Event("input", { bubbles: true }));
       }
-      if (data.score_box) {
-        var host = getResultHost(currentTarget);
-        var oldBox = host ? host.querySelector(".voice-score-box") : null;
-        if (oldBox) oldBox.remove();
-        var box = document.createElement("div");
-        box.className = "voice-score-box";
-        var transcriptHtml = data.transcript
-          ? '<details class="result-accordion" open><summary>转写文字</summary><div class="result-body"><p>' + escapeHtml(data.transcript) + '</p></div></details>'
-          : "";
-        box.innerHTML = transcriptHtml + data.score_box;
-        if (host) {
-          host.appendChild(box);
-          persistVoiceResult(currentTarget, box.innerHTML);
-        }
+      if (data.inline_feedback_html) {
+        insertInlineFeedback(data.inline_feedback_html);
+        setVoiceStatus("评分完成，结果已显示在本题下方。");
+      } else if (data.reload_url) {
+        window.location.href = data.reload_url;
       } else if (data.message) {
         alert(data.message);
       }
     })
     .catch(function (err) {
+      uploading = false;
       btn.classList.remove("listening");
       btn.innerHTML = "🎙️";
       btn.title = "录音上传：先本地转文字，再提交评分";
+      setRecordingState("");
       alert(err && err.message ? err.message : "上传失败，请稍后重试。");
     });
+  }
+
+  function insertInlineFeedback(html) {
+    if (!currentTarget || !html) return;
+    var form = currentTarget.closest("form");
+    if (!form) return;
+    var scope = form.closest(".result-body") || form.parentElement;
+    if (scope) {
+      scope.querySelectorAll(".voice-inline-feedback").forEach(function (node) {
+        node.remove();
+      });
+    }
+    form.insertAdjacentHTML("afterend", html);
+    var inserted = form.nextElementSibling;
+    var parent = inserted;
+    while (parent) {
+      if (parent.tagName === "DETAILS") parent.open = true;
+      parent = parent.parentElement;
+    }
+    if (inserted) {
+      inserted.scrollIntoView({ behavior: "smooth", block: "center" });
+      inserted.classList.add("feedback-focus-flash");
+      setTimeout(function () { inserted.classList.remove("feedback-focus-flash"); }, 1600);
+    }
+  }
+
+  function formatDuration(ms) {
+    var total = Math.max(0, Math.floor(ms / 1000));
+    var min = String(Math.floor(total / 60)).padStart(2, "0");
+    var sec = String(total % 60).padStart(2, "0");
+    return min + ":" + sec;
+  }
+
+  function updateRecordStatus() {
+    if (!recordStartedAt) return;
+    setVoiceStatus("● 正在录音 " + formatDuration(Date.now() - recordStartedAt) + "，再次点击录音按钮结束。");
+  }
+
+  function setRecordingState(state) {
+    var wrapper = currentTarget && currentTarget.closest(".voice-input-wrapper");
+    if (!wrapper) return;
+    wrapper.classList.toggle("recording-active", state === "active");
+    wrapper.classList.toggle("recording-uploading", state === "uploading");
+    wrapper.classList.toggle("recording-previewing", state === "preview");
   }
 
   function escapeHtml(value) {
@@ -352,20 +475,10 @@
     try { localStorage.setItem(key, html); } catch (e) {}
   }
 
-  function restoreVoiceResult(textarea) {
-    if (!textarea || textarea.dataset.voiceResultRestored === "1") return;
-    textarea.dataset.voiceResultRestored = "1";
+  function clearLegacyVoiceResult(textarea) {
     var key = getVoiceResultKey(textarea);
     if (!key) return;
-    var html = "";
-    try { html = localStorage.getItem(key) || ""; } catch (e) {}
-    if (!html) return;
-    var host = getResultHost(textarea);
-    if (!host || host.querySelector(".voice-score-box")) return;
-    var box = document.createElement("div");
-    box.className = "voice-score-box";
-    box.innerHTML = html;
-    host.appendChild(box);
+    try { localStorage.removeItem(key); } catch (e) {}
   }
 
   var observer = new MutationObserver(function () {

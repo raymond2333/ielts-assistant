@@ -1290,6 +1290,10 @@ def _display_record_result_data(result_data, key_prefix=""):
         st.text(str(result_data))
         return
 
+    if result_data.get("overall_score") is not None and isinstance(result_data.get("breakdown"), dict):
+        _display_speaking_feedback(result_data, save_record=False)
+        return
+
     if result_data.get("unifying_theme") or isinstance(result_data.get("linked_responses"), list):
         with st.expander("核心主题", expanded=True):
             if result_data.get("unifying_theme"):
@@ -1590,13 +1594,30 @@ def _display_study_plan(plan):
 
 
 # 显示口语反馈的函数
-def _display_speaking_feedback(feedback_data):
+def _display_speaking_feedback(feedback_data, save_record=True):
     st.markdown("---")
     st.subheader("🎯 口语反馈")
+
+    if isinstance(feedback_data, str):
+        parsed = parse_json_response(feedback_data)
+        if isinstance(parsed, dict):
+            feedback_data = parsed
+        else:
+            st.markdown(feedback_data)
+            return
+
+    if not isinstance(feedback_data, dict):
+        st.write(feedback_data)
+        return
+
+    if "formatted_text" in feedback_data:
+        cleaned = str(feedback_data["formatted_text"]).replace("无法解析为JSON格式的响应:\n\n", "")
+        st.markdown(cleaned)
+        return
     
     # 保存用户进度记录
     try:
-        if "overall_score" in feedback_data:
+        if save_record and "overall_score" in feedback_data:
             user_id = st.session_state.user_profile.get("user_id", "default_user")
             # 确保分数符合雅思格式
             score = float(feedback_data["overall_score"])
@@ -1615,7 +1636,7 @@ def _display_speaking_feedback(feedback_data):
 
     # 总体分数
     if "overall_score" in feedback_data:
-        overall_score = feedback_data["overall_score"]
+        overall_score = float(feedback_data["overall_score"])
         st.metric("总体分数", f"{overall_score:.1f}/9.0")
 
         # 分数评估
@@ -1639,7 +1660,7 @@ def _display_speaking_feedback(feedback_data):
         cols = st.columns(4)
         for i, (key, name) in enumerate(criteria):
             if key in breakdown and "score" in breakdown[key]:
-                score = breakdown[key]["score"]
+                score = float(breakdown[key]["score"])
                 with cols[i]:
                     st.metric(name, f"{score:.1f}")
 
@@ -1671,6 +1692,23 @@ def _display_speaking_feedback(feedback_data):
                         words = criterion["suggested_words"]
                         for i, word in enumerate(words):
                             word_cols[i % 3].code(word)
+
+                    for field, title in [
+                        ("vocabulary_analysis", "词汇分析"),
+                        ("grammar_analysis", "语法分析"),
+                        ("pronunciation_analysis", "发音分析"),
+                    ]:
+                        if criterion.get(field):
+                            st.write(f"**{title}:** {criterion[field]}")
+
+                    for field, title in [
+                        ("common_errors", "常见错误"),
+                        ("improvement_tips", "改进提示"),
+                    ]:
+                        if criterion.get(field):
+                            st.write(f"**{title}:**")
+                            for item in criterion[field]:
+                                st.write(f"• {item}")
 
     # 优化后的回答
     if "improved_response" in feedback_data:
@@ -2647,7 +2685,7 @@ if st.session_state.active_tab.startswith("📊"):
                         st.caption(f"题目/话题：{data['topic']}")
                     if data.get("question"):
                         st.caption(f"练习题：{data['question']}")
-                    if data.get("feedback"):
+                    if data.get("feedback") and not data.get("result_data"):
                         st.caption(f"反馈：{data['feedback']}")
                     if data.get("user_response"):
                         st.caption("你的回答：")

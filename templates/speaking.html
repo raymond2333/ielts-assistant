@@ -46,6 +46,7 @@
         <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
         <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
         <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+        <a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>
       </nav>
     </aside>
 
@@ -69,6 +70,7 @@
             <div class="drop-menu" onclick="event.stopPropagation()">
               <a href="{{ url_for('dashboard') }}">学习总览</a>
               <a href="{{ url_for('settings_page') }}">用户设置</a>
+              <a href="{{ url_for('admin_panel') }}">管理员后台</a>
               <div class="drop-divider"></div>
               <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
             </div>
@@ -162,7 +164,7 @@
         <div class="result-stack ai-output">
           {% if result_data and mode == 'part1' and result_data.questions %}
             {% for item in result_data.questions %}
-              <details class="result-accordion" {% if loop.first %}open{% endif %}>
+              <details class="result-accordion" {% if loop.first or result_data.get('_focus_question_index')|string == loop.index0|string %}open{% endif %}>
                 <summary>
                   {{ loop.index }}. {{ item.question }}
                   <button class="speak-btn" type="button" data-speak="{{ item.question|e }}">🔊 朗读题目</button>
@@ -187,6 +189,7 @@
                     <input type="hidden" name="mode" value="answer_from_cn">
                     <input type="hidden" name="source_mode" value="part1">
                     <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                    <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                     <input type="hidden" name="question" value="{{ item.question }}">
                     <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="例如：我平时喜欢在周末和朋友去咖啡馆，因为那里让我放松。"></textarea></label>
                     <button class="ghost-btn small" type="submit">生成英文答案</button>
@@ -197,6 +200,7 @@
                     <input type="hidden" name="mode" value="speaking_feedback">
                     <input type="hidden" name="source_mode" value="part1">
                     <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                    <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                     <input type="hidden" name="question" value="{{ item.question }}">
                     <input type="hidden" name="target_score" value="{{ profile.target_score }}">
                     <label><span>输入英文回答，获取 AI 批改</span><textarea name="user_response" rows="3" placeholder="在这里输入你的英文回答，AI 将为你评分并提供改进建议..."></textarea></label>
@@ -210,6 +214,7 @@
                         <input type="hidden" name="mode" value="keyword_answer">
                         <input type="hidden" name="source_mode" value="part1">
                         <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                        <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                         <input type="hidden" name="question" value="{{ item.question }}">
                         <input type="hidden" name="part" value="Part 1">
                         <label><span>你的关键词</span><textarea name="keywords" rows="3" placeholder="例如：weekends, coffee shop, relax, friends"></textarea></label>
@@ -230,23 +235,33 @@
                   {% endif %}
                   {% if item.get('_inline_result') %}
                   {% set inline = item.get('_inline_result') %}
-                  <details class="result-accordion nested-answer inline-result" open>
+                  <details class="result-accordion nested-answer inline-result" {% if result_data.get('_focus_question_index')|string == loop.index0|string %}data-feedback-focus="1"{% endif %} open>
                     <summary>
-                      {% if inline.mode == 'speaking_feedback' %}本题 AI 批改反馈
+                      {% if inline.mode in ['speaking_feedback', 'speaking_recording'] %}本题 AI 批改反馈
                       {% elif inline.mode == 'keyword_answer' %}本题关键词生成答案
                       {% else %}本题中文思路生成答案{% endif %}
                     </summary>
                     <div class="result-body">
-                      {% if inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                      {% if inline.recorded_at %}<p class="record-meta"><strong>训练时间：</strong>{{ inline.recorded_at | beijing_time }}</p>{% endif %}
+                      {% if inline.audio_file %}
+                        <p><strong>录音回放：</strong></p>
+                        <audio controls preload="none" style="width:100%;max-width:360px">
+                          <source src="/{{ inline.audio_file }}" type="{{ 'audio/webm' if inline.audio_file.endswith('.webm') else 'audio/mp4' }}">
+                        </audio>
+                      {% endif %}
+                      {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% elif inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                      {% if inline.transcript_source %}<p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'语音 API 转写','text':'文本提交'}.get(inline.transcript_source, inline.transcript_source) }}</p>{% endif %}
                       {% if inline.chinese_answer %}<p><strong>中文思路：</strong>{{ inline.chinese_answer }}</p>{% endif %}
                       {% if inline.keywords %}<p><strong>关键词：</strong>{{ inline.keywords }}</p>{% endif %}
                       {% if inline.result_data %}
-                        {{ inline.result_data | record_result('口语反馈' if inline.mode == 'speaking_feedback' else '关键词生成答案') }}
+                        {{ inline.result_data | record_result('口语反馈' if inline.mode in ['speaking_feedback', 'speaking_recording'] else '关键词生成答案') }}
                       {% else %}
                         {{ inline.result | simple_md }}
                       {% endif %}
                     </div>
                   </details>
+                    {% set feedbacks = item.get('_feedbacks', []) %}
+                    {% include '_speaking_feedback_history.html' %}
                   {% endif %}
                 </div>
               </details>
@@ -355,28 +370,38 @@
             {% if result_data.fluency_tips %}<details class="result-accordion"><summary>流利度建议</summary><div class="result-body"><ul>{% for item in result_data.fluency_tips %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
             {% if result_data.get('_inline_result') %}
             {% set inline = result_data.get('_inline_result') %}
-            <details class="result-accordion inline-result" open>
+            <details class="result-accordion inline-result" {% if result_data.get('_focus_feedback') == 'part2' %}data-feedback-focus="1"{% endif %} open>
               <summary>
-                {% if inline.mode == 'speaking_feedback' %}本题 AI 批改反馈
+                {% if inline.mode in ['speaking_feedback', 'speaking_recording'] %}本题 AI 批改反馈
                 {% elif inline.mode == 'keyword_answer' %}本题关键词生成答案
                 {% else %}本题中文思路生成答案{% endif %}
               </summary>
               <div class="result-body">
-                {% if inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                {% if inline.recorded_at %}<p class="record-meta"><strong>训练时间：</strong>{{ inline.recorded_at | beijing_time }}</p>{% endif %}
+                {% if inline.audio_file %}
+                  <p><strong>录音回放：</strong></p>
+                  <audio controls preload="none" style="width:100%;max-width:360px">
+                    <source src="/{{ inline.audio_file }}" type="{{ 'audio/webm' if inline.audio_file.endswith('.webm') else 'audio/mp4' }}">
+                  </audio>
+                {% endif %}
+                {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% elif inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                {% if inline.transcript_source %}<p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'语音 API 转写','text':'文本提交'}.get(inline.transcript_source, inline.transcript_source) }}</p>{% endif %}
                 {% if inline.chinese_answer %}<p><strong>中文思路：</strong>{{ inline.chinese_answer }}</p>{% endif %}
                 {% if inline.keywords %}<p><strong>关键词：</strong>{{ inline.keywords }}</p>{% endif %}
                 {% if inline.result_data %}
-                  {{ inline.result_data | record_result('口语反馈' if inline.mode == 'speaking_feedback' else '关键词生成答案') }}
+                  {{ inline.result_data | record_result('口语反馈' if inline.mode in ['speaking_feedback', 'speaking_recording'] else '关键词生成答案') }}
                 {% else %}
                   {{ inline.result | simple_md }}
                 {% endif %}
               </div>
             </details>
+              {% set feedbacks = result_data.get('_feedbacks', []) %}
+              {% include '_speaking_feedback_history.html' %}
             {% endif %}
           
           {% elif result_data and mode == 'part3' and result_data.discussion_questions %}
             {% for item in result_data.discussion_questions %}
-              <details class="result-accordion" {% if loop.first %}open{% endif %}>
+              <details class="result-accordion" {% if loop.first or result_data.get('_focus_question_index')|string == loop.index0|string %}open{% endif %}>
                 <summary>
                   {{ loop.index }}. {{ item.question }}
                   <button class="speak-btn" type="button" data-speak="{{ item.question|e }}">🔊 朗读题目</button>
@@ -390,6 +415,7 @@
                     <input type="hidden" name="mode" value="answer_from_cn">
                     <input type="hidden" name="source_mode" value="part3">
                     <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                    <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                     <input type="hidden" name="question" value="{{ item.question }}">
                     <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="用中文写下你的观点和例子"></textarea></label>
                     <button class="ghost-btn small" type="submit">生成英文答案</button>
@@ -400,6 +426,7 @@
                     <input type="hidden" name="mode" value="speaking_feedback">
                     <input type="hidden" name="source_mode" value="part3">
                     <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                    <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                     <input type="hidden" name="question" value="{{ item.question }}">
                     <input type="hidden" name="target_score" value="{{ profile.target_score }}">
                     <label><span>输入英文回答，获取 AI 批改</span><textarea name="user_response" rows="3" placeholder="在这里输入你的英文回答..."></textarea></label>
@@ -413,6 +440,7 @@
                         <input type="hidden" name="mode" value="keyword_answer">
                         <input type="hidden" name="source_mode" value="part3">
                         <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                        <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                         <input type="hidden" name="question" value="{{ item.question }}">
                         <input type="hidden" name="part" value="Part 3">
                         <label><span>你的关键词</span><textarea name="keywords" rows="3" placeholder="例如：technology, communication, efficiency, drawbacks"></textarea></label>
@@ -433,23 +461,33 @@
                   {% endif %}
                   {% if item.get('_inline_result') %}
                   {% set inline = item.get('_inline_result') %}
-                  <details class="result-accordion nested-answer inline-result" open>
+                  <details class="result-accordion nested-answer inline-result" {% if result_data.get('_focus_question_index')|string == loop.index0|string %}data-feedback-focus="1"{% endif %} open>
                     <summary>
-                      {% if inline.mode == 'speaking_feedback' %}本题 AI 批改反馈
+                      {% if inline.mode in ['speaking_feedback', 'speaking_recording'] %}本题 AI 批改反馈
                       {% elif inline.mode == 'keyword_answer' %}本题关键词生成答案
                       {% else %}本题中文思路生成答案{% endif %}
                     </summary>
                     <div class="result-body">
-                      {% if inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                      {% if inline.recorded_at %}<p class="record-meta"><strong>训练时间：</strong>{{ inline.recorded_at | beijing_time }}</p>{% endif %}
+                      {% if inline.audio_file %}
+                        <p><strong>录音回放：</strong></p>
+                        <audio controls preload="none" style="width:100%;max-width:360px">
+                          <source src="/{{ inline.audio_file }}" type="{{ 'audio/webm' if inline.audio_file.endswith('.webm') else 'audio/mp4' }}">
+                        </audio>
+                      {% endif %}
+                      {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% elif inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                      {% if inline.transcript_source %}<p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'语音 API 转写','text':'文本提交'}.get(inline.transcript_source, inline.transcript_source) }}</p>{% endif %}
                       {% if inline.chinese_answer %}<p><strong>中文思路：</strong>{{ inline.chinese_answer }}</p>{% endif %}
                       {% if inline.keywords %}<p><strong>关键词：</strong>{{ inline.keywords }}</p>{% endif %}
                       {% if inline.result_data %}
-                        {{ inline.result_data | record_result('口语反馈' if inline.mode == 'speaking_feedback' else '关键词生成答案') }}
+                        {{ inline.result_data | record_result('口语反馈' if inline.mode in ['speaking_feedback', 'speaking_recording'] else '关键词生成答案') }}
                       {% else %}
                         {{ inline.result | simple_md }}
                       {% endif %}
                     </div>
                   </details>
+                    {% set feedbacks = item.get('_feedbacks', []) %}
+                    {% include '_speaking_feedback_history.html' %}
                   {% endif %}
                 </div>
               </details>
@@ -528,7 +566,7 @@
       {% endif %}
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701f') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260701g') }}"></script>
   <script>
     // ===== 计时器 =====
     let timerInterval = null;
@@ -616,6 +654,6 @@
     }
   </script>
   <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
-  <script src="{{ url_for('static', filename='voice_input.js', v='20260701g') }}"></script>
+  <script src="{{ url_for('static', filename='voice_input.js', v='20260701j') }}"></script>
 </body>
 </html>

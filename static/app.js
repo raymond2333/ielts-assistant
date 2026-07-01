@@ -81,6 +81,21 @@ document.addEventListener("DOMContentLoaded", () => {
     event.stopPropagation();
     speakTextValue(text);
   });
+
+  const focusedFeedback = document.querySelector("[data-feedback-focus='1']");
+  if (focusedFeedback) {
+    setTimeout(() => {
+      let parent = focusedFeedback.parentElement;
+      while (parent) {
+        if (parent.tagName === "DETAILS") parent.open = true;
+        parent = parent.parentElement;
+      }
+      if (focusedFeedback.tagName === "DETAILS") focusedFeedback.open = true;
+      focusedFeedback.scrollIntoView({ behavior: "smooth", block: "center" });
+      focusedFeedback.classList.add("feedback-focus-flash");
+      setTimeout(() => focusedFeedback.classList.remove("feedback-focus-flash"), 1600);
+    }, 120);
+  }
 });
 
 document.addEventListener("click", function(e) {

@@ -1,0 +1,44 @@
+{% if feedbacks and feedbacks|length > 1 %}
+<details class="result-accordion nested-answer feedback-history">
+  <summary>历史训练记录（{{ feedbacks|length }} 次）</summary>
+  <div class="result-body">
+    {% for feedback in feedbacks|reverse %}
+      <details class="result-accordion nested-answer">
+        <summary>{{ (feedback.recorded_at or feedback.timestamp) | beijing_time }}{% if feedback.score %} · {{ feedback.score }} 分{% endif %}</summary>
+        <div class="result-body">
+          {% if feedback.audio_file %}
+            <p><strong>录音回放：</strong></p>
+            <audio controls preload="none" style="width:100%;max-width:360px">
+              <source src="/{{ feedback.audio_file }}" type="{{ 'audio/webm' if feedback.audio_file.endswith('.webm') else 'audio/mp4' }}">
+            </audio>
+          {% endif %}
+          {% if feedback.transcript %}
+            <details class="result-accordion nested-answer" open>
+              <summary>转写文本</summary>
+              <div class="result-body"><p>{{ feedback.transcript }}</p></div>
+            </details>
+          {% elif feedback.audio_file %}
+            <details class="result-accordion nested-answer" open>
+              <summary>转写文本</summary>
+              <div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div>
+            </details>
+          {% elif feedback.user_response %}
+            <details class="result-accordion nested-answer" open>
+              <summary>我的回答</summary>
+              <div class="result-body"><p>{{ feedback.user_response }}</p></div>
+            </details>
+          {% endif %}
+          {% if feedback.transcript_source %}
+            <p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'语音 API 转写','text':'文本提交'}.get(feedback.transcript_source, feedback.transcript_source) }}</p>
+          {% endif %}
+          {% if feedback.result_data %}
+            {{ feedback.result_data | record_result('口语反馈') }}
+          {% elif feedback.result %}
+            {{ feedback.result | simple_md }}
+          {% endif %}
+        </div>
+      </details>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}

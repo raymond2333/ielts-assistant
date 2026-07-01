@@ -39,7 +39,8 @@ SPEAKING_PART1_PROMPT = """你是雅思口语考官，请生成 Part 1 的题目
 - 生成 4 道题，每道题相互独立
 - 参考答案不要写在题目里，只放在 model_answer 字段
 - model_answer 必须是 Band 8.0-8.5 水平的高分示范：回答自然、具体、有个人细节，词汇准确灵活，句式有变化，不能写成低分、短句堆砌或模板化答案
-- Part 1 每个 model_answer 建议 3-5 句，既要口语化，也要有充分展开；拿去按雅思口语标准评分时应通常达到 8.0 左右
+- Part 1 每个 model_answer 建议 4-5 句、约 55-85 个英文词；必须包含直接回答、原因解释、具体例子或个人经历、自然收束，不能只有泛泛的两三句
+- 参考答案要像真实高分考生现场回答：口语化但信息充分，至少使用 1 个自然的复杂句和 2-3 个准确的主题词汇；拿去按雅思口语标准评分时应通常达到 Band 8.0-8.5
 - keywords 和 tips 必须是数组
 - 只输出 JSON"""
 
@@ -69,8 +70,9 @@ SPEAKING_PART2_PROMPT = """你是雅思口语考官，请生成 Part 2 的题目
 - 题目卡只放在 cue_card 字段
 - 参考答案只放在 model_answer 字段
 - model_answer 必须是 Band 8.0-8.5 水平的高分示范，包含清晰开头、充分展开的细节、自然转折和总结
-- details 数组至少 4 条，每条必须是完整英文句子或自然段，不要只给关键词；整体回答应适合 1.5-2 分钟口语表达
-- 语言要自然、有画面感，使用准确高级但不过度生硬的词汇和多样句式；拿去按雅思口语标准评分时应通常达到 8.0 左右
+- 整体参考答案建议约 190-240 个英文词，适合 1.5-2 分钟口语表达；不能生成只有提纲、关键词或四个短语的低质量答案
+- introduction、main_points、details、conclusion 都必须使用完整英文句子；main_points 可以是完整句子的数组，details 至少 5 条，每条必须是具体细节或自然段
+- 语言要自然、有画面感，有时间线、具体场景、情感反应和反思；使用准确高级但不过度生硬的词汇和多样句式；拿去按雅思口语标准评分时应通常达到 Band 8.0-8.5
 - 只输出 JSON"""
 
 # ============================================================
@@ -100,7 +102,8 @@ Part 2 话题：{part2_topic}
 - 生成 4 道讨论题，每道题相互独立
 - 参考答案不要写在题目里，只放在 model_response 字段
 - model_response 必须是 Band 8.0-8.5 水平的高分示范：有明确观点、原因解释、例子或对比、适当让步，不能只写两三句泛泛而谈
-- 每个 model_response 建议 5-7 句，体现 Part 3 所需的抽象分析和批判性思维；拿去按雅思口语标准评分时应通常达到 8.0 左右
+- 每个 model_response 建议 6-8 句、约 120-170 个英文词，体现 Part 3 所需的抽象分析、因果解释、对比和批判性思维
+- 参考答案要有高分考生的展开密度和语言质量；拿去按雅思口语标准评分时应通常达到 Band 8.0-8.5
 - 只输出 JSON"""
 
 # ============================================================
@@ -112,6 +115,7 @@ SPEAKING_FEEDBACK_PROMPT = """你是专业的雅思口语考官，请对以下�
 题目：{question}
 考生回答：{user_response}
 目标分数：{target_score}
+参考答案提示：{reference_answer_note}
 
 评分要求：
 - 请严格按照 IELTS Speaking 官方四项标准评分：Fluency and Coherence、Lexical Resource、Grammatical Range and Accuracy、Pronunciation。
@@ -119,23 +123,26 @@ SPEAKING_FEEDBACK_PROMPT = """你是专业的雅思口语考官，请对以下�
 - overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0, 1.5 ... 9.0。
 - overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
 - 如果回答很短、跑题、语法错误多或内容空泛，应明显低于目标分数。
-- 如果回答内容充分、自然流利、词汇和语法准确多样，即使是 AI 参考答案，也应按高分答案评分，通常不应低于 7.0。
+- 如果回答内容充分、自然流利、词汇和语法准确多样，即使是 AI 参考答案，也应按高分答案评分，通常应在 8.0-8.5 左右，不要压到 5.0-6.0。
+- 如果“参考答案提示”说明考生回答与系统生成的高分参考答案高度一致，请把它视为 Band 8.0-8.5 参考答案来评估；不要因为它不像真实学生、过于完整、缺少音频或过于书面而压低分数。
+- 如果输入是文字或转写文本，Pronunciation 不能因为缺少真实音频而低分；除非文本中有大量停顿词、重复、断裂或明显不可理解内容，否则 pronunciation 应与 fluency_coherence 接近，通常不低于其他三项平均分 0.5。
+- 对 Part 1/2/3 使用不同长度标准：Part 1 允许 3-5 句高质量回答，Part 2 需要 1-2 分钟完整展开，Part 3 需要抽象分析和例证。不要把 Part 1 的长度标准套到 Part 2/3。
 - Band 5：基本能表达但展开有限、重复较多、错误明显。
 - Band 6：能较清楚表达，有一定展开，但仍有停顿、重复或不够灵活。
 - Band 7：表达连贯、展开充分，词汇和语法有一定灵活性，错误不影响理解。
 - Band 8：表达流利自然，观点展开充分，词汇准确灵活，语法多样且错误很少。
 - Band 9：近似母语水平，表达自然精准，几乎无错误。
 - 严禁保留 0.0 作为占位分，除非考生回答为空或完全无法理解。
-- 下面 JSON 只是字段结构，所有分数必须替换为你根据评分标准判断出的真实数字。
+- 下面 JSON 只是字段结构和高分示例，所有分数必须替换为你根据评分标准判断出的真实数字；不要照抄示例，但也不要无依据压低充分、准确、自然的回答。
 
 请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
 {{
-  "overall_score": 0.0,
+  "overall_score": 8.0,
   "breakdown": {{
-    "fluency_coherence": {{"score": 0.0, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
-    "lexical_resource": {{"score": 0.0, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
-    "grammatical_range_accuracy": {{"score": 0.0, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
-    "pronunciation": {{"score": 0.0, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
+    "fluency_coherence": {{"score": 8.0, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
+    "lexical_resource": {{"score": 8.0, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
+    "grammatical_range_accuracy": {{"score": 8.0, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
+    "pronunciation": {{"score": 8.0, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
   }},
   "improved_response": "优化后的回答示例",
   "practice_recommendations": ["练习建议1", "练习建议2"]
@@ -150,6 +157,7 @@ SPEAKING_FEEDBACK_SIMPLE_PROMPT = """你是专业的雅思口语考官，请对�
 题目：{question}
 考生回答：{user_response}
 目标分数：{target_score}
+参考答案提示：{reference_answer_note}
 
 评分要求：
 - 请严格按照 IELTS Speaking 官方四项标准评分：Fluency and Coherence、Lexical Resource、Grammatical Range and Accuracy、Pronunciation。
@@ -157,23 +165,26 @@ SPEAKING_FEEDBACK_SIMPLE_PROMPT = """你是专业的雅思口语考官，请对�
 - overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0, 1.5 ... 9.0。
 - overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
 - 如果回答很短、跑题、语法错误多或内容空泛，应明显低于目标分数。
-- 如果回答内容充分、自然流利、词汇和语法准确多样，即使是 AI 参考答案，也应按高分答案评分，通常不应低于 7.0。
+- 如果回答内容充分、自然流利、词汇和语法准确多样，即使是 AI 参考答案，也应按高分答案评分，通常应在 8.0-8.5 左右，不要压到 5.0-6.0。
+- 如果“参考答案提示”说明考生回答与系统生成的高分参考答案高度一致，请把它视为 Band 8.0-8.5 参考答案来评估；不要因为它不像真实学生、过于完整、缺少音频或过于书面而压低分数。
+- 如果输入是文字或转写文本，Pronunciation 不能因为缺少真实音频而低分；除非文本中有大量停顿词、重复、断裂或明显不可理解内容，否则 pronunciation 应与 fluency_coherence 接近，通常不低于其他三项平均分 0.5。
+- 对 Part 1/2/3 使用不同长度标准：Part 1 允许 3-5 句高质量回答，Part 2 需要 1-2 分钟完整展开，Part 3 需要抽象分析和例证。不要把 Part 1 的长度标准套到 Part 2/3。
 - Band 5：基本能表达但展开有限、重复较多、错误明显。
 - Band 6：能较清楚表达，有一定展开，但仍有停顿、重复或不够灵活。
 - Band 7：表达连贯、展开充分，词汇和语法有一定灵活性，错误不影响理解。
 - Band 8：表达流利自然，观点展开充分，词汇准确灵活，语法多样且错误很少。
 - Band 9：近似母语水平，表达自然精准，几乎无错误。
 - 严禁保留 0.0 作为占位分，除非考生回答为空或完全无法理解。
-- 下面 JSON 只是字段结构，所有分数必须替换为你根据评分标准判断出的真实数字。
+- 下面 JSON 只是字段结构和高分示例，所有分数必须替换为你根据评分标准判断出的真实数字；不要照抄示例，但也不要无依据压低充分、准确、自然的回答。
 
 请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
 {{
-  "overall_score": 0.0,
+  "overall_score": 8.0,
   "breakdown": {{
-    "fluency_coherence": {{"score": 0.0, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
-    "lexical_resource": {{"score": 0.0, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
-    "grammatical_range_accuracy": {{"score": 0.0, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
-    "pronunciation": {{"score": 0.0, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
+    "fluency_coherence": {{"score": 8.0, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
+    "lexical_resource": {{"score": 8.0, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
+    "grammatical_range_accuracy": {{"score": 8.0, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
+    "pronunciation": {{"score": 8.0, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
   }},
   "improved_response": "优化后的回答示例",
   "practice_recommendations": ["练习建议1", "练习建议2"]

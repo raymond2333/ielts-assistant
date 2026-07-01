@@ -655,7 +655,7 @@ def get_progress(user_id: str, limit: int = 200) -> List[Dict[str, Any]]:
             SELECT id, user_id, activity, score, data, created_at
             FROM study_progress
             WHERE user_id = %s
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT %s
             """,
             (user_id, limit),

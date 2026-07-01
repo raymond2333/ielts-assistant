@@ -26,6 +26,7 @@
         <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
         <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
         <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
+        <a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>
       </nav>
     </aside>
 
@@ -49,6 +50,7 @@
             <div class="drop-menu" onclick="event.stopPropagation()">
               <a href="{{ url_for('dashboard') }}">学习总览</a>
               <a href="{{ url_for('settings_page') }}">用户设置</a>
+              <a href="{{ url_for('admin_panel') }}">管理员后台</a>
               <div class="drop-divider"></div>
               <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
             </div>

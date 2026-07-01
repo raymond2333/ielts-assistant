@@ -26,7 +26,7 @@
         <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
         <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
         <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
-        {% if is_admin %}<a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>{% endif %}
+        <a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>
       </nav>
     </aside>
 
@@ -50,7 +50,7 @@
             <div class="drop-menu" onclick="event.stopPropagation()">
               <a href="{{ url_for('dashboard') }}">学习总览</a>
               <a href="{{ url_for('settings_page') }}">用户设置</a>
-              {% if is_admin %}<a href="{{ url_for('admin_panel') }}">管理员后台</a>{% endif %}
+              <a href="{{ url_for('admin_panel') }}">管理员后台</a>
               <div class="drop-divider"></div>
               <form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form>
             </div>
@@ -113,13 +113,11 @@
           <h2>稳定版</h2>
           <p>免登录自动同步账号，打开稳定版信达雅。</p>
         </a>
-        {% if is_admin %}
         <a class="panel feature-card action-card" href="{{ url_for('admin_panel') }}">
           <p class="eyebrow">Admin</p>
           <h2>管理员后台</h2>
           <p>管理用户、查看和删除练习记录。</p>
         </a>
-        {% endif %}
       </section>
 
       <section class="panel" style="background:linear-gradient(135deg,#f0f4ff,#faf5ff);border:1px solid var(--accent)">
@@ -283,8 +281,7 @@
                   {% if item.data.essay_content %}<div class="record-meta"><strong>作文内容：</strong><div style="white-space:pre-wrap;margin-top:6px">{{ item.data.essay_content }}</div></div>{% endif %}
                   {% if item.data.chinese_answer %}<p class="record-meta"><strong>中文思路：</strong>{{ item.data.chinese_answer }}</p>{% endif %}
                   {% if item.data.keywords %}<p class="record-meta"><strong>关键词：</strong>{{ item.data.keywords }}</p>{% endif %}
-                  {% if item.data.score %}<p class="record-meta"><strong>得分：</strong>{{ item.data.score }}</p>{% endif %}
-                  {% if item.score %}<p class="record-meta"><strong>得分：</strong>{{ '%.1f'|format(item.score) }}</p>{% endif %}
+                  {% if item.display_score %}<p class="record-meta"><strong>得分：</strong>{{ '%.1f'|format(item.display_score) }}</p>{% endif %}
                   {% if item.data.word_count %}<p class="record-meta"><strong>字数：</strong>{{ item.data.word_count }}</p>{% endif %}
                   {% if item.data.audio_file %}
                     <p class="record-meta"><strong>录音：</strong>

@@ -7,6 +7,7 @@ import random
 import re
 import uuid
 from datetime import datetime
+from difflib import SequenceMatcher
 from functools import lru_cache, wraps
 from importlib.util import find_spec
 from urllib.parse import urlsplit, urlunsplit
@@ -127,13 +128,12 @@ def beijing_time_filter(value):
         except (ValueError, TypeError):
             return value
     else:
-        return str(value)
+        dt = value
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=_tz.utc)
+        dt = dt.replace(tzinfo=_BJ)
     else:
-        pass
-    dt = dt.astimezone(_BJ)
-    return dt.strftime("%Y-%m-%d %H:%M")
+        dt = dt.astimezone(_BJ)
+    return dt.strftime("%Y年%m月%d日 %H:%M")
 
 
 def _html_list(items):
@@ -142,6 +142,22 @@ def _html_list(items):
     if isinstance(items, str):
         return f"<p>{escape(items)}</p>"
     return "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
+
+
+def score_encouragement_html(score):
+    try:
+        score = float(score)
+    except (TypeError, ValueError):
+        return ""
+    if score >= 7.5:
+        label, text = "excellent", "太棒了，这已经很接近高分表达了！继续保持表达的深度和准确度。"
+    elif score >= 6.5:
+        label, text = "good", "真棒，已经达到 6.5+ 的关键门槛了！再打磨词汇和连贯性会更稳。"
+    elif score >= 5.5:
+        label, text = "steady", "不错，基础表达已经站住了。下一步重点把答案展开得更具体。"
+    else:
+        label, text = "warm", "别急，这次练习很有价值。先把回答说完整，再逐步提升词汇和语法。"
+    return f"<div class='score-encouragement {label}'>{escape(text)}</div>"
 
 
 def _audio_html(audio_file):
@@ -165,7 +181,7 @@ def _feedback_html(feedbacks):
         data = data if isinstance(data, dict) else {}
         body = []
         if feedback.get("timestamp"):
-            body.append(f"<p class='record-meta'><strong>反馈时间：</strong>{escape(feedback['timestamp'])}</p>")
+            body.append(f"<p class='record-meta'><strong>反馈时间：</strong>{escape(beijing_time_filter(feedback['timestamp']))}</p>")
         if feedback.get("audio_file"):
             body.append(_audio_html(feedback.get("audio_file")))
         if feedback.get("user_response"):
@@ -236,6 +252,7 @@ def record_result_filter(result_data, activity=""):
     sections = []
 
     if result_data.get("overall_score") is not None and isinstance(result_data.get("breakdown"), dict):
+        sections.append(score_encouragement_html(result_data.get("overall_score")))
         sections.append(
             "<details class='result-accordion' open><summary>总体评分</summary>"
             f"<div class='result-body'><p><strong>总分：</strong>{escape(result_data.get('overall_score'))} / 9.0</p></div></details>"
@@ -798,6 +815,60 @@ def _normalized_question(text):
     return " ".join(str(text or "").split())
 
 
+def _normalized_answer_text(text):
+    text = str(text or "").lower()
+    text = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", " ", text)
+    return " ".join(text.split())
+
+
+def _flatten_reference_answer(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return " ".join(_flatten_reference_answer(item) for item in value)
+    if isinstance(value, dict):
+        return " ".join(_flatten_reference_answer(item) for item in value.values())
+    return ""
+
+
+def collect_reference_answers(parent_data, source_mode):
+    if not isinstance(parent_data, dict):
+        return []
+    answers = []
+    if source_mode == "part1":
+        for item in parent_data.get("questions", []):
+            if isinstance(item, dict) and item.get("model_answer"):
+                answers.append(item["model_answer"])
+    elif source_mode == "part2":
+        answer = _flatten_reference_answer(parent_data.get("model_answer"))
+        if answer:
+            answers.append(answer)
+    elif source_mode == "part3":
+        for item in parent_data.get("discussion_questions", []):
+            if isinstance(item, dict) and item.get("model_response"):
+                answers.append(item["model_response"])
+    return [answer for answer in answers if _normalized_answer_text(answer)]
+
+
+def reference_answer_note_for_submission(user_response, parent_data, source_mode):
+    response = _normalized_answer_text(user_response)
+    if len(response) < 40:
+        return "无"
+    for answer in collect_reference_answers(parent_data, source_mode):
+        reference = _normalized_answer_text(answer)
+        if len(reference) < 40:
+            continue
+        shorter = min(len(response), len(reference))
+        contains = shorter >= 40 and (response in reference or reference in response)
+        similarity = SequenceMatcher(None, response, reference).ratio()
+        if contains or similarity >= 0.88:
+            return (
+                "考生回答与本题系统生成的 Band 8.0-8.5 高分参考答案高度一致。"
+                "请按高分参考答案的语言质量评分，不要无依据压到 5.0-6.0。"
+            )
+    return "无"
+
+
 def is_speaking_feedback_record(record):
     data = record.get("data") if isinstance(record, dict) else {}
     return record.get("activity") == "口语反馈" or (isinstance(data, dict) and data.get("mode") == "speaking_feedback")
@@ -812,6 +883,70 @@ def is_attachable_speaking_feedback(record):
     )
 
 
+def feedback_result_data_with_score(result_data, score):
+    if isinstance(result_data, dict) and result_data.get("overall_score") not in (None, ""):
+        return result_data
+    if isinstance(result_data, dict) and score not in (None, ""):
+        result_data = dict(result_data)
+        result_data["overall_score"] = score
+    return result_data
+
+
+def canonical_feedback_score(result_data, fallback_score=None):
+    if isinstance(result_data, dict):
+        normalized = normalize_ielts_score(result_data.get("overall_score"))
+        if normalized is not None:
+            return normalized
+    normalized = normalize_ielts_score(fallback_score)
+    return normalized
+
+
+def inline_speaking_feedback_html(inline):
+    inline = inline if isinstance(inline, dict) else {}
+    result_data = inline.get("result_data")
+    score = canonical_feedback_score(result_data, inline.get("score"))
+    title = "本题 AI 批改反馈"
+    body = []
+    if inline.get("recorded_at"):
+        body.append(f"<p class='record-meta'><strong>训练时间：</strong>{escape(beijing_time_filter(inline['recorded_at']))}</p>")
+    if inline.get("audio_file"):
+        body.append(_audio_html(inline.get("audio_file")))
+    transcript = inline.get("transcript") or ""
+    user_response = inline.get("user_response") or ""
+    if transcript:
+        body.append(
+            "<details class='result-accordion nested-answer' open><summary>转写文本 / 我的回答</summary>"
+            f"<div class='result-body'><p>{escape(transcript)}</p></div></details>"
+        )
+    elif user_response:
+        body.append(
+            "<details class='result-accordion nested-answer' open><summary>我的回答</summary>"
+            f"<div class='result-body'><p>{escape(user_response)}</p></div></details>"
+        )
+    elif inline.get("audio_file"):
+        body.append(
+            "<details class='result-accordion nested-answer' open><summary>转写文本</summary>"
+            "<div class='result-body'><p class='empty-text'>暂未识别到转写文本。</p></div></details>"
+        )
+    if inline.get("transcript_source"):
+        source_label = {"local": "本地转写", "api": "语音 API 转写", "text": "文本提交"}.get(
+            inline.get("transcript_source"),
+            inline.get("transcript_source"),
+        )
+        body.append(f"<p class='record-meta'><strong>转写来源：</strong>{escape(source_label)}</p>")
+    if score is not None:
+        body.append(f"<p class='record-meta'><strong>本次得分：</strong>{escape(score)} / 9.0</p>")
+    if isinstance(result_data, dict):
+        body.append(str(record_result_filter(result_data, "口语反馈")))
+    elif inline.get("result"):
+        body.append(str(simple_md_filter(inline.get("result"))))
+    return (
+        "<details class='result-accordion nested-answer inline-result voice-inline-feedback' "
+        "data-feedback-focus='1' open>"
+        f"<summary>{title}</summary><div class='result-body'>{''.join(body)}</div></details>"
+    )
+
+
 def attach_speaking_feedback(records):
     feedback_by_question = {}
     for record in records:
@@ -821,14 +956,26 @@ def attach_speaking_feedback(records):
         question_key = _normalized_question(data.get("question", ""))
         if not question_key:
             continue
+        raw_score = data.get("score") if data.get("score") not in (None, "") else record.get("score")
+        result_data = feedback_result_data_with_score(data.get("result_data"), raw_score)
+        score = canonical_feedback_score(result_data, raw_score)
+        result_data = feedback_result_data_with_score(result_data, score)
         feedback_by_question.setdefault(question_key, []).append({
             "id": record.get("id"),
             "timestamp": record.get("timestamp", ""),
+            "mode": data.get("mode", ""),
+            "score": score,
             "user_response": data.get("user_response", "") or data.get("transcript", ""),
+            "transcript": data.get("transcript", ""),
             "audio_file": data.get("audio_file", ""),
+            "recorded_at": data.get("recorded_at") or record.get("timestamp", ""),
+            "transcript_source": data.get("transcript_source", ""),
             "result": data.get("result", ""),
-            "result_data": data.get("result_data"),
+            "result_data": result_data,
         })
+
+    for feedbacks in feedback_by_question.values():
+        feedbacks.sort(key=lambda item: (item.get("timestamp") or "", int(item.get("id") or 0)))
 
     for record in records:
         if is_speaking_feedback_record(record):
@@ -856,6 +1003,51 @@ def attach_speaking_feedback(records):
     return records
 
 
+def latest_feedback_inline(feedbacks):
+    if not feedbacks:
+        return None
+    latest = feedbacks[-1]
+    result_data = latest.get("result_data")
+    latest_score = (
+        result_data.get("overall_score")
+        if isinstance(result_data, dict) and result_data.get("overall_score") not in (None, "")
+        else latest.get("score")
+    )
+    return {
+        "mode": latest.get("mode") or "speaking_feedback",
+        "result": latest.get("result", ""),
+        "result_data": latest.get("result_data"),
+        "user_response": latest.get("user_response", "") or latest.get("transcript", ""),
+        "transcript": latest.get("transcript", ""),
+        "audio_file": latest.get("audio_file", ""),
+        "recorded_at": latest.get("recorded_at") or latest.get("timestamp", ""),
+        "transcript_source": latest.get("transcript_source", ""),
+        "score": latest_score,
+    }
+
+
+def decorate_current_speaking_result(user_id, result_data):
+    if not isinstance(result_data, dict):
+        return result_data
+    wrapper = {
+        "activity": "当前口语练习",
+        "data": {"result_data": result_data},
+    }
+    attach_speaking_feedback(get_progress(user_id, limit=300) + [wrapper])
+    decorated = wrapper["data"]["result_data"]
+    if isinstance(decorated.get("questions"), list):
+        for item in decorated["questions"]:
+            if isinstance(item, dict) and item.get("_feedbacks"):
+                item["_inline_result"] = latest_feedback_inline(item["_feedbacks"])
+    if isinstance(decorated.get("discussion_questions"), list):
+        for item in decorated["discussion_questions"]:
+            if isinstance(item, dict) and item.get("_feedbacks"):
+                item["_inline_result"] = latest_feedback_inline(item["_feedbacks"])
+    if decorated.get("_feedbacks"):
+        decorated["_inline_result"] = latest_feedback_inline(decorated["_feedbacks"])
+    return decorated
+
+
 def visible_progress(records):
     return [
         record for record in records
@@ -864,8 +1056,19 @@ def visible_progress(records):
     ]
 
 
+def with_display_scores(records):
+    for record in records:
+        score = score_from_progress_record(record)
+        if score is not None:
+            record["display_score"] = score
+            data = record.get("data")
+            if isinstance(data, dict):
+                data["display_score"] = score
+    return records
+
+
 def prepare_progress(records):
-    return visible_progress(attach_speaking_feedback(records))
+    return with_display_scores(visible_progress(attach_speaking_feedback(records)))
 
 
 def prepare_feedback_context(records):
@@ -979,13 +1182,14 @@ def score_from_progress_record(record):
     data = record.get("data", {}) if isinstance(record, dict) else {}
     if not isinstance(data, dict):
         data = {}
-    candidates = [
-        record.get("score"),
-        data.get("score"),
-    ]
+    candidates = []
     result_data = data.get("result_data")
     if isinstance(result_data, dict):
         candidates.append(result_data.get("overall_score"))
+    candidates.extend([
+        data.get("score"),
+        record.get("score"),
+    ])
     for candidate in candidates:
         if candidate in (None, ""):
             continue
@@ -1151,6 +1355,21 @@ def form_json_object(name):
     return data if isinstance(data, dict) else None
 
 
+def speaking_parent_data_from_form():
+    parent_data = form_json_object("source_result_data")
+    if parent_data is not None:
+        return parent_data
+    cached_data = session.get("speaking_result_data")
+    if cached_data:
+        try:
+            parsed = json.loads(cached_data)
+        except (TypeError, ValueError):
+            parsed = None
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 def speaking_source_mode_from_form(default_mode):
     source_mode = request.form.get("source_mode", "").strip()
     if source_mode in {"part1", "part2", "part3"}:
@@ -1165,7 +1384,27 @@ def speaking_source_mode_from_form(default_mode):
     return default_mode
 
 
-def attach_inline_speaking_result(parent_data, source_mode, action_mode, question, result, action_result_data):
+def speaking_part_label(source_mode):
+    return {
+        "part1": "Part 1",
+        "part2": "Part 2",
+        "part3": "Part 3",
+    }.get(source_mode, "Part 1")
+
+
+def mark_speaking_focus(parent_data, source_mode):
+    if not isinstance(parent_data, dict):
+        return parent_data
+    if source_mode == "part2":
+        parent_data["_focus_feedback"] = "part2"
+    else:
+        question_index = request.form.get("question_index", "").strip()
+        if question_index:
+            parent_data["_focus_question_index"] = question_index
+    return parent_data
+
+
+def attach_inline_speaking_result(parent_data, source_mode, action_mode, question, result, action_result_data, extra=None):
     if not isinstance(parent_data, dict):
         return None
 
@@ -1177,20 +1416,36 @@ def attach_inline_speaking_result(parent_data, source_mode, action_mode, questio
         "chinese_answer": request.form.get("chinese_answer", "").strip(),
         "keywords": request.form.get("keywords", "").strip(),
     }
+    if isinstance(extra, dict):
+        inline.update({key: value for key, value in extra.items() if value not in (None, "")})
 
     question_key = _normalized_question(question)
+    question_index = request.form.get("question_index", "").strip()
+    try:
+        question_index = int(question_index)
+    except (TypeError, ValueError):
+        question_index = None
     if source_mode == "part1" and isinstance(parent_data.get("questions"), list):
-        for item in parent_data["questions"]:
-            if _normalized_question(item.get("question", "")) == question_key:
-                item["_inline_result"] = inline
-                break
+        questions = parent_data["questions"]
+        if question_index is not None and 0 <= question_index < len(questions):
+            questions[question_index]["_inline_result"] = inline
+        else:
+            for item in questions:
+                if _normalized_question(item.get("question", "")) == question_key:
+                    item["_inline_result"] = inline
+                    break
     elif source_mode == "part3" and isinstance(parent_data.get("discussion_questions"), list):
-        for item in parent_data["discussion_questions"]:
-            if _normalized_question(item.get("question", "")) == question_key:
-                item["_inline_result"] = inline
-                break
+        questions = parent_data["discussion_questions"]
+        if question_index is not None and 0 <= question_index < len(questions):
+            questions[question_index]["_inline_result"] = inline
+        else:
+            for item in questions:
+                if _normalized_question(item.get("question", "")) == question_key:
+                    item["_inline_result"] = inline
+                    break
     elif source_mode == "part2":
         parent_data["_inline_result"] = inline
+    mark_speaking_focus(parent_data, source_mode)
     return parent_data
 
 
@@ -1249,6 +1504,34 @@ def normalize_speaking_scores(feedback_data):
     if scores and all(score == 0.0 for score in scores):
         return feedback_data, "模型返回了全 0 分，疑似照抄格式示例，请重新评分。"
     return feedback_data, ""
+
+
+def calibrate_reference_answer_scores(feedback_data, reference_answer_note):
+    if not isinstance(feedback_data, dict) or reference_answer_note == "无":
+        return feedback_data
+    breakdown = feedback_data.get("breakdown")
+    if not isinstance(breakdown, dict):
+        return feedback_data
+    adjusted = False
+    for item in breakdown.values():
+        if not isinstance(item, dict):
+            continue
+        score = normalize_ielts_score(item.get("score"))
+        if score is not None and 0 < score < 7.5:
+            item["score"] = 7.5
+            adjusted = True
+    if adjusted:
+        scores = [
+            normalize_ielts_score(item.get("score"))
+            for item in breakdown.values()
+            if isinstance(item, dict) and normalize_ielts_score(item.get("score")) is not None
+        ]
+        if scores:
+            feedback_data["overall_score"] = round((sum(scores) / len(scores)) * 2) / 2
+    overall = normalize_ielts_score(feedback_data.get("overall_score"))
+    if overall is not None and 0 < overall < 7.5:
+        feedback_data["overall_score"] = 7.5
+    return feedback_data
 
 
 @lru_cache(maxsize=2)
@@ -1913,24 +2196,29 @@ def speaking():
             question = request.form.get("question", "").strip()
             user_response = request.form.get("user_response", "").strip()
             target_score = float_field("target_score", 6.5)
+            source_mode = speaking_source_mode_from_form(mode)
+            parent_data = speaking_parent_data_from_form()
+            reference_note = reference_answer_note_for_submission(user_response, parent_data, source_mode)
             result = assistant.get_speaking_feedback_direct(
                 question,
                 user_response,
                 target_score,
+                speaking_part_label(source_mode),
+                reference_note,
             )
             result_data = parse_model_output(result)
             result_data, _score_warning = normalize_speaking_scores(result_data if isinstance(result_data, dict) else None)
+            result_data = calibrate_reference_answer_scores(result_data, reference_note)
+            score_value = result_data.get("overall_score") if isinstance(result_data, dict) else None
             save_progress(session["user_id"], "口语反馈", {
                 "mode": mode,
                 "question": question,
                 "user_response": user_response,
-                "score": result_data.get("overall_score") if isinstance(result_data, dict) else None,
+                "score": score_value,
                 "result": result,
                 "result_data": result_data,
             })
             refresh_user_level_tracking(session["user_id"])
-            source_mode = speaking_source_mode_from_form(mode)
-            parent_data = form_json_object("source_result_data")
             parent_with_inline = attach_inline_speaking_result(
                 parent_data,
                 source_mode,
@@ -1938,6 +2226,7 @@ def speaking():
                 question,
                 result,
                 result_data,
+                {"score": score_value},
             )
             if parent_with_inline is not None:
                 render_result = json.dumps(parent_with_inline, ensure_ascii=False)
@@ -1961,7 +2250,7 @@ def speaking():
                 "result_data": result_data,
             })
             source_mode = speaking_source_mode_from_form(mode)
-            parent_data = form_json_object("source_result_data")
+            parent_data = speaking_parent_data_from_form()
             parent_with_inline = attach_inline_speaking_result(
                 parent_data,
                 source_mode,
@@ -1985,7 +2274,7 @@ def speaking():
                 "result": result,
             })
             source_mode = speaking_source_mode_from_form(mode)
-            parent_data = form_json_object("source_result_data")
+            parent_data = speaking_parent_data_from_form()
             parent_with_inline = attach_inline_speaking_result(
                 parent_data,
                 source_mode,
@@ -2032,6 +2321,9 @@ def speaking():
                         result_data = json.loads(cached_data)
                     except (TypeError, ValueError):
                         result_data = None
+    if isinstance(result_data, dict) and mode in {"part1", "part2", "part3"}:
+        result_data = decorate_current_speaking_result(session["user_id"], result_data)
+        result = json.dumps(result_data, ensure_ascii=False)
     return render_template("speaking.html", result=result, result_data=result_data, mode=mode, **common_context())
 
 
@@ -2379,7 +2671,7 @@ def api_speech_score():
     target_score = float_field("target_score", 6.5)
     save_recording = request.form.get("save_recording", "1") == "1"
     source_mode = request.form.get("source_mode", "").strip()
-    source_result_data = form_json_object("source_result_data")
+    source_result_data = speaking_parent_data_from_form()
 
     saved_filename = None
     saved_path = ""
@@ -2426,18 +2718,23 @@ def api_speech_score():
     if assistant and (transcript or saved_filename):
         try:
             if transcript and len(transcript) > 10:
+                reference_note = reference_answer_note_for_submission(transcript, source_result_data, source_mode)
                 feedback = assistant.get_speaking_feedback_direct(
                     question=question,
                     user_response=transcript,
-                    target_score=target_score
+                    target_score=target_score,
+                    part=speaking_part_label(source_mode),
+                    reference_answer_note=reference_note,
                 )
                 feedback_text = feedback
                 parsed_feedback = parse_model_output(feedback)
                 feedback_data = parsed_feedback if isinstance(parsed_feedback, dict) else None
                 feedback_data, score_warning = normalize_speaking_scores(feedback_data)
+                feedback_data = calibrate_reference_answer_scores(feedback_data, reference_note)
                 if score_warning:
                     feedback_text = f"{score_warning}\n\n{feedback_text}"
-                score_result = extract_ielts_score(feedback_data) or extract_ielts_score(feedback)
+                normalized_score = feedback_data.get("overall_score") if isinstance(feedback_data, dict) else None
+                score_result = normalized_score if normalized_score not in (None, "") else extract_ielts_score(feedback)
                 if score_warning:
                     score_result = ""
         except Exception as e:
@@ -2468,31 +2765,32 @@ def api_speech_score():
         "message": "录音已上传。" if saved_filename else "已提交评分。",
         "transcript_source": transcript_source,
     }
-    if feedback_text:
-        heading = "评分结果" if score_result else "录音上传结果"
-        score_line = f"<br>综合得分：{escape(score_result)}" if score_result else ""
-        source_labels = {"local": "本地转写", "api": "语音 API 转写", "text": "文本提交"}
-        source_line = f"<br><small>转写来源：{source_labels.get(transcript_source, transcript_source)}</small>"
-        meta_html = f"<p class='record-meta'><strong>训练时间：</strong>{escape(recorded_at)}</p>"
-        audio_html = _audio_html(saved_filename)
-        question_html = f"<p><strong>练习题：</strong>{escape(question)}</p>" if question else ""
-        response_html = (
-            "<details class='result-accordion' open><summary>我的本次回答</summary>"
-            f"<div class='result-body'><p>{escape(transcript)}</p></div></details>"
-        ) if transcript else ""
-        feedback_html = (
-            str(record_result_filter(feedback_data, "口语反馈"))
-            if isinstance(feedback_data, dict)
-            else str(simple_md_filter(feedback_text))
-        )
+    if feedback_text or saved_filename or transcript:
         response_data["score"] = score_result
         response_data["result_data"] = feedback_data
-        response_data["score_box"] = (
-            f"<strong>本题 AI 批改反馈</strong>{score_line}{source_line}"
-            f"{meta_html}{question_html}{audio_html}{response_html}"
-            f"<details class='result-accordion' open><summary>{heading}</summary>"
-            f"<div class='result-body'>{feedback_html}</div></details>"
+        inline_payload = {
+            "mode": "speaking_recording",
+            "result": feedback_text,
+            "result_data": feedback_data,
+            "user_response": transcript,
+            "transcript": transcript,
+            "audio_file": saved_filename or "",
+            "recorded_at": recorded_at,
+            "transcript_source": transcript_source,
+            "score": canonical_feedback_score(feedback_data, score_result),
+        }
+        response_data["inline_feedback_html"] = inline_speaking_feedback_html(inline_payload)
+        parent_with_inline = attach_inline_speaking_result(
+            source_result_data,
+            source_mode,
+            "speaking_recording",
+            question,
+            feedback_text,
+            feedback_data,
+            inline_payload,
         )
+        if parent_with_inline is not None and source_mode in {"part1", "part2", "part3"}:
+            response_data["updated_parent"] = True
     if saved_filename:
         response_data["audio_saved"] = saved_filename
 
