@@ -535,7 +535,7 @@ def record_result_filter(result_data, activity=""):
     elif isinstance(model_answer, str) and model_answer.strip():
         sections.append(
             "<details class='result-accordion'><summary>参考答案</summary>"
-            f"<div class='result-body'><button class='speak-btn' type='button'>朗读参考答案</button><p class='speak-source'>{escape(model_answer)}</p></div></details>"
+            f"<div class='result-body'><button class='speak-btn' type='button'>朗读参考答案</button><div class='speak-source'>{simple_md_filter(model_answer)}</div></div></details>"
         )
 
     criteria_labels = {
@@ -2371,6 +2371,30 @@ def speaking():
             if replay_mode == "speaking_recording":
                 mode, result_data = speaking_record_replay_payload(replay_record)
                 result = json.dumps(result_data, ensure_ascii=False)
+            elif replay_mode == "speaking_feedback":
+                # Load the parent question generation record instead, so the
+                # page shows questions + inline feedback (not just feedback alone).
+                feedback_data = replay_record.get("data") or {}
+                source_mode = feedback_data.get("source_mode") or ""
+                question = feedback_data.get("question") or ""
+                activity_map = {
+                    "part1": "口语Part 1题目生成",
+                    "part2": "口语Part 2题目生成",
+                    "part3": "口语Part 3题目生成",
+                }
+                # Try to find the matching parent question record
+                parent_activity = activity_map.get(source_mode)
+                parent_record = None
+                if parent_activity:
+                    parent_record = get_latest_progress_by_activity(
+                        session["user_id"], parent_activity
+                    )
+                if parent_record:
+                    mode = infer_record_mode(parent_record) or source_mode or "part1"
+                    result, result_data = result_from_record(parent_record)
+                else:
+                    mode = source_mode or "part1"
+                    result, result_data = None, None
             else:
                 mode = replay_mode
                 result, result_data = result_from_record(replay_record)

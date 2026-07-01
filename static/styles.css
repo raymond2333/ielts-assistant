@@ -1161,6 +1161,22 @@ nav a:hover {
   font-size: 0.82rem;
 }
 
+/* ---- form submit loading bar ---- */
+.form-loading-bar {
+  margin-top: 8px;
+  background: var(--line);
+  border-radius: 6px;
+  height: 4px;
+  overflow: hidden;
+}
+.form-loading-bar-inner {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
 .feedback-focus-flash {
   outline: 3px solid rgba(15, 123, 99, 0.28);
   box-shadow: 0 0 0 8px rgba(15, 123, 99, 0.08);

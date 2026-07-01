@@ -17,6 +17,41 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ---- Loading state: disable submit buttons and show progress on form submit ----
+  document.addEventListener("submit", (e) => {
+    const form = e.target;
+    if (form.tagName !== "FORM") return;
+    const btn = form.querySelector('button[type="submit"]');
+    if (!btn || btn.disabled) return;
+    btn.dataset.originalText = btn.textContent;
+    btn.textContent = "正在生成…";
+    btn.disabled = true;
+    // Insert a progress bar below the button
+    let bar = document.createElement("div");
+    bar.className = "form-loading-bar";
+    bar.innerHTML = '<div class="form-loading-bar-inner"></div>';
+    btn.parentNode.insertBefore(bar, btn.nextSibling);
+    // Animate indeterminate progress
+    let pct = 0;
+    const tick = () => {
+      pct = Math.min(pct + Math.random() * 12, 95);
+      const inner = bar.querySelector(".form-loading-bar-inner");
+      if (inner) inner.style.width = pct + "%";
+    };
+    bar._interval = setInterval(tick, 400);
+    tick();
+    // If the page navigates away, the bar disappears naturally.
+    // If the form submission fails (e.g. validation), restore the button.
+    setTimeout(() => {
+      if (!btn.disabled) return;
+      // Still disabled after 60s — likely stuck, restore
+      clearInterval(bar._interval);
+      if (bar.parentNode) bar.remove();
+      btn.textContent = btn.dataset.originalText || btn.textContent;
+      btn.disabled = false;
+    }, 60000);
+  });
+
   document.querySelectorAll("[data-tab-group]").forEach((group) => {
     const buttons = group.querySelectorAll("[data-tab-target]");
     const panels = group.querySelectorAll("[data-tab-panel]");

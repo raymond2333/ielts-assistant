@@ -216,15 +216,12 @@
 
                 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
                   <a class="primary-btn small" href="{{ url_for('writing', import_topic='1', import_question=result_data.question, import_task=target_task) }}">📝 导入题目开始练习</a>
-                  <button class="ghost-btn small" type="button" onclick="document.getElementById('modelAnswerForm').style.display='block';this.style.display='none'">✨ 生成参考范文</button>
-                </div>
-                <div id="modelAnswerForm" style="display:none;margin-top:10px">
-                  <form method="post" class="settings-form">
+                  <form method="post" class="settings-form" style="display:inline">
                     <input type="hidden" name="mode" value="generate_model_answer">
                     <input type="hidden" name="topic" value="{{ result_data.question }}">
                     <input type="hidden" name="task_type" value="{{ target_task }}">
                     <input type="hidden" name="topic_context" value="{{ result_data | tojson | forceescape }}">
-                    <button class="ghost-btn small" type="submit">✨ 确认生成参考范文</button>
+                    <button class="ghost-btn small" type="submit">✨ 生成参考范文</button>
                   </form>
                 </div>
               </div>
