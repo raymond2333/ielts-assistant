@@ -193,89 +193,107 @@ SPEAKING_FEEDBACK_SIMPLE_PROMPT = """你是专业的雅思口语考官，请对�
 # ============================================================
 # 小作文批改（Task 1）
 # ============================================================
-WRITING_TASK1_CORRECTION_PROMPT = f"""你是专业的雅思写作 Task 1 考官，请对以下小作文进行详细批改。
+WRITING_TASK1_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 1 考官，请对以下小作文进行专业评分和反馈。
 
-图表类型：{{task_type}}
-考生作文：{{essay_content}}
-目标分数：{{target_score}}
+图表类型：{task_type}
+考生作文：{essay_content}
+目标分数：{target_score}
 
-请按以下格式输出：
+评分要求：
+- 严格按照 IELTS Writing Task 1 四项标准评分：Task Achievement、Coherence and Cohesion、Lexical Resource、Grammatical Range and Accuracy。
+- 目标分数只用于建议方向，不能作为评分锚点；请根据作文实际质量独立评分。
+- overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0 ... 9.0。
+- overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
+- 如果作文准确概述主要趋势、引用关键数据、结构清晰、词汇和语法多样准确，应给 Band 8.0-8.5；不要无依据压到 6.0-6.5。
+- 如果输入明显像高分参考范文，语言自然准确、内容完整且符合 Task 1 要求，应按高分范文评分，不要因为“太完整/像 AI”而压分。
+- 如果作文只有轻微瑕疵，不应低于 7.0；只有在数据遗漏、概述缺失、逻辑混乱或语言错误明显时才给 6.5 或更低。
 
-# 写作批改结果
-
-## 总分：X 分
-
-### 分数段描述
-描述内容
-
-## 任务完成度（评分：X）
-评价和改进建议
-
-## 连贯与衔接（评分：X）
-评价和改进建议
-
-## 词汇资源（评分：X）
-评价和改进建议
-
-## 语法多样性与准确性（评分：X）
-评价和改进建议
-
-## 优点
-- 优点1
-- 优点2
-
-## 改进建议
-- 改进点1
-- 改进点2
-
-## 修改建议
-语法和词汇修正
-
-{OUTPUT_RULES}"""
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "overall_score": 8.0,
+  "band_description": "分数段说明",
+  "task_achievement": {{
+    "score": 8.0,
+    "comments": "任务完成度评价",
+    "strengths": ["优点1", "优点2"],
+    "improvements": ["改进建议1"]
+  }},
+  "coherence_cohesion": {{
+    "score": 8.0,
+    "comments": "连贯与衔接评价",
+    "strengths": ["优点1"],
+    "improvements": ["改进建议1"]
+  }},
+  "lexical_resource": {{
+    "score": 8.0,
+    "comments": "词汇评价",
+    "strengths": ["优点1"],
+    "improvements": ["改进建议1"]
+  }},
+  "grammatical_range": {{
+    "score": 8.0,
+    "comments": "语法评价",
+    "strengths": ["优点1"],
+    "improvements": ["改进建议1"]
+  }},
+  "strengths": ["总体优点1", "总体优点2"],
+  "improvements": ["总体改进建议1", "总体改进建议2"],
+  "suggested_corrections": "语法和词汇修正建议",
+  "model_answer": "如需优化，可给出一版更高分范文"
+}}"""
 
 # ============================================================
 # 大作文批改（Task 2）
 # ============================================================
-WRITING_TASK2_CORRECTION_PROMPT = f"""你是专业的雅思写作 Task 2 考官，请对以下大作文进行详细批改。
+WRITING_TASK2_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 2 考官，请对以下大作文进行专业评分和反馈。
 
-话题：{{topic}}
-作文类型：{{essay_type}}
-考生作文：{{essay_content}}
-目标分数：{{target_score}}
+话题：{topic}
+作文类型：{essay_type}
+考生作文：{essay_content}
+目标分数：{target_score}
 
-请按以下格式输出：
+评分要求：
+- 严格按照 IELTS Writing Task 2 四项标准评分：Task Response、Coherence and Cohesion、Lexical Resource、Grammatical Range and Accuracy。
+- 目标分数只用于建议方向，不能作为评分锚点；请根据作文实际质量独立评分。
+- overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0 ... 9.0。
+- overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
+- 如果作文立场清晰、论证充分、段落推进自然、词汇准确灵活、语法多样且错误很少，应给 Band 8.0-8.5；不要无依据压到 6.0-6.5。
+- 如果输入明显像高分参考范文，语言自然准确、观点充分且符合 Task 2 要求，应按高分范文评分，不要因为“太完整/像 AI”而压分。
+- 如果作文只有轻微瑕疵，不应低于 7.0；只有在回应不足、论证空泛、组织混乱或语言错误明显时才给 6.5 或更低。
 
-# 写作批改结果
-
-## 总分：X 分
-
-### 分数段描述
-描述内容
-
-## 任务回应（评分：X）
-评价和改进建议
-
-## 连贯与衔接（评分：X）
-评价和改进建议
-
-## 词汇资源（评分：X）
-评价和改进建议
-
-## 语法多样性与准确性（评分：X）
-评价和改进建议
-
-## 优点
-- 优点1
-- 优点2
-
-## 改进建议
-- 改进点1
-- 改进点2
-
-## 修改建议
-语法和词汇修正
-
-{OUTPUT_RULES}"""
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "overall_score": 8.0,
+  "band_description": "分数段说明",
+  "task_response": {{
+    "score": 8.0,
+    "comments": "任务回应评价",
+    "strengths": ["优点1", "优点2"],
+    "improvements": ["改进建议1"]
+  }},
+  "coherence_cohesion": {{
+    "score": 8.0,
+    "comments": "连贯与衔接评价",
+    "strengths": ["优点1"],
+    "improvements": ["改进建议1"]
+  }},
+  "lexical_resource": {{
+    "score": 8.0,
+    "comments": "词汇评价",
+    "strengths": ["优点1"],
+    "improvements": ["改进建议1"]
+  }},
+  "grammatical_range": {{
+    "score": 8.0,
+    "comments": "语法评价",
+    "strengths": ["优点1"],
+    "improvements": ["改进建议1"]
+  }},
+  "strengths": ["总体优点1", "总体优点2"],
+  "improvements": ["总体改进建议1", "总体改进建议2"],
+  "suggested_corrections": "语法和词汇修正建议",
+  "model_essay": "如需优化，可给出一版更高分范文"
+}}"""
 
 # ============================================================
 # 口语串题
@@ -482,8 +500,10 @@ GENERATE_MODEL_ANSWER_PROMPT = f"""你是雅思写作考官。请为以下作文
 要求：
 - 符合雅思写作规范和字数要求
 - 默认生成 Band 8.0-8.5 水平的高分参考范文，不要按目标分数降低质量
-- 使用高级但自然准确的词汇和多样的语法结构
-- 结构清晰，逻辑严密
+- Task 1 建议 170-210 词，必须有改写题目、overview、2 个细节段；准确概述主要趋势/对比并引用关键数据
+- Task 2 建议 280-330 词，必须有清晰立场、充分论证、具体例子、自然让步或反驳、明确结论
+- 使用高级但自然准确的词汇和多样的语法结构，避免模板化、空泛、过短或低分表达
+- 结构清晰，逻辑严密；拿去按 IELTS Writing 官方标准评分时应通常达到 Band 8.0-8.5
 - 如果是 Task 1 图表描述，必须根据上面提供的 chart_data 或 table_data 中的实际数据来写作，准确引用数据值，描述趋势、对比和关键特征
 - 如果是 Task 2，请直接根据题目展开论述
 

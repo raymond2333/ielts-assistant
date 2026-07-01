@@ -957,7 +957,8 @@ def _render_writing_task1():
                             essay_content=essay_content,
                             target_score=target_score
                         )
-                        st.session_state.current_writing_feedback = parse_json_response(result)
+                        feedback_data = parse_json_response(result)
+                        st.session_state.current_writing_feedback = _normalize_writing_scores(feedback_data, "Task 1")
                         st.session_state.current_essay_content = essay_content
                     except Exception as e:
                         st.error(f"批改作文时出错: {str(e)}")
@@ -1082,7 +1083,8 @@ def _render_writing_task2():
                             essay_content=essay_content,
                             target_score=target_score
                         )
-                        st.session_state.current_writing_feedback = parse_json_response(result)
+                        feedback_data = parse_json_response(result)
+                        st.session_state.current_writing_feedback = _normalize_writing_scores(feedback_data, "Task 2")
                         st.session_state.current_essay_content = essay_content
                     except Exception as e:
                         st.error(f"批改作文时出错: {str(e)}")
@@ -1280,6 +1282,45 @@ def _display_writing_feedback(feedback_data, task_type):
         if "current_writing_feedback" in st.session_state:
             del st.session_state["current_writing_feedback"]
         st.experimental_rerun()
+
+
+def _normalize_ielts_score(value):
+    if value in (None, ""):
+        return None
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, min(9.0, round(score * 2) / 2))
+
+
+def _writing_criteria_keys(task_type):
+    return (
+        ["task_achievement", "coherence_cohesion", "lexical_resource", "grammatical_range"]
+        if task_type == "Task 1"
+        else ["task_response", "coherence_cohesion", "lexical_resource", "grammatical_range"]
+    )
+
+
+def _normalize_writing_scores(feedback_data, task_type):
+    if not isinstance(feedback_data, dict):
+        return feedback_data
+    scores = []
+    for key in _writing_criteria_keys(task_type):
+        item = feedback_data.get(key)
+        if not isinstance(item, dict):
+            continue
+        score = _normalize_ielts_score(item.get("score"))
+        if score is not None:
+            item["score"] = score
+            scores.append(score)
+    if scores:
+        feedback_data["overall_score"] = round((sum(scores) / len(scores)) * 2) / 2
+    else:
+        score = _normalize_ielts_score(feedback_data.get("overall_score"))
+        if score is not None:
+            feedback_data["overall_score"] = score
+    return feedback_data
 
 
 def _display_record_result_data(result_data, key_prefix=""):

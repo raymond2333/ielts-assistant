@@ -1564,6 +1564,70 @@ def calibrate_reference_answer_scores(feedback_data, reference_answer_note):
     return feedback_data
 
 
+def writing_criteria_keys(task_type):
+    return (
+        ["task_achievement", "coherence_cohesion", "lexical_resource", "grammatical_range"]
+        if task_type == "Task 1"
+        else ["task_response", "coherence_cohesion", "lexical_resource", "grammatical_range"]
+    )
+
+
+def normalize_writing_scores(feedback_data, task_type):
+    if not isinstance(feedback_data, dict):
+        return feedback_data
+    scores = []
+    for key in writing_criteria_keys(task_type):
+        item = feedback_data.get(key)
+        if not isinstance(item, dict):
+            continue
+        score = normalize_ielts_score(item.get("score"))
+        if score is not None:
+            item["score"] = score
+            scores.append(score)
+    if scores:
+        feedback_data["overall_score"] = round((sum(scores) / len(scores)) * 2) / 2
+    else:
+        score = normalize_ielts_score(feedback_data.get("overall_score"))
+        if score is not None:
+            feedback_data["overall_score"] = score
+    return feedback_data
+
+
+def reference_essay_note_for_submission(essay_content):
+    stored = session.get("latest_model_answer", "")
+    if not stored:
+        return "无"
+    response = _normalized_answer_text(essay_content)
+    reference = _normalized_answer_text(stored)
+    if len(response) < 120 or len(reference) < 120:
+        return "无"
+    shorter = min(len(response), len(reference))
+    contains = shorter >= 120 and (response in reference or reference in response)
+    similarity = SequenceMatcher(None, response, reference).ratio()
+    if contains or similarity >= 0.88:
+        return "考生作文与平台刚生成的 Band 8.0-8.5 高分参考范文高度一致，请按高分参考范文标准评分。"
+    return "无"
+
+
+def calibrate_reference_essay_scores(feedback_data, task_type, reference_note):
+    if not isinstance(feedback_data, dict) or reference_note == "无":
+        return feedback_data
+    adjusted = False
+    for key in writing_criteria_keys(task_type):
+        item = feedback_data.get(key)
+        if not isinstance(item, dict):
+            continue
+        score = normalize_ielts_score(item.get("score"))
+        if score is not None and 0 < score < 7.5:
+            item["score"] = 7.5
+            adjusted = True
+    feedback_data = normalize_writing_scores(feedback_data, task_type)
+    overall = normalize_ielts_score(feedback_data.get("overall_score"))
+    if adjusted or (overall is not None and 0 < overall < 7.5):
+        feedback_data["overall_score"] = max(7.5, overall or 7.5)
+    return feedback_data
+
+
 @lru_cache(maxsize=2)
 def get_local_whisper_model(model_name, device, compute_type):
     from faster_whisper import WhisperModel
@@ -2521,12 +2585,15 @@ def writing():
             task_type = request.form.get("task_type", "图表描述")
             essay_content = request.form.get("essay_content", "")
             target_score = float_field("target_score", 6.5)
+            reference_note = reference_essay_note_for_submission(essay_content)
             result = assistant.correct_writing_task1(
                 task_type,
                 essay_content,
                 target_score,
             )
             result_data = parse_model_output(result)
+            result_data = normalize_writing_scores(result_data, "Task 1")
+            result_data = calibrate_reference_essay_scores(result_data, "Task 1", reference_note)
             save_progress(session["user_id"], "写作 Task 1 批改", {
                 "mode": mode,
                 "task_type": task_type,
@@ -2542,6 +2609,7 @@ def writing():
             essay_type = request.form.get("essay_type", "议论文")
             essay_content = request.form.get("essay_content", "")
             target_score = float_field("target_score", 6.5)
+            reference_note = reference_essay_note_for_submission(essay_content)
             result = assistant.correct_writing_task2(
                 topic_category,
                 essay_type,
@@ -2549,6 +2617,8 @@ def writing():
                 target_score,
             )
             result_data = parse_model_output(result)
+            result_data = normalize_writing_scores(result_data, "Task 2")
+            result_data = calibrate_reference_essay_scores(result_data, "Task 2", reference_note)
             save_progress(session["user_id"], "写作 Task 2 批改", {
                 "mode": mode,
                 "topic_category": topic_category,
@@ -2579,6 +2649,7 @@ def writing():
             chart_data = topic_data.get("chart_data")
             table_data = topic_data.get("table_data")
             result = assistant.generate_model_answer(task_type, topic, chart_type, chart_data, table_data)
+            session["latest_model_answer"] = result
             result_data = {
                 **topic_data,
                 "mode": mode,
