@@ -1131,6 +1131,29 @@ nav a:hover {
   margin-top: 10px;
 }
 
+/* ---- upload progress bar (voice recording → AI feedback) ---- */
+.voice-upload-progress {
+  margin-top: 10px;
+  background: var(--line);
+  border-radius: 6px;
+  height: 8px;
+  overflow: hidden;
+  position: relative;
+}
+.voice-upload-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 6px;
+  transition: width 0.15s linear;
+}
+.voice-upload-progress-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .voice-status {
   display: none;
   margin-top: 6px;

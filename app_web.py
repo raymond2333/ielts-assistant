@@ -871,15 +871,25 @@ def reference_answer_note_for_submission(user_response, parent_data, source_mode
 
 def is_speaking_feedback_record(record):
     data = record.get("data") if isinstance(record, dict) else {}
-    return record.get("activity") == "口语反馈" or (isinstance(data, dict) and data.get("mode") == "speaking_feedback")
+    # 活动名为“口语反馈” 或 模式为 speaking_feedback 或 存有完整 feedback 数据
+    return (
+        record.get("activity") == "口语反馈"
+        or (isinstance(data, dict) and data.get("mode") == "speaking_feedback")
+        or (isinstance(data, dict) and isinstance(data.get("result_data"), dict)
+            and data["result_data"].get("overall_score") not in (None, "")
+            and data["result_data"].get("breakdown"))
+    )
 
 
 def is_attachable_speaking_feedback(record):
     data = record.get("data") if isinstance(record, dict) else {}
-    return is_speaking_feedback_record(record) or (
-        isinstance(data, dict)
-        and data.get("mode") == "speaking_recording"
-        and data.get("result_data")
+    return (
+        is_speaking_feedback_record(record)
+        or (
+            isinstance(data, dict)
+            and data.get("mode") == "speaking_recording"
+            and data.get("result_data")
+        )
     )
 
 
@@ -2318,11 +2328,11 @@ def speaking():
         if result is not None:
             if render_result is not None:
                 # Inline-result action (feedback / keyword / cn-answer).
-                # Save to session temporarily so the GET handler can display it.
-                # The data is tiny (just the parent with one extra key) so this
-                # will NOT overflow the cookie.
-                session["speaking_result"] = render_result
-                session["speaking_result_data"] = json.dumps(render_result_data, ensure_ascii=False)
+                # Store a compact replay hint so GET can load the exact feedback
+                # record — avoids cookie bloat and keeps scores in sync with the DB.
+                latest_feedback = get_latest_progress_by_activity(session["user_id"], "口语反馈")
+                if latest_feedback:
+                    session["_speaking_replay_id"] = latest_feedback.get("id", "")
                 session["speaking_mode"] = render_mode or mode
                 return redirect(url_for("speaking", mode=render_mode or mode))
             session["speaking_result"] = result
@@ -2333,6 +2343,17 @@ def speaking():
             session["speaking_mode"] = mode
     else:
         replay_record = replay_record_from_args()
+        if not replay_record:
+            try:
+                hint_id = session.pop("_speaking_replay_id", "")
+                if hint_id:
+                    progress = get_progress(session["user_id"], limit=50)
+                    for p in progress:
+                        if str(p.get("id")) == str(hint_id):
+                            replay_record = p
+                            break
+            except Exception:
+                pass
         if replay_record:
             replay_mode = infer_record_mode(replay_record) or mode
             if replay_mode == "speaking_recording":

@@ -490,7 +490,11 @@
     if (form.tagName !== 'FORM') return;
     var modeInput = form.querySelector('input[name="mode"]');
     if (!modeInput || modeInput.value !== 'speaking_feedback') return;
-    if (!pendingRecording || !pendingRecording.blob || uploading) return;
+    if (!pendingRecording || !pendingRecording.blob) return;
+    if (uploading) {
+      e.preventDefault();
+      return;
+    }
     if (interceptedForms.has(form)) return;
     interceptedForms.add(form);
     e.preventDefault();
@@ -498,9 +502,31 @@
     var btn = pendingRecording.btn;
     var blob = pendingRecording.blob;
     uploading = true;
+
+    // ---- show a progress overlay on the submit button ----
+    var submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn._originalText = submitBtn.textContent;
+      submitBtn.textContent = '正在上传录音…';
+      submitBtn.disabled = true;
+    }
+
     if (btn) { btn.innerHTML = '⏳'; btn.title = '正在上传录音并转写…'; }
-    setVoiceStatus('正在上传录音并转写，完成后将自动提交评分…');
+    setVoiceStatus('正在上传录音并转写（可能需要几秒到十几秒），请勿关闭页面…');
     setRecordingState('uploading');
+
+    // ---- progress bar inside the recording preview ----
+    var wrapper = textarea && textarea.closest(".voice-input-wrapper");
+    var progressBar = null;
+    if (wrapper) {
+      progressBar = document.createElement("div");
+      progressBar.className = "voice-upload-progress";
+      progressBar.innerHTML =
+        "<div class='voice-upload-progress-bar'></div>" +
+        "<span class='voice-upload-progress-label'>上传中 0%</span>";
+      wrapper.appendChild(progressBar);
+    }
+
     var fd = new FormData();
     fd.append('audio', blob, 'recording.' + (blob.type.includes('webm') ? 'webm' : 'm4a'));
     // Pass all form context so speech-score can save a complete training record
@@ -512,38 +538,63 @@
     if (t) fd.append('target_score', t.value || '6.5');
     if (sm) fd.append('source_mode', sm.value || '');
     if (sd) fd.append('source_result_data', sd.value || '');
-    fetch('/api/speech-score', { method: 'POST', body: fd })
-      .then(function (r) {
-        return r.text().then(function (t) {
-          var d = {}; try { d = t ? JSON.parse(t) : {}; } catch (e) { throw new Error('服务异常'); }
-          if (!r.ok) throw new Error(d.error || ('请求失败 ' + r.status));
-          return d;
-        });
-      })
-      .then(function (data) {
-        uploading = false;
-        if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
-        setRecordingState('');
-        clearRecordingPreview(textarea);
-        setVoiceStatus(data.transcript ? '转写完成，评分结果已显示在下方。' : '评分完成，结果已显示在下方。');
-        interceptedForms.delete(form);
-        if (data.transcript && textarea) {
-          textarea.value = data.transcript.trim();
-          textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        if (data.inline_feedback_html) {
-          insertInlineFeedback(data.inline_feedback_html);
-        } else {
-          // Fallback: reload page so GET rebuilds everything from DB
-          window.location.reload();
-        }
-      })
-      .catch(function (err) {
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/speech-score');
+    xhr.upload.onprogress = function (ev) {
+      if (ev.lengthComputable && progressBar) {
+        var pct = Math.round((ev.loaded / ev.total) * 100);
+        var bar = progressBar.querySelector('.voice-upload-progress-bar');
+        var label = progressBar.querySelector('.voice-upload-progress-label');
+        if (bar) bar.style.width = pct + '%';
+        if (label) label.textContent = '上传中 ' + pct + '%';
+      }
+    };
+    xhr.onload = function () {
+      // Remove progress bar
+      if (progressBar && progressBar.parentNode) progressBar.parentNode.removeChild(progressBar);
+
+      var ok = xhr.status >= 200 && xhr.status < 300;
+      var data = {};
+      try { data = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch (e) {}
+      if (!ok) {
         uploading = false;
         interceptedForms.delete(form);
         if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
         setRecordingState('');
-        alert(err && err.message ? err.message : '录音上传失败，请稍后重试。');
-      });
+        if (submitBtn) { submitBtn.textContent = submitBtn._originalText || '获取 AI 批改反馈'; submitBtn.disabled = false; }
+        alert(data.error || ('请求失败 ' + xhr.status));
+        return;
+      }
+
+      uploading = false;
+      if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
+      setRecordingState('');
+      clearRecordingPreview(textarea);
+      setVoiceStatus(data.transcript ? '转写完成，评分结果已显示在下方。' : '评分完成，结果已显示在下方。');
+      interceptedForms.delete(form);
+      if (submitBtn) { submitBtn.textContent = submitBtn._originalText || '获取 AI 批改反馈'; submitBtn.disabled = false; }
+
+      if (data.transcript && textarea) {
+        textarea.value = data.transcript.trim();
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (data.inline_feedback_html) {
+        insertInlineFeedback(data.inline_feedback_html);
+      } else {
+        // Fallback: reload page so GET rebuilds everything from DB
+        window.location.reload();
+      }
+    };
+    xhr.onerror = function () {
+      if (progressBar && progressBar.parentNode) progressBar.parentNode.removeChild(progressBar);
+      uploading = false;
+      interceptedForms.delete(form);
+      if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
+      setRecordingState('');
+      if (submitBtn) { submitBtn.textContent = submitBtn._originalText || '获取 AI 批改反馈'; submitBtn.disabled = false; }
+      alert('录音上传失败，请检查网络后重试。');
+    };
+    xhr.send(fd);
   }, true);
 })();
