@@ -483,22 +483,27 @@
   observer.observe(document.body, { childList: true, subtree: true });
   document.querySelectorAll("textarea:not(.no-voice)").forEach(createBtn);
 
-  // ---- Capture：点击“获取 AI 批改反馈”且有录音在排队时，先上传录音再提交 ----
+  // ---- Capture：点击"获取 AI 批改反馈"且有录音在排队时，先上传再提交 ----
+  var interceptedForms = new WeakSet();
   document.addEventListener('submit', function (e) {
     var form = e.target;
     if (form.tagName !== 'FORM') return;
     var modeInput = form.querySelector('input[name="mode"]');
     if (!modeInput || modeInput.value !== 'speaking_feedback') return;
     if (!pendingRecording || !pendingRecording.blob || uploading) return;
+    if (interceptedForms.has(form)) return;
+    interceptedForms.add(form);
     e.preventDefault();
     var textarea = pendingRecording.textarea;
     var btn = pendingRecording.btn;
     var blob = pendingRecording.blob;
     uploading = true;
-    if (btn) { btn.innerHTML = '⏳'; btn.title = '正在上传录音…'; }
+    if (btn) { btn.innerHTML = '⏳'; btn.title = '正在上传录音并转写…'; }
     setVoiceStatus('正在上传录音并转写，完成后将自动提交评分…');
+    setRecordingState('uploading');
     var fd = new FormData();
     fd.append('audio', blob, 'recording.' + (blob.type.includes('webm') ? 'webm' : 'm4a'));
+    // Pass all form context so speech-score can save a complete training record
     var q = form.querySelector("input[name='question'], textarea[name='question']");
     var t = form.querySelector("input[name='target_score']");
     var sm = form.querySelector("input[name='source_mode']");
@@ -520,19 +525,25 @@
         if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
         setRecordingState('');
         clearRecordingPreview(textarea);
-        setVoiceStatus('');
-        if (data.error) { alert('上传失败: ' + data.error); return; }
+        setVoiceStatus(data.transcript ? '转写完成，评分结果已显示在下方。' : '评分完成，结果已显示在下方。');
+        interceptedForms.delete(form);
         if (data.transcript && textarea) {
           textarea.value = data.transcript.trim();
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        form.submit();
+        if (data.inline_feedback_html) {
+          insertInlineFeedback(data.inline_feedback_html);
+        } else {
+          // Fallback: reload page so GET rebuilds everything from DB
+          window.location.reload();
+        }
       })
       .catch(function (err) {
         uploading = false;
+        interceptedForms.delete(form);
         if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
         setRecordingState('');
-        alert(err && err.message ? err.message : '录音上传失败');
+        alert(err && err.message ? err.message : '录音上传失败，请稍后重试。');
       });
   }, true);
 })();

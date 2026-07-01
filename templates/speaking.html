@@ -249,7 +249,7 @@
                           <source src="/{{ inline.audio_file }}" type="{{ 'audio/webm' if inline.audio_file.endswith('.webm') else 'audio/mp4' }}">
                         </audio>
                       {% endif %}
-                      {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% elif inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                      {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本 / 我的回答</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.user_response %}<details class="result-accordion nested-answer" open><summary>我的回答</summary><div class="result-body"><p>{{ inline.user_response }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% endif %}
                       {% if inline.transcript_source %}<p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'语音 API 转写','text':'文本提交'}.get(inline.transcript_source, inline.transcript_source) }}</p>{% endif %}
                       {% if inline.chinese_answer %}<p><strong>中文思路：</strong>{{ inline.chinese_answer }}</p>{% endif %}
                       {% if inline.keywords %}<p><strong>关键词：</strong>{{ inline.keywords }}</p>{% endif %}
@@ -382,7 +382,7 @@
                     <source src="/{{ inline.audio_file }}" type="{{ 'audio/webm' if inline.audio_file.endswith('.webm') else 'audio/mp4' }}">
                   </audio>
                 {% endif %}
-                {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% elif inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本 / 我的回答</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.user_response %}<details class="result-accordion nested-answer" open><summary>我的回答</summary><div class="result-body"><p>{{ inline.user_response }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% endif %}
                 {% if inline.transcript_source %}<p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'语音 API 转写','text':'文本提交'}.get(inline.transcript_source, inline.transcript_source) }}</p>{% endif %}
                 {% if inline.chinese_answer %}<p><strong>中文思路：</strong>{{ inline.chinese_answer }}</p>{% endif %}
                 {% if inline.keywords %}<p><strong>关键词：</strong>{{ inline.keywords }}</p>{% endif %}
@@ -471,7 +471,7 @@
                           <source src="/{{ inline.audio_file }}" type="{{ 'audio/webm' if inline.audio_file.endswith('.webm') else 'audio/mp4' }}">
                         </audio>
                       {% endif %}
-                      {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% elif inline.user_response %}<p><strong>你的回答：</strong>{{ inline.user_response }}</p>{% endif %}
+                      {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本 / 我的回答</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.user_response %}<details class="result-accordion nested-answer" open><summary>我的回答</summary><div class="result-body"><p>{{ inline.user_response }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% endif %}
                       {% if inline.transcript_source %}<p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'语音 API 转写','text':'文本提交'}.get(inline.transcript_source, inline.transcript_source) }}</p>{% endif %}
                       {% if inline.chinese_answer %}<p><strong>中文思路：</strong>{{ inline.chinese_answer }}</p>{% endif %}
                       {% if inline.keywords %}<p><strong>关键词：</strong>{{ inline.keywords }}</p>{% endif %}

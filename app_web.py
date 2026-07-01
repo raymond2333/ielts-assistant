@@ -1006,22 +1006,32 @@ def attach_speaking_feedback(records):
 def latest_feedback_inline(feedbacks):
     if not feedbacks:
         return None
-    latest = feedbacks[-1]
-    result_data = latest.get("result_data")
+    # Prefer the most recent "口语反馈" over "口语录音练习"
+    best = None
+    best_ts = ""
+    for fb in feedbacks:
+        is_feedback = (fb.get("mode") or "") in ("speaking_feedback", "口语反馈")
+        ts = fb.get("timestamp") or fb.get("recorded_at") or ""
+        if not best or is_feedback or ts > best_ts:
+            best = fb
+            best_ts = ts
+    if not best:
+        return None
+    result_data = best.get("result_data")
     latest_score = (
         result_data.get("overall_score")
         if isinstance(result_data, dict) and result_data.get("overall_score") not in (None, "")
-        else latest.get("score")
+        else best.get("score")
     )
     return {
-        "mode": latest.get("mode") or "speaking_feedback",
-        "result": latest.get("result", ""),
-        "result_data": latest.get("result_data"),
-        "user_response": latest.get("user_response", "") or latest.get("transcript", ""),
-        "transcript": latest.get("transcript", ""),
-        "audio_file": latest.get("audio_file", ""),
-        "recorded_at": latest.get("recorded_at") or latest.get("timestamp", ""),
-        "transcript_source": latest.get("transcript_source", ""),
+        "mode": best.get("mode") or "speaking_feedback",
+        "result": best.get("result", ""),
+        "result_data": best.get("result_data"),
+        "user_response": best.get("user_response", "") or best.get("transcript", ""),
+        "transcript": best.get("transcript", ""),
+        "audio_file": best.get("audio_file", ""),
+        "recorded_at": best.get("recorded_at") or best.get("timestamp", ""),
+        "transcript_source": best.get("transcript_source", ""),
         "score": latest_score,
         "chinese_answer": "",
         "keywords": "",
@@ -2308,10 +2318,12 @@ def speaking():
         if result is not None:
             if render_result is not None:
                 # Inline-result action (feedback / keyword / cn-answer).
-                # Redirect to GET without session data.  GET reloads the parent
-                # questions from the DB so the score always matches what the
-                # learning-record view shows, and the session cookie never
-                # blows past the ~4 KB browser limit.
+                # Save to session temporarily so the GET handler can display it.
+                # The data is tiny (just the parent with one extra key) so this
+                # will NOT overflow the cookie.
+                session["speaking_result"] = render_result
+                session["speaking_result_data"] = json.dumps(render_result_data, ensure_ascii=False)
+                session["speaking_mode"] = render_mode or mode
                 return redirect(url_for("speaking", mode=render_mode or mode))
             session["speaking_result"] = result
             session["speaking_result_data"] = (
@@ -2329,19 +2341,6 @@ def speaking():
             else:
                 mode = replay_mode
                 result, result_data = result_from_record(replay_record)
-        elif result is None and result_data is None:
-            # POST returned an inline result — reload the most recent question
-            # generation record from DB so the display matches the learning record.
-            activity_map = {
-                "part1": "口语Part 1题目生成",
-                "part2": "口语Part 2题目生成",
-                "part3": "口语Part 3题目生成",
-            }
-            activity = activity_map.get(mode, activity_map["part1"])
-            latest = get_latest_progress_by_activity(session["user_id"], activity)
-            if latest:
-                mode = infer_record_mode(latest) or mode
-                result, result_data = result_from_record(latest)
         else:
             cached = session.pop("speaking_result", None)
             cached_data = session.pop("speaking_result_data", None)
