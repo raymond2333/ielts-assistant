@@ -119,6 +119,7 @@ def beijing_time_filter(value):
         return ""
     from datetime import datetime as _dt, timezone as _tz, timedelta as _td
     _BJ = _tz(_td(hours=8))
+    _UTC = _tz.utc
     if isinstance(value, str):
         value = value.strip()
         if not value:
@@ -130,7 +131,14 @@ def beijing_time_filter(value):
     else:
         dt = value
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=_BJ)
+        # Server may be in UTC — convert naive UTC to Beijing, otherwise
+        # treat as already-Beijing (backward compat with local dev).
+        now_utc = _dt.now(_UTC)
+        server_is_utc = abs((now_utc.replace(tzinfo=None) - _dt.now()).total_seconds()) < 2
+        if server_is_utc:
+            dt = dt.replace(tzinfo=_UTC).astimezone(_BJ)
+        else:
+            dt = dt.replace(tzinfo=_BJ)
     else:
         dt = dt.astimezone(_BJ)
     return dt.strftime("%Y年%m月%d日 %H:%M")
