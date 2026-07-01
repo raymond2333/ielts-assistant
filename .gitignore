@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .venv/
 mysql-data/
+data/audio/
 data/charts/*.png
 .ielts_last_user.json
 .DS_Store

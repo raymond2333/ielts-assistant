@@ -38,6 +38,8 @@ SPEAKING_PART1_PROMPT = """你是雅思口语考官，请生成 Part 1 的题目
 要求：
 - 生成 4 道题，每道题相互独立
 - 参考答案不要写在题目里，只放在 model_answer 字段
+- model_answer 必须是 Band 8.0-8.5 水平的高分示范：回答自然、具体、有个人细节，词汇准确灵活，句式有变化，不能写成低分、短句堆砌或模板化答案
+- Part 1 每个 model_answer 建议 3-5 句，既要口语化，也要有充分展开；拿去按雅思口语标准评分时应通常达到 8.0 左右
 - keywords 和 tips 必须是数组
 - 只输出 JSON"""
 
@@ -66,6 +68,9 @@ SPEAKING_PART2_PROMPT = """你是雅思口语考官，请生成 Part 2 的题目
 要求：
 - 题目卡只放在 cue_card 字段
 - 参考答案只放在 model_answer 字段
+- model_answer 必须是 Band 8.0-8.5 水平的高分示范，包含清晰开头、充分展开的细节、自然转折和总结
+- details 数组至少 4 条，每条必须是完整英文句子或自然段，不要只给关键词；整体回答应适合 1.5-2 分钟口语表达
+- 语言要自然、有画面感，使用准确高级但不过度生硬的词汇和多样句式；拿去按雅思口语标准评分时应通常达到 8.0 左右
 - 只输出 JSON"""
 
 # ============================================================
@@ -94,6 +99,8 @@ Part 2 话题：{part2_topic}
 要求：
 - 生成 4 道讨论题，每道题相互独立
 - 参考答案不要写在题目里，只放在 model_response 字段
+- model_response 必须是 Band 8.0-8.5 水平的高分示范：有明确观点、原因解释、例子或对比、适当让步，不能只写两三句泛泛而谈
+- 每个 model_response 建议 5-7 句，体现 Part 3 所需的抽象分析和批判性思维；拿去按雅思口语标准评分时应通常达到 8.0 左右
 - 只输出 JSON"""
 
 # ============================================================
@@ -106,14 +113,29 @@ SPEAKING_FEEDBACK_PROMPT = """你是专业的雅思口语考官，请对以下�
 考生回答：{user_response}
 目标分数：{target_score}
 
+评分要求：
+- 请严格按照 IELTS Speaking 官方四项标准评分：Fluency and Coherence、Lexical Resource、Grammatical Range and Accuracy、Pronunciation。
+- 请根据考生实际回答质量独立评分，不要照抄目标分数；目标分数只用于给改进建议。
+- overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0, 1.5 ... 9.0。
+- overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
+- 如果回答很短、跑题、语法错误多或内容空泛，应明显低于目标分数。
+- 如果回答内容充分、自然流利、词汇和语法准确多样，即使是 AI 参考答案，也应按高分答案评分，通常不应低于 7.0。
+- Band 5：基本能表达但展开有限、重复较多、错误明显。
+- Band 6：能较清楚表达，有一定展开，但仍有停顿、重复或不够灵活。
+- Band 7：表达连贯、展开充分，词汇和语法有一定灵活性，错误不影响理解。
+- Band 8：表达流利自然，观点展开充分，词汇准确灵活，语法多样且错误很少。
+- Band 9：近似母语水平，表达自然精准，几乎无错误。
+- 严禁保留 0.0 作为占位分，除非考生回答为空或完全无法理解。
+- 下面 JSON 只是字段结构，所有分数必须替换为你根据评分标准判断出的真实数字。
+
 请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
 {{
-  "overall_score": 6.5,
+  "overall_score": 0.0,
   "breakdown": {{
-    "fluency_coherence": {{"score": 6.5, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
-    "lexical_resource": {{"score": 6.5, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
-    "grammatical_range_accuracy": {{"score": 6.5, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
-    "pronunciation": {{"score": 6.5, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
+    "fluency_coherence": {{"score": 0.0, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
+    "lexical_resource": {{"score": 0.0, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
+    "grammatical_range_accuracy": {{"score": 0.0, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
+    "pronunciation": {{"score": 0.0, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
   }},
   "improved_response": "优化后的回答示例",
   "practice_recommendations": ["练习建议1", "练习建议2"]
@@ -129,14 +151,29 @@ SPEAKING_FEEDBACK_SIMPLE_PROMPT = """你是专业的雅思口语考官，请对�
 考生回答：{user_response}
 目标分数：{target_score}
 
+评分要求：
+- 请严格按照 IELTS Speaking 官方四项标准评分：Fluency and Coherence、Lexical Resource、Grammatical Range and Accuracy、Pronunciation。
+- 请根据考生实际回答质量独立评分，不要照抄目标分数；目标分数只用于给改进建议。
+- overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0, 1.5 ... 9.0。
+- overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
+- 如果回答很短、跑题、语法错误多或内容空泛，应明显低于目标分数。
+- 如果回答内容充分、自然流利、词汇和语法准确多样，即使是 AI 参考答案，也应按高分答案评分，通常不应低于 7.0。
+- Band 5：基本能表达但展开有限、重复较多、错误明显。
+- Band 6：能较清楚表达，有一定展开，但仍有停顿、重复或不够灵活。
+- Band 7：表达连贯、展开充分，词汇和语法有一定灵活性，错误不影响理解。
+- Band 8：表达流利自然，观点展开充分，词汇准确灵活，语法多样且错误很少。
+- Band 9：近似母语水平，表达自然精准，几乎无错误。
+- 严禁保留 0.0 作为占位分，除非考生回答为空或完全无法理解。
+- 下面 JSON 只是字段结构，所有分数必须替换为你根据评分标准判断出的真实数字。
+
 请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
 {{
-  "overall_score": 6.5,
+  "overall_score": 0.0,
   "breakdown": {{
-    "fluency_coherence": {{"score": 6.5, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
-    "lexical_resource": {{"score": 6.5, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
-    "grammatical_range_accuracy": {{"score": 6.5, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
-    "pronunciation": {{"score": 6.5, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
+    "fluency_coherence": {{"score": 0.0, "strengths": ["优点"], "weaknesses": ["待改进点"], "suggestions": ["建议"]}},
+    "lexical_resource": {{"score": 0.0, "vocabulary_analysis": "词汇分析", "suggested_words": ["推荐词汇"]}},
+    "grammatical_range_accuracy": {{"score": 0.0, "grammar_analysis": "语法分析", "common_errors": ["常见错误"]}},
+    "pronunciation": {{"score": 0.0, "pronunciation_analysis": "发音分析", "improvement_tips": ["改进建议"]}}
   }},
   "improved_response": "优化后的回答示例",
   "practice_recommendations": ["练习建议1", "练习建议2"]
@@ -232,49 +269,38 @@ WRITING_TASK2_CORRECTION_PROMPT = f"""你是专业的雅思写作 Task 2 考官�
 # ============================================================
 # 口语串题
 # ============================================================
-THEME_LINKING_PROMPT = f"""你是雅思口语串题专家，请将以下话题进行有机串联。
+THEME_LINKING_PROMPT = """你是雅思口语串题专家，请将以下话题进行有机串联。
 
-需要串联的话题：{{topics}}
-核心主题：{{main_theme}}
-目标分数：{{target_score}}
+需要串联的话题：{topics}
+核心主题：{main_theme}
 
-请按以下格式输出：
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "unifying_theme": "中文核心主题",
+  "unifying_theme_en": "English core theme",
+  "linked_responses": [
+    {{
+      "topic": "话题名称",
+      "topic_en": "Topic in English",
+      "adapted_response": "适应核心主题的中文回答",
+      "adapted_response_en": "English response adapted to core theme",
+      "possible_questions": ["Possible IELTS Part 2 question 1", "Possible IELTS Part 2 question 2"],
+      "key_elements": ["元素1", "元素2"],
+      "transition_phrases": ["短语1", "短语2"]
+    }}
+  ],
+  "versatile_vocabulary": ["中文词汇1", "中文词汇2"],
+  "versatile_vocabulary_en": ["English vocab 1", "English vocab 2"],
+  "practice_strategy": "练习策略建议",
+  "study_plan": "学习计划建议"
+}}
 
-# 串题方案
-
-## 核心主题
-中文核心主题
-**English:** English core theme
-
-## 各话题回答
-
-### 话题 1：[话题名称]
-**English:** [Topic in English]
-**中文回答：** 适应核心主题的回答
-**English Response:** English response
-**关键元素：** 元素1、元素2
-**Key Elements:** Element 1、Element 2
-**过渡短语：** 短语1、短语2
-**Transition Phrases:** Phrase 1、Phrase 2
-
-（重复话题 2、话题 3……）
-
-## 通用词汇
-- 词汇1
-- **English:** Vocabulary1
-
-## 灵活句式
-- 句式1
-- **English:** Sentence 1
-
-## 记忆技巧
-- 技巧1
-- **English:** Memory aid 1
-
-## 练习策略
-策略建议
-
-{OUTPUT_RULES}"""
+要求：
+- 每个话题都必须出现在 linked_responses 中
+- possible_questions 必须是数组，列出 2-4 个与该答案高度相关、考场上可能出现的英文雅思口语题
+- key_elements 和 transition_phrases 必须是数组
+- adapted_response_en 必须按 Band 8.0-8.5 高分口语答案写作：表达自然、内容具体、逻辑清楚、可灵活迁移，不能根据目标分数降低答案质量
+- 只输出 JSON"""
 
 # ============================================================
 # 话题扩展
@@ -407,6 +433,11 @@ ANSWER_FROM_CN_PROMPT = f"""你是雅思口语教练。请把学生的中文思�
 中文思路：
 {{chinese_answer}}
 
+要求：
+- 英文答案默认按 Band 8.0-8.5 高分示范生成，保留学生原意，但提升表达的准确性、自然度和展开深度
+- 不要为了迁就目标分数降低答案质量
+- 根据题目类型控制长度：Part 1 简洁但充分，Part 2 可展开为 1-2 分钟，Part 3 要有分析深度
+
 请输出：
 
 # 英文答案
@@ -439,7 +470,8 @@ GENERATE_MODEL_ANSWER_PROMPT = f"""你是雅思写作考官。请为以下作文
 
 要求：
 - 符合雅思写作规范和字数要求
-- 使用高级词汇和多样的语法结构
+- 默认生成 Band 8.0-8.5 水平的高分参考范文，不要按目标分数降低质量
+- 使用高级但自然准确的词汇和多样的语法结构
 - 结构清晰，逻辑严密
 - 如果是 Task 1 图表描述，必须根据上面提供的 chart_data 或 table_data 中的实际数据来写作，准确引用数据值，描述趋势、对比和关键特征
 - 如果是 Task 2，请直接根据题目展开论述
@@ -463,7 +495,8 @@ KEYWORD_ANSWER_PROMPT = """你是雅思口语教练。请根据学生提供的�
 - 答案长度适合 {part}（Part 1 约30-60秒，Part 2 约1-2分钟，Part 3 约45-60秒）
 - 自然融入学生提供的关键词
 - 使用适当的连接词和过渡语
-- 展现词汇和语法的丰富性
+- 默认生成 Band 8.0-8.5 高分示范答案，展现词汇和语法的丰富性、准确性和自然度
+- 不要为了迁就目标分数降低答案质量
 
 请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
 {{
@@ -573,36 +606,27 @@ IMPROVEMENT_SUGGESTIONS_PROMPT = """你是雅思备考教练。请根据学生�
 最近训练记录：
 {history_text}
 
-请输出格式：
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "summary": "总体评价内容",
+  "priority_areas": ["领域1", "领域2"],
+  "suggestions": [
+    {{
+      "area": "领域名称",
+      "current_issue": "当前问题描述",
+      "action": "具体行动建议",
+      "weekly_goal": "每周目标",
+      "estimated_improvement": "预计提升幅度"
+    }}
+  ],
+  "study_tips": ["技巧1", "技巧2"],
+  "motivation": "鼓励语"
+}}
 
-# 重点提升建议
-
-## 总体评价
-评价内容
-
-## 优先提升领域
-- 领域1
-- 领域2
-
-## 具体建议
-
-### 1. 领域名称
-**当前问题：** 问题描述
-**行动建议：** 具体行动建议
-**每周目标：** 每周目标
-**预计提升：** 预计提升幅度
-
-### 2. 领域名称
-（同上重复）
-
-## 学习技巧
-- 技巧1
-- 技巧2
-
-## 鼓励语
-鼓励内容
-
-{output_rules}"""
+要求：
+- priority_areas 和 study_tips 必须是数组
+- suggestions 中每个对象必须包含 area、current_issue、action、weekly_goal、estimated_improvement 字段
+- 只输出 JSON"""
 
 # ============================================================
 # 作文思路互动（旧版 app_web.py mode="writing_ideas"）
@@ -632,7 +656,7 @@ WORD_EXPLANATION_PROMPT_FULL = """请解释雅思学习中这个英文词/短语
 # ============================================================
 # 生成学习计划
 # ============================================================
-STUDY_PLAN_PROMPT = f"""你是雅思备考教练。请根据以下学生信息，生成一份个性化学习计划。
+STUDY_PLAN_PROMPT = """你是雅思备考教练。请根据以下学生信息，生成一份个性化学习计划。
 
 学生情况：
 - 当前综合水平：{{current_level}}
@@ -644,31 +668,25 @@ STUDY_PLAN_PROMPT = f"""你是雅思备考教练。请根据以下学生信息�
 最近训练记录：
 {{history_text}}
 
-请按以下格式输出（Markdown 格式，禁止使用 ```json 或 ``` 代码块）：
+请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
+{{
+  "title": "学习计划",
+  "overall_assessment": "总体评价内容",
+  "priority_areas": ["优先提升领域1", "优先提升领域2"],
+  "weekly_schedule": [
+    {{
+      "week": 1,
+      "theme": "本周主题",
+      "focus": "本周重点",
+      "tasks": ["具体任务1", "具体任务2", "具体任务3"],
+      "goal": "本周目标"
+    }}
+  ],
+  "study_tips": ["学习建议1", "学习建议2"],
+  "milestones": ["阶段性检查点1", "阶段性检查点2"]
+}}
 
-# 学习计划
-
-## 总体评价
-评价内容
-
-## 优先提升领域
-- 领域1
-- 领域2
-
-## 每周安排
-
-### 第 1 周：[主题]
-**重点：** 重点内容
-**具体任务：**
-- 任务1
-- 任务2
-- 任务3
-**本周目标：** 目标描述
-
-（第 2 周、第 3 周……按实际周数依次列出）
-
-## 学习建议
-- 建议1
-- 建议2
-
-{OUTPUT_RULES}"""
+要求：
+- weekly_schedule 必须按实际学习周期列出，从第 1 周到第 {{weeks}} 周
+- priority_areas、tasks、study_tips、milestones 必须是数组
+- 只输出 JSON"""

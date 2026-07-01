@@ -172,7 +172,7 @@
 
       {% if result %}
       <section class="panel result-panel">
-        <div class="panel-heading"><div><p class="eyebrow">Result</p><h2>{{ '生成题目' if mode == 'generate_topic' else ('思路建议' if mode == 'ideas' else ('参考范文' if mode == 'generate_model_answer' else '批改结果')) }}</h2></div></div>
+        <div class="panel-heading"><div><p class="eyebrow">Result</p><h2>{{ '生成题目' if mode == 'generate_topic' else ('思路建议' if mode == 'ideas' else '批改结果') }}</h2></div></div>
         <div class="result-stack ai-output">
           {% if result_data and mode == 'generate_topic' %}
             {% set target_task = result_data.task_type if result_data.task_type else 'Task 2' %}
@@ -221,49 +221,44 @@
                     <input type="hidden" name="mode" value="generate_model_answer">
                     <input type="hidden" name="topic" value="{{ result_data.question }}">
                     <input type="hidden" name="task_type" value="{{ target_task }}">
-                    <input type="hidden" name="topic_context" value="{{ result_data | tojson | forceescape }}">
                     <button class="ghost-btn small" type="submit">✨ 确认生成参考范文</button>
                   </form>
                 </div>
               </div>
             </details>
-          {% elif mode == 'generate_model_answer' %}
-            {% if result_data %}
-              <details class="result-accordion" open>
-                <summary>📌 题目与数据</summary>
-                <div class="result-body">
-                  {% set answer_task = result_data.task_type if result_data.task_type else 'Task 2' %}
-                  {% if answer_task == 'Task 1' %}
-                    {% if result_data.chart_type %}<p><strong>图表类型：</strong>{{ result_data.chart_type }}</p>{% endif %}
-                    {% if result_data.chart_image %}
-                      <div style="margin-top:12px">
-                        <img src="/{{ result_data.chart_image }}" alt="Task 1 chart" style="max-width:100%;border:1px solid var(--line);border-radius:12px;background:white">
-                      </div>
-                    {% endif %}
-                    {% if result_data.table_data %}
-                      <div style="margin-top:12px;overflow-x:auto">
-                        <table class="data-table" style="width:100%">
-                          <thead><tr>{% for h in result_data.table_data.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
-                          <tbody>{% for row in result_data.table_data.rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
-                        </table>
-                      </div>
-                    {% endif %}
-                    {% if result_data.chart_data %}
-                      <details class="result-accordion"><summary>📋 表格数据</summary><div class="result-body"><table class="data-table"><thead><tr><th>项目</th><th>数值</th></tr></thead><tbody>{% for row in result_data.chart_data %}<tr><td>{{ row.label }}</td><td>{{ row.value }}</td></tr>{% endfor %}</tbody></table></div></details>
-                    {% endif %}
-                  {% else %}
-                    {% if result_data.topic_category %}<p><strong>话题类别：</strong>{{ result_data.topic_category }}</p>{% endif %}
-                    {% if result_data.essay_type %}<p><strong>作文类型：</strong>{{ result_data.essay_type }}</p>{% endif %}
-                  {% endif %}
-                  <p style="font-size:1.05rem;line-height:1.7;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e5e7eb"><strong>题目：</strong>{{ result_data.question or result_data.topic }}</p>
-                </div>
-              </details>
-            {% endif %}
+          {% elif result_data and mode == 'generate_model_answer' %}
             <details class="result-accordion" open><summary>✨ 参考范文</summary><div class="result-body">{{ result | simple_md }}</div></details>
           {% elif result_data and mode == 'task1' %}
-            {{ result_data | record_result('写作 Task 1 批改') }}
+            <details class="result-accordion" open><summary>总分与整体评价</summary><div class="result-body"><p><strong>总分：</strong>{{ result_data.overall_score }}</p><p>{{ result_data.band_description }}</p></div></details>
+            {% for key, label in [('task_achievement','任务完成度'),('coherence_cohesion','连贯与衔接'),('lexical_resource','词汇资源'),('grammatical_range','语法多样性与准确性'),('grammatical_range_accuracy','语法多样性与准确性')] %}
+              {% if result_data[key] %}
+                <details class="result-accordion"><summary>{{ label }} · {{ result_data[key].score }}</summary><div class="result-body"><p>{{ result_data[key].comments or result_data[key].assessment or result_data[key].grammar_analysis }}</p></div></details>
+              {% endif %}
+            {% endfor %}
+            {% if result_data.strengths %}<details class="result-accordion"><summary>优点</summary><div class="result-body"><ul>{% for item in result_data.strengths %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.improvements %}<details class="result-accordion"><summary>改进建议</summary><div class="result-body"><ul>{% for item in result_data.improvements %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.suggested_corrections %}<details class="result-accordion"><summary>修改建议</summary><div class="result-body"><p>{{ result_data.suggested_corrections }}</p></div></details>{% endif %}
+            {% if result_data.model_answer %}<details class="result-accordion"><summary>参考范文</summary><div class="result-body">{{ result_data.model_answer | simple_md }}</div></details>{% endif %}
           {% elif result_data and mode == 'task2' %}
-            {{ result_data | record_result('写作 Task 2 批改') }}
+            <details class="result-accordion" open><summary>总分与整体评价</summary><div class="result-body"><p><strong>总分：</strong>{{ result_data.overall_score }}</p><p>{{ result_data.band_description }}</p></div></details>
+            {% for key, label in [('task_response','任务回应'),('coherence_cohesion','连贯与衔接'),('lexical_resource','词汇资源'),('grammatical_range','语法多样性与准确性'),('grammatical_range_accuracy','语法多样性与准确性')] %}
+              {% if result_data[key] %}
+                <details class="result-accordion">
+                  <summary>{{ label }} · {{ result_data[key].score }}</summary>
+                  <div class="result-body">
+                    <ul>
+                      {% for sub_key, value in result_data[key].items() %}
+                        {% if sub_key != 'score' %}<li><strong>{{ sub_key }}：</strong>{{ value | simple_md if value is string else value }}</li>{% endif %}
+                      {% endfor %}
+                    </ul>
+                  </div>
+                </details>
+              {% endif %}
+            {% endfor %}
+            {% if result_data.strengths %}<details class="result-accordion"><summary>优点</summary><div class="result-body"><ul>{% for item in result_data.strengths %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.improvements %}<details class="result-accordion"><summary>改进建议</summary><div class="result-body"><ul>{% for item in result_data.improvements %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.suggested_corrections %}<details class="result-accordion"><summary>修改建议</summary><div class="result-body"><p>{{ result_data.suggested_corrections | simple_md if result_data.suggested_corrections is string else result_data.suggested_corrections }}</p></div></details>{% endif %}
+            {% if result_data.corrected_essay %}<details class="result-accordion"><summary>修正后作文</summary><div class="result-body">{{ result_data.corrected_essay | simple_md }}</div></details>{% endif %}
           {% else %}
             {% if mode == 'ideas' and (ideas_topic or ideas_question) %}
             <details class="result-accordion" open><summary>你的作文题目</summary><div class="result-body">
@@ -281,7 +276,7 @@
       {% endif %}
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701e') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
 </body>
 </html>

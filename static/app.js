@@ -42,26 +42,44 @@ document.addEventListener("DOMContentLoaded", () => {
     if (active) syncResults(active.dataset.tabTarget);
   });
 
-  document.querySelectorAll("[data-speak]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const text = button.dataset.speak || "";
-      if (!text) return;
-      if (!window.speechSynthesis) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text.replace(/\s+/g, " ").trim());
+  function speakTextValue(text) {
+    if (!text || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/\s+/g, " ").trim();
+    const maxChunkLength = 180;
+    const chunks = cleanText.match(new RegExp(`.{1,${maxChunkLength}}(\\s|$)`, "g")) || [cleanText];
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find((v) =>
+      /Microsoft Jenny|Microsoft Aria|Google US|Samantha|Alex|Daniel|Karen|Tingting/i.test(v.name)
+    ) || voices.find((v) => /^en[-_](US|GB|AU)/i.test(v.lang));
+    const speakChunk = (index) => {
+      if (index >= chunks.length) return;
+      const utterance = new SpeechSynthesisUtterance(chunks[index].trim());
       utterance.lang = "en-US";
       utterance.rate = 0.78;
       utterance.pitch = 1;
       utterance.volume = 1;
-      const voices = window.speechSynthesis.getVoices();
-      const preferred = voices.find((v) =>
-        /Microsoft Jenny|Microsoft Aria|Google US|Samantha|Alex|Daniel|Karen|Tingting/i.test(v.name)
-      ) || voices.find((v) => /^en[-_](US|GB|AU)/i.test(v.lang));
       if (preferred) utterance.voice = preferred;
-      setTimeout(() => window.speechSynthesis.speak(utterance), 80);
-    });
+      utterance.onend = () => speakChunk(index + 1);
+      window.speechSynthesis.speak(utterance);
+    };
+    speakChunk(0);
+  }
+
+  window.speakText = speakTextValue;
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest(".speak-btn");
+    if (!button) return;
+    const directText = button.dataset.speak || "";
+    const nearest = button.closest(".result-body, .cue-card-body, details, summary");
+    const source = (nearest ? nearest.querySelector(".speak-source") : null) ||
+      (button.closest("details") ? button.closest("details").querySelector(".speak-source") : null);
+    const text = directText || (source ? source.textContent : "");
+    if (!text) return;
+    event.preventDefault();
+    event.stopPropagation();
+    speakTextValue(text);
   });
 });
 

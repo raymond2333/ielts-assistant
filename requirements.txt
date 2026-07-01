@@ -12,3 +12,4 @@ matplotlib
 seaborn
 graphviz
 waitress
+faster-whisper

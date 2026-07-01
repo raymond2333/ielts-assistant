@@ -177,7 +177,7 @@ class TongyiIELTSAssistant:
     # 口语串题
     # ============================================================
     def link_speaking_themes(self, topics, main_theme, target_score):
-        prompt = THEME_LINKING_PROMPT.format(topics=", ".join(topics), main_theme=main_theme, target_score=target_score)
+        prompt = THEME_LINKING_PROMPT.format(topics=", ".join(topics), main_theme=main_theme)
         return self.llm.invoke(prompt).content
 
     def expand_topic(self, topic, expansion_type):

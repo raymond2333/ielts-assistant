@@ -11,7 +11,7 @@
 ### Flask 新版（推荐）
 - **学习总览**：展示综合水平、目标分数、四项水平、最近学习记录。
 - **用户设置**：独立的设置页面，管理个人信息、学习目标、四项水平和各模型 API Key。
-- **口语练习**：Part 1/2/3 题目生成，支持 AI 反馈批改（评分 + 分项评价 + 改进建议）、中文思路转英文答案、语音朗读、语音输入和录音评分。
+- **口语练习**：Part 1/2/3 题目生成，支持 AI 反馈批改（评分 + 分项评价 + 改进建议）、中文思路转英文答案、语音朗读、语音输入、本地录音转文字和录音评分。
 - **口语串题**：多话题统一主题串联，中英文双语输出。
 - **作文批改**：Task 1/2 批改，随机生成作文题目（含图表图片），思路互动，一键填充到练习区。
 - **学习分析**：记录总览 + AI 个性化学习计划（基于训练历史）。
@@ -110,6 +110,20 @@ export OPENAI_API_KEY=your_openai_api_key
 ```
 
 也可以参考 `.env.example` 创建自己的环境变量配置。
+
+### 本地语音转文字
+
+Flask Beta 版录音上传会优先使用服务器本地 `faster-whisper` 将录音转成文字，再把文字提交给当前选择的文本模型评分。因此即使用户主要使用 DeepSeek，也可以通过“本地转文字 → DeepSeek 评分”的方式完成口语评分。
+
+```bash
+export LOCAL_TRANSCRIBE_ENABLED=true
+export LOCAL_TRANSCRIBE_MODEL=base
+export LOCAL_TRANSCRIBE_DEVICE=auto
+export LOCAL_TRANSCRIBE_COMPUTE_TYPE=int8
+export LOCAL_TRANSCRIBE_LANGUAGE=en
+```
+
+如果服务器未安装本地语音识别组件，系统会尝试使用已保存的 OpenAI API Key 进行音频转写；如果既没有本地转写，也没有支持语音识别的 API，则只能先在本地或浏览器中把录音转为文字，再上传文字进行评分。
 
 ### MySQL 配置
 
@@ -449,7 +463,7 @@ streamlit run main.py --server.port 8502
 
 ### 语音功能在哪个版本使用？
 
-语音朗读、语音输入和录音评分现在是 Flask Beta 版独有功能。Streamlit 稳定版只保留文本输入、AI 批改、题目生成和学习记录回看。
+语音朗读、语音输入、本地录音转文字和录音评分现在是 Flask Beta 版独有功能。Streamlit 稳定版只保留文本输入、AI 批改、题目生成和学习记录回看。录音评分会优先本地转文字，再把文字提交给当前模型；若未启用本地转写且当前 API 不支持语音识别，需要先转成文字后再上传。
 
 ### 学习计划可以重新生成吗？
 

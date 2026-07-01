@@ -150,16 +150,6 @@
           <div class="metric-card compact"><span>阅读</span><strong>{{ '%.1f' | format(profile.reading_level) }}</strong></div>
           <div class="metric-card compact"><span>写作</span><strong>{{ '%.1f' | format(profile.writing_level) }}</strong></div>
         </div>
-        <div class="tracking-note">
-          <strong>动态追踪：</strong>
-          口语和写作会根据最近 {{ level_tracking.recent_limit or 5 }} 次有分数的练习自动更新；听力和阅读仍使用用户中心里的手动设置。
-          {% if level_tracking.speaking_scores %}
-            <span>口语最近分数：{% for score in level_tracking.speaking_scores %}<b>{{ '%.1f'|format(score) }}</b>{% if not loop.last %}, {% endif %}{% endfor %}</span>
-          {% endif %}
-          {% if level_tracking.writing_scores %}
-            <span>写作最近分数：{% for score in level_tracking.writing_scores %}<b>{{ '%.1f'|format(score) }}</b>{% if not loop.last %}, {% endif %}{% endfor %}</span>
-          {% endif %}
-        </div>
       </section>
 
       <section class="panel">
@@ -175,74 +165,36 @@
           {% endif %}
         </div>
         {% if suggestions %}
-          <details class="result-accordion">
-            <summary>查看已生成的重点提升建议</summary>
-            <div class="result-body">
-          {% if suggestions.get('formatted_text') %}
-            {{ suggestions.formatted_text | simple_md }}
-          {% else %}
-          {% if suggestions.get('summary') %}<details class="result-accordion" open><summary>总体建议</summary><div class="result-body"><p><strong>{{ suggestions.get('summary', '') }}</strong></p></div></details>{% endif %}
+          <p><strong>{{ suggestions.get('summary', '') }}</strong></p>
           {% if suggestions.get('priority_areas') %}
-          <details class="result-accordion"><summary>优先提升领域</summary><div class="result-body"><p class="tag-row">
+          <p class="tag-row">
             {% for area in suggestions.priority_areas %}<span class="tag tag-accent">{{ area }}</span>{% endfor %}
-          </p></div></details>
+          </p>
           {% endif %}
           {% if suggestions.get('suggestions') %}
-          <details class="result-accordion" open><summary>分项提升建议</summary><div class="result-body">
           {% for s in suggestions.suggestions %}
-          <details class="result-accordion nested-answer">
-            <summary>{{ s.get('area', '') }}</summary>
-            <div class="result-body">
+          <div class="theme-card">
+            <h3>{{ s.get('area', '') }}</h3>
             <p class="record-meta"><strong>当前问题：</strong>{{ s.get('current_issue', '') }}</p>
             <p class="record-meta"><strong>行动建议：</strong>{{ s.get('action', '') }}</p>
             <p class="record-meta"><strong>每周目标：</strong>{{ s.get('weekly_goal', '') }}</p>
             <p class="record-meta"><strong>预计提升：</strong>{{ s.get('estimated_improvement', '') }}</p>
-            </div>
-          </details>
+          </div>
           {% endfor %}
-          </div></details>
           {% endif %}
           {% if suggestions.get('study_tips') %}
-          <details class="result-accordion"><summary>学习技巧</summary><div class="result-body"><p class="tag-row">
+          <p class="tag-row"><strong>学习技巧：</strong>
             {% for tip in suggestions.study_tips %}<span class="tag">{{ tip }}</span>{% endfor %}
-          </p></div></details>
+          </p>
           {% endif %}
           {% if suggestions.get('motivation') %}
           <p class="record-meta" style="color:var(--accent);font-weight:800;text-align:center;font-size:1.05rem">{{ suggestions.motivation }}</p>
           {% endif %}
-          {% endif %}
-            </div>
-          </details>
           <form method="post" action="{{ url_for('generate_suggestions') }}" style="margin-top:12px">
             <button class="ghost-btn" type="submit">重新生成</button>
           </form>
         {% else %}
           <p class="empty-text">点击上方按钮，AI 会根据你的训练记录和弱项生成个性化提升建议。</p>
-        {% endif %}
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">Study Plan</p>
-            <h2>个性化学习计划</h2>
-          </div>
-          {% if not study_plan %}
-          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin:0">
-            <button class="primary-btn" type="submit">生成详细学习计划</button>
-          </form>
-          {% endif %}
-        </div>
-        {% if study_plan %}
-          <details class="result-accordion">
-            <summary>查看已生成的学习计划</summary>
-            <div class="result-body">{{ study_plan | study_plan_result }}</div>
-          </details>
-          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px">
-            <button class="ghost-btn" type="submit">重新生成</button>
-          </form>
-        {% else %}
-          <p class="empty-text">生成后会自动保存；之后每次打开页面都会显示最新一次计划，直到你重新生成。</p>
         {% endif %}
       </section>
 
@@ -262,12 +214,12 @@
           <div class="timeline">
             {% for item in progress %}
               <details class="timeline-item">
-                <summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp | beijing_time }}</span></summary>
+                <summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp }}</span></summary>
                 <div class="result-body">
                   <p class="record-meta"><strong>记录ID：</strong>{{ item.id }}</p>
                   <a class="primary-btn small" href="{{ url_for('replay', id=item.id) }}" style="margin-bottom:10px;display:inline-block">🔄 重新练习此题</a>
                   <form method="post" action="{{ url_for('delete_record', record_id=item.id) }}" style="display:inline-block;margin-left:8px" onsubmit="return confirm('确定删除这条练习记录吗？')">
-                    <input type="hidden" name="next" value="{{ url_for('dashboard', date=date_filter, page=page, _anchor='history') }}">
+                    <input type="hidden" name="next" value="{{ url_for('dashboard', date=date_filter, _anchor='history') }}">
                     <button class="ghost-btn small" type="submit" style="color:var(--danger)">删除记录</button>
                   </form>
                   {% if item.data.mode %}<p class="record-meta"><strong>模式：</strong>{{ item.data.mode }}</p>{% endif %}
@@ -280,7 +232,7 @@
                   {% if item.data.topic %}<p class="record-meta"><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
                   {% if item.data.question %}<p class="record-meta"><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
                   {% if item.data.user_response %}<p class="record-meta"><strong>你的回答：</strong>{{ item.data.user_response[:200] }}{% if item.data.user_response|length > 200 %}...{% endif %}</p>{% endif %}
-                  {% if item.data.essay_content %}<div class="record-meta"><strong>作文内容：</strong><div style="white-space:pre-wrap;margin-top:6px">{{ item.data.essay_content }}</div></div>{% endif %}
+                  {% if item.data.essay_content %}<p class="record-meta"><strong>作文内容（前300字）：</strong>{{ item.data.essay_content[:300] }}{% if item.data.essay_content|length > 300 %}...{% endif %}</p>{% endif %}
                   {% if item.data.chinese_answer %}<p class="record-meta"><strong>中文思路：</strong>{{ item.data.chinese_answer }}</p>{% endif %}
                   {% if item.data.keywords %}<p class="record-meta"><strong>关键词：</strong>{{ item.data.keywords }}</p>{% endif %}
                   {% if item.data.score %}<p class="record-meta"><strong>得分：</strong>{{ item.data.score }}</p>{% endif %}
@@ -294,24 +246,13 @@
                       <button class="ghost-btn small del-recording-btn" data-timestamp="{{ item.timestamp }}" style="margin-left:8px;color:var(--danger)">删除录音</button>
                     </p>
                   {% endif %}
-                  {% if item.data.transcript %}
-                    <details class="result-accordion" open><summary>我的本次回答</summary><div class="result-body"><p>{{ item.data.transcript }}</p></div></details>
-                  {% endif %}
-                  {% if item.data.feedback and not item.data.result_data %}<p class="record-meta"><strong>反馈：</strong>{{ item.data.feedback }}</p>{% endif %}
+                  {% if item.data.transcript %}<p class="record-meta"><strong>转写内容：</strong>{{ item.data.transcript[:300] }}</p>{% endif %}
+                  {% if item.data.feedback %}<p class="record-meta"><strong>反馈：</strong>{{ item.data.feedback }}</p>{% endif %}
                   {% if item.data.result_data %}
                     <details class="result-accordion">
                       <summary>{{ item.activity | record_title }}</summary>
                       <div class="result-body">{{ item.data.result_data | record_result(item.activity) }}</div>
                     </details>
-                    {% if item.data.mode == 'generate_topic' and item.data.result_data.question %}
-                      <form method="post" action="{{ url_for('writing') }}" style="margin-top:10px">
-                        <input type="hidden" name="mode" value="generate_model_answer">
-                        <input type="hidden" name="topic" value="{{ item.data.result_data.question }}">
-                        <input type="hidden" name="task_type" value="{{ item.data.result_data.task_type or item.data.task_type or 'Task 2' }}">
-                        <input type="hidden" name="topic_context" value="{{ item.data.result_data | tojson | forceescape }}">
-                        <button class="ghost-btn small" type="submit">✨ 生成参考范文</button>
-                      </form>
-                    {% endif %}
                   {% elif item.data.result %}
                     <details class="result-accordion">
                       <summary>{{ item.activity | record_title }}</summary>
@@ -322,21 +263,12 @@
               </details>
             {% endfor %}
           </div>
-          <div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap">
-            {% if page > 1 %}
-              <a class="ghost-btn small" href="{{ url_for('dashboard', date=date_filter, page=page-1, _anchor='history') }}">上一页</a>
-            {% endif %}
-            <span class="record-meta">第 {{ page }} / {{ total_pages }} 页 · 共 {{ total_records }} 条</span>
-            {% if page < total_pages %}
-              <a class="ghost-btn small" href="{{ url_for('dashboard', date=date_filter, page=page+1, _anchor='history') }}">下一页</a>
-            {% endif %}
-          </div>
         {% else %}
           <p class="empty-text">暂无学习记录。完成口语反馈、作文批改或题目练习后会显示在这里。</p>
         {% endif %}
       </section>
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701e') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

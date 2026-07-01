@@ -22,63 +22,28 @@
       <section class="metric-grid">
         <div class="metric-card"><span>综合水平</span><strong>{{ '%.1f'|format(profile.current_level) }}</strong></div>
         <div class="metric-card"><span>目标分数</span><strong>{{ '%.1f'|format(profile.target_score) }}</strong></div>
-        <div class="metric-card"><span>学习记录</span><strong>{{ total_records }}</strong></div>
+        <div class="metric-card"><span>学习记录</span><strong>{{ progress|length }}</strong></div>
         <div class="metric-card"><span>生词本</span><strong>{{ user_words|length }}</strong></div>
       </section>
-      <section class="panel">
-        <div class="panel-heading">
-          <div><p class="eyebrow">Study Plan</p><h2>个性化学习计划</h2></div>
-          {% if not study_plan %}
-          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin:0"><button class="primary-btn" type="submit">生成详细学习计划</button></form>
-          {% endif %}
-        </div>
-        {% if study_plan %}
-          <details class="result-accordion">
-            <summary>查看已生成的学习计划</summary>
-            <div class="result-body">{{ study_plan | study_plan_result }}</div>
-          </details>
-          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px"><button class="ghost-btn" type="submit">重新生成</button></form>
-        {% else %}
-          <p class="empty-text">生成后会自动保存；之后每次打开页面都会显示最新一次计划，直到你重新生成。</p>
-        {% endif %}
-      </section>
-      <section class="panel"><h2>最近学习记录</h2>{% if progress %}<div class="timeline">{% for item in progress %}<details class="timeline-item detail-record"><summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp | beijing_time }}</span></summary><div class="result-body">
+      <section class="panel"><h2>最近学习记录</h2>{% if progress %}<div class="timeline">{% for item in progress %}<details class="timeline-item detail-record"><summary><strong>{{ item.activity }}</strong><span>{{ item.timestamp }}</span></summary><div class="result-body">
         <p><strong>记录ID：</strong>{{ item.id }}</p>
         <a class="primary-btn small" href="{{ url_for('replay', id=item.id) }}" style="margin-bottom:10px;display:inline-block">重新练习此题</a>
-        <form method="post" action="{{ url_for('delete_record', record_id=item.id) }}" style="display:inline-block;margin-left:8px" onsubmit="return confirm('确定删除这条练习记录吗？')"><input type="hidden" name="next" value="{{ url_for('analysis', page=page) }}"><button class="ghost-btn small" type="submit" style="color:var(--danger)">删除记录</button></form>
+        <form method="post" action="{{ url_for('delete_record', record_id=item.id) }}" style="display:inline-block;margin-left:8px" onsubmit="return confirm('确定删除这条练习记录吗？')"><input type="hidden" name="next" value="{{ url_for('analysis') }}"><button class="ghost-btn small" type="submit" style="color:var(--danger)">删除记录</button></form>
         {% if item.data.mode %}<p><strong>模式：</strong>{{ item.data.mode }}</p>{% endif %}
         {% if item.data.topic %}<p><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
         {% if item.data.question %}<p><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
-        {% if item.data.audio_file %}
-          <p><strong>录音回放：</strong></p>
-          <audio controls preload="none" style="width:100%;max-width:360px">
-            <source src="/{{ item.data.audio_file }}" type="{{ 'audio/webm' if item.data.audio_file.endswith('.webm') else 'audio/mp4' }}">
-          </audio>
-        {% endif %}
-        {% if item.data.transcript %}
-          <details class="result-accordion" open><summary>我的本次回答</summary><div class="result-body"><p>{{ item.data.transcript }}</p></div></details>
-        {% endif %}
-        {% if item.data.essay_content %}<div><strong>作文内容：</strong><div style="white-space:pre-wrap;margin-top:6px">{{ item.data.essay_content }}</div></div>{% endif %}
+        {% if item.data.essay_content %}<p><strong>作文内容（前300字）：</strong>{{ item.data.essay_content[:300] }}</p>{% endif %}
         {% if item.data.chinese_answer %}<p><strong>中文思路：</strong>{{ item.data.chinese_answer }}</p>{% endif %}
         {% if item.data.score %}<p><strong>得分：</strong>{{ item.data.score }}</p>{% endif %}
         {% if item.data.result_data %}
           <details class="result-accordion" open><summary>{{ item.activity | record_title }}</summary><div class="result-body">{{ item.data.result_data | record_result(item.activity) }}</div></details>
-          {% if item.data.mode == 'generate_topic' and item.data.result_data.question %}
-            <form method="post" action="{{ url_for('writing') }}" style="margin-top:10px">
-              <input type="hidden" name="mode" value="generate_model_answer">
-              <input type="hidden" name="topic" value="{{ item.data.result_data.question }}">
-              <input type="hidden" name="task_type" value="{{ item.data.result_data.task_type or item.data.task_type or 'Task 2' }}">
-              <input type="hidden" name="topic_context" value="{{ item.data.result_data | tojson | forceescape }}">
-              <button class="ghost-btn small" type="submit">✨ 生成参考范文</button>
-            </form>
-          {% endif %}
         {% elif item.data.result %}
           <details class="result-accordion" open><summary>{{ item.activity | record_title }}</summary><div class="result-body">{{ item.data.result | simple_md }}</div></details>
         {% endif %}
-      </div></details>{% endfor %}</div><div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap">{% if page > 1 %}<a class="ghost-btn small" href="{{ url_for('analysis', page=page-1) }}">上一页</a>{% endif %}<span class="record-meta">第 {{ page }} / {{ total_pages }} 页 · 共 {{ total_records }} 条</span>{% if page < total_pages %}<a class="ghost-btn small" href="{{ url_for('analysis', page=page+1) }}">下一页</a>{% endif %}</div>{% else %}<p class="empty-text">暂无学习记录。</p>{% endif %}</section>
+      </div></details>{% endfor %}</div>{% else %}<p class="empty-text">暂无学习记录。</p>{% endif %}</section>
       <section class="panel"><h2>生词本概览</h2>{% if user_words %}<div class="phrase-list">{% for item in user_words[:30] %}<span>{{ item.word }}</span>{% endfor %}</div>{% else %}<p class="empty-text">选中 AI 输出中的单词即可收藏到生词本。</p>{% endif %}</section>
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701e') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

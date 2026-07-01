@@ -547,6 +547,22 @@ nav a:hover {
   border-color: var(--line);
 }
 
+.tracking-note {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.tracking-note strong,
+.tracking-note b {
+  color: var(--ink);
+}
+
 .panel {
   border-radius: 22px;
   padding: 24px;
@@ -1060,6 +1076,13 @@ nav a:hover {
   border-radius: 8px;
   font-size: 0.9rem;
   animation: fadeIn 0.3s;
+}
+
+.voice-status {
+  display: none;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
 }
 
 @keyframes fadeIn {

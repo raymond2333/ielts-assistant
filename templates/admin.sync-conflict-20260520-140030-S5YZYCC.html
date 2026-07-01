@@ -149,7 +149,7 @@
           <div class="timeline">
             {% for item in records %}
               <details class="timeline-item">
-                <summary><strong>{{ item.activity }}</strong><span>{{ item.user_id }} · {{ item.timestamp | beijing_time }}</span></summary>
+                <summary><strong>{{ item.activity }}</strong><span>{{ item.user_id }} · {{ item.timestamp }}</span></summary>
                 <div class="result-body">
                   <p class="record-meta"><strong>记录ID：</strong>{{ item.id }}</p>
                   <p class="record-meta"><strong>用户：</strong>{{ item.user_id }}</p>
@@ -157,7 +157,7 @@
                   {% if item.data.topic %}<p class="record-meta"><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
                   {% if item.data.question %}<p class="record-meta"><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
                   {% if item.data.user_response %}<p class="record-meta"><strong>用户回答：</strong>{{ item.data.user_response[:240] }}{% if item.data.user_response|length > 240 %}...{% endif %}</p>{% endif %}
-                  {% if item.data.essay_content %}<div class="record-meta"><strong>作文内容：</strong><div style="white-space:pre-wrap;margin-top:6px">{{ item.data.essay_content }}</div></div>{% endif %}
+                  {% if item.data.essay_content %}<p class="record-meta"><strong>作文内容：</strong>{{ item.data.essay_content[:300] }}{% if item.data.essay_content|length > 300 %}...{% endif %}</p>{% endif %}
                   <form method="post" action="{{ url_for('delete_record', record_id=item.id) }}" onsubmit="return confirm('确定删除这条记录吗？')" style="margin:10px 0">
                     <input type="hidden" name="scope" value="admin">
                     <input type="hidden" name="next" value="{{ url_for('admin_panel', user_id=selected_user) }}">
@@ -178,6 +178,6 @@
       </section>
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701e') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
