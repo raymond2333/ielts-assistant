@@ -1663,7 +1663,7 @@ def _normalize_base_url(value):
 
 def _request_base_url():
     forwarded_proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
-    scheme = forwarded_proto or request.scheme or "http"
+    scheme = forwarded_proto or ("https" if request.is_secure else (request.scheme or "http"))
     host = request.headers.get("X-Forwarded-Host", "").split(",")[0].strip() or request.host
     return f"{scheme}://{host}".rstrip("/")
 
@@ -1697,7 +1697,11 @@ def _replace_url_port(base_url, port):
         netloc = f"{userinfo}@{netloc}"
     if port:
         netloc = f"{netloc}:{port}"
-    return urlunsplit((parts.scheme or "http", netloc, "", "", "")).rstrip("/")
+    scheme = parts.scheme or request.scheme or "http"
+    # Ensure the scheme matches the current request so HTTPS pages link to HTTPS
+    if request.is_secure:
+        scheme = "https"
+    return urlunsplit((scheme, netloc, "", "", "")).rstrip("/")
 
 
 def _legacy_streamlit_base_url():
