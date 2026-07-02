@@ -1175,16 +1175,14 @@ def _display_writing_feedback(feedback_data, task_type):
         try:
             overall_score = float(feedback_data["overall_score"])
             st.metric("总体分数", f"{overall_score:.1f}/9.0")
-
-            # 分数评估
-            if overall_score >= 7.0:
-                st.success("优秀！继续保持")
-            elif overall_score >= 6.0:
-                st.info("良好！有提升空间")
-            else:
-                st.warning("需要加强练习")
+            _display_writing_encouragement(overall_score)
         except (ValueError, TypeError):
             st.info("无法获取有效的总体分数")
+
+    essay_content = st.session_state.get("current_essay_content", "")
+    if essay_content:
+        with st.expander("我的作文原文", expanded=False):
+            st.write(essay_content)
 
     # 分数段描述
     if "band_description" in feedback_data:
@@ -1292,6 +1290,17 @@ def _normalize_ielts_score(value):
     except (TypeError, ValueError):
         return None
     return max(0.0, min(9.0, round(score * 2) / 2))
+
+
+def _display_writing_encouragement(score):
+    if score >= 7.5:
+        st.success("太棒了，这篇作文已经有高分范文的质感了！继续保持论证深度和语言准确度。")
+    elif score >= 6.5:
+        st.info("真棒，已经站上 6.5+ 的关键台阶了！下一步把观点展开和细节表达再打磨一下。")
+    elif score >= 5.5:
+        st.warning("不错，作文框架已经有基础了。接下来重点补强论证、衔接和句式准确性。")
+    else:
+        st.error("别急，这次批改很有价值。先把段落结构和核心观点写清楚，分数会慢慢上来。")
 
 
 def _writing_criteria_keys(task_type):

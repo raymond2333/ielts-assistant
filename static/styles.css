@@ -1215,6 +1215,16 @@ nav a:hover {
   border: 1px solid #fda4af;
 }
 
+.essay-original {
+  color: var(--text);
+  line-height: 1.75;
+  white-space: normal;
+}
+
+.essay-original p {
+  margin: 0;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }

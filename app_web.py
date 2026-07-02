@@ -168,6 +168,22 @@ def score_encouragement_html(score):
     return f"<div class='score-encouragement {label}'>{escape(text)}</div>"
 
 
+def writing_score_encouragement_html(score):
+    try:
+        score = float(score)
+    except (TypeError, ValueError):
+        return ""
+    if score >= 7.5:
+        label, text = "excellent", "太棒了，这篇作文已经有高分范文的质感了！继续保持论证深度和语言准确度。"
+    elif score >= 6.5:
+        label, text = "good", "真棒，已经站上 6.5+ 的关键台阶了！下一步把观点展开和细节表达再打磨一下。"
+    elif score >= 5.5:
+        label, text = "steady", "不错，作文框架已经有基础了。接下来重点补强论证、衔接和句式准确性。"
+    else:
+        label, text = "warm", "别急，这次批改很有价值。先把段落结构和核心观点写清楚，分数会慢慢上来。"
+    return f"<div class='score-encouragement {label}'>{escape(text)}</div>"
+
+
 def _audio_html(audio_file):
     if not audio_file:
         return ""
@@ -258,6 +274,34 @@ def record_result_filter(result_data, activity=""):
         return Markup(f"<pre>{escape(str(result_data or ''))}</pre>")
 
     sections = []
+    writing_criteria = [
+        "task_achievement",
+        "task_response",
+        "coherence_cohesion",
+        "lexical_resource",
+        "grammatical_range",
+        "grammatical_range_accuracy",
+    ]
+    is_writing_feedback = (
+        result_data.get("overall_score") is not None
+        and any(isinstance(result_data.get(key), dict) for key in writing_criteria)
+    )
+    if is_writing_feedback:
+        sections.append(writing_score_encouragement_html(result_data.get("overall_score")))
+        band_description = result_data.get("band_description")
+        band_html = f"<p>{escape(band_description)}</p>" if band_description else ""
+        sections.append(
+            "<details class='result-accordion' open><summary>总分与整体评价</summary>"
+            f"<div class='result-body'><p><strong>总分：</strong>{escape(result_data.get('overall_score'))} / 9.0</p>"
+            f"{band_html}</div></details>"
+        )
+        essay_content = result_data.get("_essay_content") or result_data.get("essay_content")
+        if essay_content:
+            essay_html = escape(essay_content).replace("\n", "<br>")
+            sections.append(
+                "<details class='result-accordion'><summary>我的作文原文</summary>"
+                f"<div class='result-body essay-original'><p>{essay_html}</p></div></details>"
+            )
 
     if result_data.get("overall_score") is not None and isinstance(result_data.get("breakdown"), dict):
         sections.append(score_encouragement_html(result_data.get("overall_score")))
@@ -621,6 +665,8 @@ def record_result_filter(result_data, activity=""):
     }
     for key, label in scalar_labels.items():
         value = result_data.get(key)
+        if is_writing_feedback and key in {"overall_score", "band_description"}:
+            continue
         if value:
             if key == "formatted_text":
                 value = str(value).replace("无法解析为JSON格式的响应:\n\n", "")
@@ -2404,11 +2450,15 @@ def speaking():
         if result is not None:
             if render_result is not None:
                 # Inline-result action (feedback / keyword / cn-answer).
-                # Store a compact replay hint so GET can load the exact feedback
-                # record — avoids cookie bloat and keeps scores in sync with the DB.
-                latest_feedback = get_latest_progress_by_activity(session["user_id"], "口语反馈")
-                if latest_feedback:
-                    session["_speaking_replay_id"] = latest_feedback.get("id", "")
+                # Keep the current question set plus the inline result for the
+                # redirect target; otherwise GET may load an unrelated old
+                # feedback record and the visible questions disappear.
+                session.pop("_speaking_replay_id", None)
+                session["speaking_result"] = render_result
+                session["speaking_result_data"] = (
+                    json.dumps(render_result_data, ensure_ascii=False)
+                    if render_result_data is not None else None
+                )
                 session["speaking_mode"] = render_mode or mode
                 return redirect(url_for("speaking", mode=render_mode or mode))
             session["speaking_result"] = result
@@ -2594,6 +2644,8 @@ def writing():
             result_data = parse_model_output(result)
             result_data = normalize_writing_scores(result_data, "Task 1")
             result_data = calibrate_reference_essay_scores(result_data, "Task 1", reference_note)
+            if isinstance(result_data, dict):
+                result_data["_essay_content"] = essay_content
             save_progress(session["user_id"], "写作 Task 1 批改", {
                 "mode": mode,
                 "task_type": task_type,
@@ -2619,6 +2671,8 @@ def writing():
             result_data = parse_model_output(result)
             result_data = normalize_writing_scores(result_data, "Task 2")
             result_data = calibrate_reference_essay_scores(result_data, "Task 2", reference_note)
+            if isinstance(result_data, dict):
+                result_data["_essay_content"] = essay_content
             save_progress(session["user_id"], "写作 Task 2 批改", {
                 "mode": mode,
                 "topic_category": topic_category,
