@@ -46,7 +46,7 @@
       speakBtn.type = "button";
       speakBtn.className = "voice-btn";
       speakBtn.title = "语音转文字（说英语）";
-      speakBtn.innerHTML = "🎤";
+      speakBtn.innerHTML = '<span class="svg-icon icon-transcribe"></span><small>转文字</small>';
       speakBtn.addEventListener("click", function (e) { e.preventDefault(); toggleSpeech(textarea, speakBtn); });
       btnBar.appendChild(speakBtn);
     }
@@ -56,7 +56,7 @@
       recBtn.type = "button";
       recBtn.className = "voice-btn rec-btn";
       recBtn.title = "录音：完成后点击“获取 AI 批改反馈”自动上传";
-      recBtn.innerHTML = "🎙️";
+      recBtn.innerHTML = '<span class="svg-icon icon-mic"></span><small>录音</small>';
       recBtn.addEventListener("click", function (e) { e.preventDefault(); toggleRecord(textarea, recBtn); });
       btnBar.appendChild(recBtn);
     }
@@ -91,7 +91,7 @@
     recognition.onstart = function () {
       listening = true;
       btn.classList.add("listening");
-      btn.innerHTML = "🔴";
+      btn.innerHTML = "<span>🔴</span><small>听写中</small>";
       btn.title = "正在听…点击停止";
       setVoiceStatus("正在听，说完后文字会自动出现在输入框。");
       clearTimeout(noResultTimer);
@@ -170,7 +170,7 @@
     var targetBtn = btn || activeSpeechBtn;
     if (targetBtn) {
       targetBtn.classList.remove("listening");
-      targetBtn.innerHTML = "🎤";
+      targetBtn.innerHTML = '<span class="svg-icon icon-transcribe"></span><small>转文字</small>';
       targetBtn.title = "语音转文字（说英语）";
     }
     try { recognition.abort(); } catch (e) {}
@@ -225,7 +225,7 @@
       };
       mediaRecorder.start();
       btn.classList.add("listening");
-      btn.innerHTML = "⏺️";
+      btn.innerHTML = '<span class="svg-icon icon-recording"></span><small>录音中</small>';
       btn.title = "录音中…点击停止";
       setRecordingState("active");
       updateRecordStatus();
@@ -243,7 +243,7 @@
       mediaRecorder.stop();
     }
     btn.classList.remove("listening");
-    btn.innerHTML = "🎙️";
+    btn.innerHTML = '<span class="svg-icon icon-mic"></span><small>重录</small>';
     btn.title = "重新录音";
     setRecordingState("preview");
     setVoiceStatus("录音已结束。请先试听，满意后再上传评分。");
@@ -307,7 +307,7 @@
   function uploadAudio(blob, btn) {
     uploading = true;
     if (btn) {
-      btn.innerHTML = "⏳";
+      btn.innerHTML = "<span>⏳</span><small>上传中</small>";
       btn.title = "正在上传录音并转文字...";
     }
     setRecordingState("uploading");
@@ -348,7 +348,7 @@
     .then(function (data) {
       uploading = false;
       btn.classList.remove("listening");
-      btn.innerHTML = "🎙️";
+      btn.innerHTML = '<span class="svg-icon icon-mic"></span><small>录音</small>';
       btn.title = "录音上传：先本地转文字，再提交评分";
       setRecordingState("");
       clearRecordingPreview(currentTarget);
@@ -378,7 +378,7 @@
     .catch(function (err) {
       uploading = false;
       btn.classList.remove("listening");
-      btn.innerHTML = "🎙️";
+      btn.innerHTML = '<span class="svg-icon icon-mic"></span><small>录音</small>';
       btn.title = "录音上传：先本地转文字，再提交评分";
       setRecordingState("");
       alert(err && err.message ? err.message : "上传失败，请稍后重试。");
@@ -418,7 +418,7 @@
 
   function updateRecordStatus() {
     if (!recordStartedAt) return;
-    setVoiceStatus("● 正在录音 " + formatDuration(Date.now() - recordStartedAt) + "，再次点击录音按钮结束。");
+    setVoiceStatus("● 正在录音 " + formatDuration(Date.now() - recordStartedAt) + "，再次点击红色录音按钮结束。");
   }
 
   function setRecordingState(state) {
@@ -511,7 +511,7 @@
       submitBtn.disabled = true;
     }
 
-    if (btn) { btn.innerHTML = '⏳'; btn.title = '正在上传录音并转写…'; }
+    if (btn) { btn.innerHTML = '<span>⏳</span><small>上传中</small>'; btn.title = '正在上传录音并转写…'; }
     setVoiceStatus('正在上传录音并转写（可能需要几秒到十几秒），请勿关闭页面…');
     setRecordingState('uploading');
 
@@ -560,7 +560,7 @@
       if (!ok) {
         uploading = false;
         interceptedForms.delete(form);
-        if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
+        if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<span class="svg-icon icon-mic"></span><small>录音</small>'; btn.title = '重新录音'; }
         setRecordingState('');
         if (submitBtn) { submitBtn.textContent = submitBtn._originalText || '获取 AI 批改反馈'; submitBtn.disabled = false; }
         alert(data.error || ('请求失败 ' + xhr.status));
@@ -568,7 +568,7 @@
       }
 
       uploading = false;
-      if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
+      if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<span class="svg-icon icon-mic"></span><small>录音</small>'; btn.title = '重新录音'; }
       setRecordingState('');
       clearRecordingPreview(textarea);
       setVoiceStatus(data.transcript ? '转写完成，评分结果已显示在下方。' : '评分完成，结果已显示在下方。');
@@ -590,7 +590,7 @@
       if (progressBar && progressBar.parentNode) progressBar.parentNode.removeChild(progressBar);
       uploading = false;
       interceptedForms.delete(form);
-      if (btn) { btn.classList.remove('listening'); btn.innerHTML = '🎙️'; btn.title = '重新录音'; }
+      if (btn) { btn.classList.remove('listening'); btn.innerHTML = '<span class="svg-icon icon-mic"></span><small>录音</small>'; btn.title = '重新录音'; }
       setRecordingState('');
       if (submitBtn) { submitBtn.textContent = submitBtn._originalText || '获取 AI 批改反馈'; submitBtn.disabled = false; }
       alert('录音上传失败，请检查网络后重试。');

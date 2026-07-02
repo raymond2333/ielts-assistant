@@ -196,6 +196,95 @@ def _audio_html(audio_file):
     )
 
 
+def _score_float(value):
+    try:
+        return max(0.0, min(9.0, float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def score_visual_html(overall_score, criteria):
+    overall = _score_float(overall_score)
+    valid_criteria = []
+    for label, score in criteria:
+        value = _score_float(score)
+        if value is not None:
+            valid_criteria.append((label, value))
+    if overall is None and not valid_criteria:
+        return ""
+    if overall is None and valid_criteria:
+        overall = round(sum(score for _, score in valid_criteria) / len(valid_criteria) * 2) / 2
+    percent = int(round((overall / 9) * 100)) if overall is not None else 0
+    if overall >= 7.5:
+        level = "高分表现"
+    elif overall >= 6.5:
+        level = "目标达成"
+    elif overall >= 5.5:
+        level = "稳步提升"
+    else:
+        level = "基础巩固"
+    bars = []
+    for label, score in valid_criteria:
+        bar_width = int(round((score / 9) * 100))
+        bars.append(
+            "<div class='score-bar-row'>"
+            f"<div class='score-bar-label'>{escape(label)}</div>"
+            "<div class='score-bar-track'>"
+            f"<span style='width:{bar_width}%'></span>"
+            "</div>"
+            f"<strong>{score:.1f}</strong>"
+            "</div>"
+        )
+    return (
+        "<div class='score-visual'>"
+        "<div class='score-ring' style='--score-pct:"
+        f"{percent}%;'><div><strong>{overall:.1f}</strong><span>/ 9.0</span></div></div>"
+        "<div class='score-visual-main'>"
+        f"<p class='eyebrow'>IELTS SCORE</p><h3>{escape(level)}</h3>"
+        f"<p>本次表现约达到 {overall:.1f} 分，下面是各评分维度的可视化拆解。</p>"
+        f"<div class='score-bars'>{''.join(bars)}</div>"
+        "</div></div>"
+    )
+
+
+def speaking_score_visual_html(result_data):
+    if not isinstance(result_data, dict):
+        return ""
+    breakdown = result_data.get("breakdown")
+    labels = {
+        "fluency_coherence": "流利度与连贯性",
+        "lexical_resource": "词汇资源",
+        "grammatical_range_accuracy": "语法范围与准确性",
+        "pronunciation": "发音",
+    }
+    criteria = []
+    if isinstance(breakdown, dict):
+        for key, label in labels.items():
+            item = breakdown.get(key)
+            if isinstance(item, dict):
+                criteria.append((label, item.get("score")))
+    return score_visual_html(result_data.get("overall_score"), criteria)
+
+
+def writing_score_visual_html(result_data):
+    if not isinstance(result_data, dict):
+        return ""
+    labels = {
+        "task_achievement": "任务完成度",
+        "task_response": "任务回应",
+        "coherence_cohesion": "连贯与衔接",
+        "lexical_resource": "词汇资源",
+        "grammatical_range": "语法多样性与准确性",
+        "grammatical_range_accuracy": "语法范围与准确性",
+    }
+    criteria = []
+    for key, label in labels.items():
+        item = result_data.get(key)
+        if isinstance(item, dict):
+            criteria.append((label, item.get("score")))
+    return score_visual_html(result_data.get("overall_score"), criteria)
+
+
 def _feedback_html(feedbacks):
     if not feedbacks:
         return ""
@@ -210,7 +299,10 @@ def _feedback_html(feedbacks):
             body.append(_audio_html(feedback.get("audio_file")))
         if feedback.get("user_response"):
             body.append(f"<p><strong>当时我的回答：</strong></p><p>{escape(feedback['user_response'])}</p>")
-        if data.get("overall_score") is not None:
+        visual = speaking_score_visual_html(data)
+        if visual:
+            body.append(visual)
+        elif data.get("overall_score") is not None:
             body.append(f"<p><strong>AI 评分：</strong>{escape(data['overall_score'])} / 9.0</p>")
         breakdown = data.get("breakdown")
         if isinstance(breakdown, dict):
@@ -288,6 +380,7 @@ def record_result_filter(result_data, activity=""):
     )
     if is_writing_feedback:
         sections.append(writing_score_encouragement_html(result_data.get("overall_score")))
+        sections.append(writing_score_visual_html(result_data))
         band_description = result_data.get("band_description")
         band_html = f"<p>{escape(band_description)}</p>" if band_description else ""
         sections.append(
@@ -305,6 +398,7 @@ def record_result_filter(result_data, activity=""):
 
     if result_data.get("overall_score") is not None and isinstance(result_data.get("breakdown"), dict):
         sections.append(score_encouragement_html(result_data.get("overall_score")))
+        sections.append(speaking_score_visual_html(result_data))
         sections.append(
             "<details class='result-accordion' open><summary>总体评分</summary>"
             f"<div class='result-body'><p><strong>总分：</strong>{escape(result_data.get('overall_score'))} / 9.0</p></div></details>"
@@ -465,7 +559,7 @@ def record_result_filter(result_data, activity=""):
         )
         if result_data.get("key_features"):
             meta.append(
-                "<details class='result-accordion'><summary>📊 关键特征</summary>"
+                "<details class='result-accordion'><summary><span class='svg-icon icon-analysis' aria-hidden='true'></span> 关键特征</summary>"
                 f"<div class='result-body'>{_html_list(result_data['key_features'])}</div></details>"
             )
         if result_data.get("chart_data"):
@@ -821,6 +915,21 @@ def int_query(name, default=1):
         return default
 
 
+
+_TYPE_FILTERS = {
+    "part1": lambda r: "Part 1" in r.get("display_title", ""),
+    "part2": lambda r: "Part 2" in r.get("display_title", ""),
+    "part3": lambda r: "Part 3" in r.get("display_title", ""),
+    "theme": lambda r: "串题" in r.get("display_title", ""),
+    "task1": lambda r: "Task 1" in r.get("display_title", ""),
+    "task2": lambda r: "Task 2" in r.get("display_title", ""),
+}
+
+
+def _matches_type_filter(record, type_filter):
+    fn = _TYPE_FILTERS.get(type_filter)
+    return fn(record) if fn else True
+
 def paginate_records(records, page, per_page=10):
     total = len(records)
     total_pages = max(1, (total + per_page - 1) // per_page)
@@ -1129,7 +1238,179 @@ def visible_progress(records):
         record for record in records
         if record.get("activity") not in {STUDY_PLAN_ACTIVITY, IMPROVEMENT_SUGGESTIONS_ACTIVITY}
         and not is_speaking_feedback_record(record)
+        and not is_inline_generation_record(record)
     ]
+
+
+INLINE_GENERATION_ACTIVITIES = {
+    "生成参考范文",
+    "关键词生成答案",
+    "中文思路生成英文口语答案",
+}
+
+
+def is_inline_generation_record(record):
+    return record.get("activity") in INLINE_GENERATION_ACTIVITIES
+
+
+def _record_lookup_key(record):
+    data = record.get("data") if isinstance(record, dict) else {}
+    data = data if isinstance(data, dict) else {}
+    result_data = data.get("result_data")
+    candidates = [
+        data.get("question"),
+        data.get("topic"),
+        data.get("original_question"),
+        data.get("source_question"),
+    ]
+    if isinstance(result_data, dict):
+        candidates.extend([
+            result_data.get("question"),
+            result_data.get("topic"),
+            result_data.get("cue_card"),
+        ])
+    for candidate in candidates:
+        key = _normalized_question(str(candidate or ""))
+        if key:
+            return key
+    return ""
+
+
+def _record_display_meta(record):
+    activity = record.get("activity", "")
+    data = record.get("data") if isinstance(record, dict) else {}
+    data = data if isinstance(data, dict) else {}
+    mode = data.get("mode", "")
+    task_type = data.get("task_type", "")
+
+    if "Part 1" in activity or mode == "part1":
+        return {"icon": "speaking", "title": "口语 Part 1 训练", "badge": "Speaking"}
+    if "Part 2" in activity or mode == "part2":
+        return {"icon": "target", "title": "口语 Part 2 训练", "badge": "Cue Card"}
+    if "Part 3" in activity or mode == "part3":
+        return {"icon": "brain", "title": "口语 Part 3 训练", "badge": "Discussion"}
+    if "口语串题" in activity:
+        return {"icon": "theme", "title": "口语串题训练", "badge": "Theme"}
+    if "口语" in activity or mode in {"speaking_feedback", "speaking_recording"}:
+        return {"icon": "mic", "title": "口语训练", "badge": "Speaking"}
+    if "Task 1" in activity or task_type == "Task 1" or mode == "task1":
+        return {"icon": "chart", "title": "写作 Task 1 训练", "badge": "Writing"}
+    if "Task 2" in activity or task_type == "Task 2" or mode == "task2":
+        return {"icon": "writing", "title": "写作 Task 2 训练", "badge": "Writing"}
+    if "作文" in activity or "写作" in activity:
+        return {"icon": "writing", "title": "写作训练", "badge": "Writing"}
+    if "背单词" in activity or "词" in activity:
+        return {"icon": "vocabulary", "title": "背单词训练", "badge": "Vocabulary"}
+    return {"icon": "practice", "title": "学习训练", "badge": "Practice"}
+
+
+def _result_question_count(result_data):
+    if not isinstance(result_data, dict):
+        return 0
+    if isinstance(result_data.get("questions"), list):
+        return len(result_data["questions"])
+    if isinstance(result_data.get("discussion_questions"), list):
+        return len(result_data["discussion_questions"])
+    if result_data.get("cue_card"):
+        return 1
+    if result_data.get("question"):
+        return 1
+    return 0
+
+
+def _feedback_score_values(feedbacks):
+    scores = []
+    for feedback in feedbacks or []:
+        result_data = feedback.get("result_data")
+        raw_score = (
+            result_data.get("overall_score")
+            if isinstance(result_data, dict)
+            else feedback.get("score")
+        )
+        score = normalize_ielts_score(raw_score)
+        if score is not None:
+            scores.append(score)
+    return scores
+
+
+def _record_progress_summary(record):
+    data = record.get("data") if isinstance(record, dict) else {}
+    data = data if isinstance(data, dict) else {}
+    result_data = data.get("result_data")
+    generated = _result_question_count(result_data)
+    practiced = 0
+    scores = []
+
+    if isinstance(result_data, dict):
+        if isinstance(result_data.get("questions"), list):
+            for item in result_data["questions"]:
+                if isinstance(item, dict) and item.get("_feedbacks"):
+                    practiced += 1
+                    scores.extend(_feedback_score_values(item.get("_feedbacks")))
+        if isinstance(result_data.get("discussion_questions"), list):
+            for item in result_data["discussion_questions"]:
+                if isinstance(item, dict) and item.get("_feedbacks"):
+                    practiced += 1
+                    scores.extend(_feedback_score_values(item.get("_feedbacks")))
+        if result_data.get("_feedbacks"):
+            practiced += 1
+            scores.extend(_feedback_score_values(result_data.get("_feedbacks")))
+
+    own_score = score_from_progress_record(record)
+    if own_score is not None:
+        scores.append(own_score)
+        practiced = max(practiced, 1)
+        generated = max(generated, 1)
+    if data.get("user_response") or data.get("essay_content") or data.get("transcript"):
+        practiced = max(practiced, 1)
+        generated = max(generated, 1)
+    if not generated and (data.get("question") or data.get("topic")):
+        generated = 1
+
+    score = round_ielts_band(sum(scores) / len(scores)) if scores else None
+    practiced = min(practiced, generated) if generated else practiced
+    percent = int((practiced / generated) * 100) if generated else (100 if practiced else 0)
+    return {
+        "generated": generated,
+        "practiced": practiced,
+        "score": score,
+        "percent": max(0, min(100, percent)),
+        "question_label": f"{practiced}/{generated}" if generated else "0/0",
+    }
+
+
+def decorate_progress_display(records):
+    main_records = visible_progress(records)
+    main_by_key = {}
+    for record in main_records:
+        meta = _record_display_meta(record)
+        record.update({
+            "display_icon": meta["icon"],
+            "display_title": meta["title"],
+            "display_badge": meta["badge"],
+        })
+        data = record.get("data")
+        if isinstance(data, dict):
+            data.setdefault("_related_records", [])
+        key = _record_lookup_key(record)
+        if key:
+            main_by_key.setdefault(key, record)
+
+    for record in records:
+        if not is_inline_generation_record(record):
+            continue
+        key = _record_lookup_key(record)
+        parent = main_by_key.get(key)
+        if not parent:
+            continue
+        parent_data = parent.get("data")
+        if isinstance(parent_data, dict):
+            parent_data.setdefault("_related_records", []).append(record)
+
+    for record in main_records:
+        record["progress_summary"] = _record_progress_summary(record)
+
+    return main_records
 
 
 def with_display_scores(records):
@@ -1144,7 +1425,7 @@ def with_display_scores(records):
 
 
 def prepare_progress(records):
-    return with_display_scores(visible_progress(attach_speaking_feedback(records)))
+    return with_display_scores(decorate_progress_display(attach_speaking_feedback(records)))
 
 
 def prepare_feedback_context(records):
@@ -1323,6 +1604,167 @@ def tracked_profile_from_progress(profile, records, limit=5):
         "recent_limit": limit,
     }
     return tracked
+
+
+def skill_score_overview(profile):
+    target = profile_band(profile, "target_score", 6.5)
+    items = [
+        ("听力", "listening", "listening_level"),
+        ("口语", "speaking", "speaking_level"),
+        ("阅读", "reading", "reading_level"),
+        ("写作", "writing", "writing_level"),
+    ]
+    overview = []
+    for label, icon, key in items:
+        score = round_ielts_band(profile_band(profile, key, 5.0))
+        overview.append({
+            "label": label,
+            "icon": icon,
+            "score": score,
+            "target": target,
+            "percent": max(0, min(100, int((score / 9.0) * 100))),
+            "target_percent": max(0, min(100, int((target / 9.0) * 100))),
+            "gap": round_ielts_band(max(0.0, target - score)),
+        })
+    return overview
+
+
+def dashboard_goal_progress(records, weekly_target=5):
+    now = datetime.now()
+    week_start = now.date().toordinal() - now.weekday()
+    practiced = 0
+    for record in records:
+        ts = record.get("timestamp") or ""
+        try:
+            date_value = datetime.fromisoformat(ts.replace("Z", "+00:00")).date()
+        except (TypeError, ValueError):
+            continue
+        if date_value.toordinal() < week_start:
+            continue
+        summary = record.get("progress_summary") or _record_progress_summary(record)
+        practiced += max(1, int(summary.get("practiced") or 0)) if summary.get("practiced") else 0
+    target = max(1, int(weekly_target or 5))
+    return {
+        "done": practiced,
+        "target": target,
+        "percent": min(100, int((practiced / target) * 100)),
+    }
+
+
+def exam_countdown(profile):
+    exam_date = profile.get("exam_date") or ""
+    try:
+        days = (datetime.strptime(exam_date, "%Y-%m-%d").date() - datetime.now().date()).days
+    except (TypeError, ValueError):
+        return None
+    return {"days": max(0, days), "date": exam_date}
+
+
+def ability_trend_data(records, profile, limit=7):
+    points = []
+    for record in records:
+        skill = progress_skill(record)
+        if skill not in {"speaking", "writing"}:
+            continue
+        score = score_from_progress_record(record)
+        if score is None:
+            continue
+        points.append({
+            "date": (record.get("timestamp") or "")[:10],
+            "label": "口语" if skill == "speaking" else "写作",
+            "skill": skill,
+            "score": score,
+            "percent": max(0, min(100, int((score / 9.0) * 100))),
+        })
+    points = points[-limit:]
+    if not points:
+        points = [
+            {"date": "当前", "label": "口语", "skill": "speaking", "score": profile_band(profile, "speaking_level"), "percent": int(profile_band(profile, "speaking_level") / 9 * 100)},
+            {"date": "当前", "label": "写作", "skill": "writing", "score": profile_band(profile, "writing_level"), "percent": int(profile_band(profile, "writing_level") / 9 * 100)},
+        ]
+    return points
+
+
+def ability_trend_chart(records, profile, limit=6):
+    dates = []
+    for record in records:
+        date = (record.get("timestamp") or "")[:10]
+        if date and date not in dates:
+            dates.append(date)
+    if not dates:
+        dates = [datetime.now().strftime("%Y-%m-%d")]
+    dates = dates[-limit:]
+
+    base_scores = {
+        "listening": profile_band(profile, "listening_level"),
+        "speaking": profile_band(profile, "speaking_level"),
+        "reading": profile_band(profile, "reading_level"),
+        "writing": profile_band(profile, "writing_level"),
+    }
+    daily_scores = {date: {key: [] for key in base_scores} for date in dates}
+    for record in records:
+        date = (record.get("timestamp") or "")[:10]
+        if date not in daily_scores:
+            continue
+        skill = progress_skill(record)
+        if skill not in daily_scores[date]:
+            continue
+        score = score_from_progress_record(record)
+        if score is not None:
+            daily_scores[date][skill].append(score)
+
+    current = dict(base_scores)
+    chart_dates = []
+    for date in dates:
+        day = {"date": date, "short": date[5:] if len(date) >= 10 else date}
+        for skill in base_scores:
+            scores = daily_scores[date][skill]
+            if scores:
+                current[skill] = round_ielts_band(sum(scores) / len(scores))
+            day[skill] = current[skill]
+        chart_dates.append(day)
+
+    width, height = 620, 260
+    left, right, top, bottom = 42, 18, 22, 34
+    usable_w = width - left - right
+    usable_h = height - top - bottom
+
+    def point_for(index, score):
+        x = left + (usable_w * index / max(1, len(chart_dates) - 1))
+        y = top + usable_h - (max(0, min(9, score)) / 9.0) * usable_h
+        return f"{x:.1f},{y:.1f}"
+
+    def dot_for(index, score):
+        x = left + (usable_w * index / max(1, len(chart_dates) - 1))
+        y = top + usable_h - (max(0, min(9, score)) / 9.0) * usable_h
+        return {"x": x, "y": y, "score": score}
+
+    series_meta = [
+        ("listening", "听力", "#2f8df7"),
+        ("speaking", "口语", "#19ad83"),
+        ("reading", "阅读", "#8265e8"),
+        ("writing", "写作", "#ff922e"),
+    ]
+    series = []
+    for key, label, color in series_meta:
+        values = [day[key] for day in chart_dates]
+        series.append({
+            "key": key,
+            "label": label,
+            "color": color,
+            "latest": values[-1] if values else base_scores[key],
+            "points": " ".join(point_for(i, score) for i, score in enumerate(values)),
+            "dots": [dot_for(i, score) for i, score in enumerate(values)],
+        })
+    grid = []
+    for score in [0, 3, 4.5, 6, 7.5, 9]:
+        y = top + usable_h - (score / 9.0) * usable_h
+        grid.append({"score": score, "y": y})
+    x_labels = [
+        {"label": day["short"], "x": left + (usable_w * i / max(1, len(chart_dates) - 1))}
+        for i, day in enumerate(chart_dates)
+    ]
+    return {"width": width, "height": height, "series": series, "grid": grid, "x_labels": x_labels}
 
 
 def refresh_user_level_tracking(user_id):
@@ -1970,29 +2412,31 @@ def auth():
 def dashboard():
     user_id = session["user_id"]
     tracked_profile = refresh_user_level_tracking(user_id)
-    date_filter = request.args.get("date", "").strip()
-    page = int_query("page", 1)
     all_progress = list(reversed(get_progress(user_id, limit=180)))
     suggestion_record = get_latest_progress_by_activity(user_id, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
     study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
     suggestions = latest_saved_suggestions([suggestion_record] if suggestion_record else [])
     study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
-    progress = prepare_progress(all_progress)
-    if date_filter:
-        progress = [p for p in progress if (p.get("timestamp") or "").startswith(date_filter)]
-    progress, page, total_pages, total_records = paginate_records(progress, page, 10)
+    prepared_progress = prepare_progress(all_progress)
+    prepared_progress.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
+    total_records = len(prepared_progress)
+    progress = prepared_progress[:4]
     context = common_context()
     context["profile"] = tracked_profile
     context["level_tracking"] = tracked_profile.get("_tracking", {})
+    context["skill_scores"] = skill_score_overview(tracked_profile)
+    context["goal_progress"] = dashboard_goal_progress(prepared_progress)
+    context["exam_countdown"] = exam_countdown(tracked_profile)
+    context["ability_trend_chart"] = ability_trend_chart(all_progress, tracked_profile)
     return render_template(
         "dashboard.html",
         progress=progress,
-        page=page,
-        total_pages=total_pages,
+        page=1,
+        total_pages=1,
         total_records=total_records,
         suggestions=suggestions,
         study_plan=study_plan,
-        date_filter=date_filter,
+        date_filter="",
         score_options=score_options(),
         target_options=score_options(4.0, 9.0),
         **context,
@@ -2774,13 +3218,20 @@ def writing():
 @login_required
 def analysis():
     user_id = session["user_id"]
+    tracked_profile = refresh_user_level_tracking(user_id)
     page = int_query("page", 1)
+    type_filter = request.args.get("type", "").strip()
     all_progress = list(reversed(get_progress(user_id, limit=180)))
     study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
     study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
     progress = prepare_progress(all_progress)
+    if type_filter:
+        progress = [p for p in progress if _matches_type_filter(p, type_filter)]
     progress, page, total_pages, total_records = paginate_records(progress, page, 10)
     user_words = get_user_words(user_id)
+    context = common_context()
+    context["profile"] = tracked_profile
+    context["skill_scores"] = skill_score_overview(context["profile"])
     return render_template(
         "analysis.html",
         progress=progress,
@@ -2789,7 +3240,8 @@ def analysis():
         total_records=total_records,
         study_plan=study_plan,
         user_words=user_words,
-        **common_context(),
+        type_filter=type_filter,
+        **context,
     )
 
 

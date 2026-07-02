@@ -6,28 +6,6 @@
   <title>口语练习 · 信达雅</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   <style>
-    .timer-display {
-      font-size: 3rem;
-      font-weight: bold;
-      text-align: center;
-      padding: 1rem;
-      margin: 1rem 0;
-      border-radius: 12px;
-      background: #f0f4ff;
-      border: 2px solid #4f46e5;
-      font-variant-numeric: tabular-nums;
-    }
-    .timer-display.warning { background: #fef3c7; border-color: #d97706; color: #92400e; }
-    .timer-display.danger { background: #fee2e2; border-color: #dc2626; color: #991b1b; animation: pulse 1s infinite; }
-    .timer-controls { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin: 1rem 0; }
-    .timer-btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; font-size: 0.95rem; font-weight: 600; }
-    .timer-btn.prep { background: #4f46e5; color: #fff; }
-    .timer-btn.speak { background: #059669; color: #fff; }
-    .timer-btn.stop { background: #dc2626; color: #fff; }
-    .timer-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
-    .feedback-box { margin: 1rem 0; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }
-    .answer-form { margin: 0.5rem 0; }
     .speak-btn { border:1px solid #d9e2de; border-radius:999px; padding:4px 10px; background:white; cursor:pointer; font-weight:600; font-size:0.8rem; vertical-align:middle; }
     .speak-btn:hover { background:#e5e7eb; }
   </style>
@@ -40,13 +18,13 @@
         <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
       </div>
       <nav>
-        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
-        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
-        <a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a>
-        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
-        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
-        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
-        <a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>
+        <a href="{{ url_for('dashboard') }}" title="首页"><span class="svg-icon icon-home nav-svg" aria-hidden="true"></span><span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习"><span class="svg-icon icon-speaking nav-svg" aria-hidden="true"></span><span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('theme_linking') }}" title="口语串题"><span class="svg-icon icon-theme nav-svg" aria-hidden="true"></span><span class="nav-text">口语串题</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改"><span class="svg-icon icon-writing nav-svg" aria-hidden="true"></span><span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析"><span class="svg-icon icon-analysis nav-svg" aria-hidden="true"></span><span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词"><span class="svg-icon icon-vocabulary nav-svg" aria-hidden="true"></span><span class="nav-text">背单词</span></a>
+        <a href="{{ url_for('admin_panel') }}" title="管理员"><span class="svg-icon icon-admin nav-svg" aria-hidden="true"></span><span class="nav-text">管理员</span></a>
       </nav>
     </aside>
 
@@ -117,7 +95,7 @@
 
         <div class="tab-panel {{ 'active' if mode == 'part2' else '' }}" data-tab-panel="part2">
           <div class="panel-description">
-            <p><strong>🎯 Part 2: 个人陈述（Cue Card）</strong> — 你将领到一张话题卡，1 分钟准备 + 2 分钟连续发言。需涵盖卡片上的所有提示点，注意内容组织和时间控制。</p>
+            <p><strong><span class="svg-icon icon-target" aria-hidden="true"></span> Part 2: 个人陈述（Cue Card）</strong> — 你将领到一张话题卡，1 分钟准备 + 2 分钟连续发言。需涵盖卡片上的所有提示点，注意内容组织和时间控制。</p>
           </div>
           <form method="post" class="settings-form">
             <input type="hidden" name="mode" value="part2">
@@ -141,7 +119,7 @@
 
         <div class="tab-panel {{ 'active' if mode == 'part3' else '' }}" data-tab-panel="part3">
           <div class="panel-description">
-            <p><strong>🧠 Part 3: 深入讨论</strong> — 考官基于 Part 2 话题延展提问，考察分析、比较和观点表达能力。回答时长 4-5 分钟，每题 45-60 秒。需展现批判性思维。</p>
+            <p><strong><span class="svg-icon icon-brain" aria-hidden="true"></span> Part 3: 深入讨论</strong> — 考官基于 Part 2 话题延展提问，考察分析、比较和观点表达能力。回答时长 4-5 分钟，每题 45-60 秒。需展现批判性思维。</p>
           </div>
           <form method="post" class="settings-form">
             <input type="hidden" name="mode" value="part3">
@@ -183,19 +161,8 @@
                   </details>
                   {% endif %}
 
-                  
-                  <!-- 中文思路生成英文答案 -->
-                  <form method="post" class="settings-form answer-form">
-                    <input type="hidden" name="mode" value="answer_from_cn">
-                    <input type="hidden" name="source_mode" value="part1">
-                    <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
-                    <input type="hidden" name="question_index" value="{{ loop.index0 }}">
-                    <input type="hidden" name="question" value="{{ item.question }}">
-                    <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="例如：我平时喜欢在周末和朋友去咖啡馆，因为那里让我放松。"></textarea></label>
-                    <button class="ghost-btn small" type="submit">生成英文答案</button>
-                  </form>
-                  
-                  <!-- 输入英文回答获取批改 -->
+
+                  <!-- 输入英文回答获取批改 (主入口) -->
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="speaking_feedback">
                     <input type="hidden" name="source_mode" value="part1">
@@ -206,6 +173,22 @@
                     <label><span>输入英文回答，获取 AI 批改</span><textarea name="user_response" rows="3" placeholder="在这里输入你的英文回答，AI 将为你评分并提供改进建议..."></textarea></label>
                     <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
                   </form>
+
+                  <!-- 中文思路生成英文答案 (折叠) -->
+                  <details class="result-accordion nested-answer">
+                    <summary>💡 用中文思路生成英文答案</summary>
+                    <div class="result-body">
+                      <form method="post" class="settings-form answer-form">
+                        <input type="hidden" name="mode" value="answer_from_cn">
+                        <input type="hidden" name="source_mode" value="part1">
+                        <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                        <input type="hidden" name="question_index" value="{{ loop.index0 }}">
+                        <input type="hidden" name="question" value="{{ item.question }}">
+                        <label><span>输入中文思路</span><textarea name="chinese_answer" rows="3" placeholder="例如：我平时喜欢在周末和朋友去咖啡馆，因为那里让我放松。"></textarea></label>
+                        <button class="ghost-btn small" type="submit">生成英文答案</button>
+                      </form>
+                    </div>
+                  </details>
 
                   <details class="result-accordion nested-answer">
                     <summary>🔑 根据关键词生成完整答案</summary>
@@ -271,32 +254,58 @@
           {% elif result_data and mode == 'part2' %}
             <!-- Part 2: 题目卡 -->
             <details class="result-accordion" open>
-              <summary>🎯 题目卡 <button class="speak-btn" type="button">🔊 朗读题目</button></summary>
+              <summary><span class="svg-icon icon-target" aria-hidden="true"></span> 题目卡 <button class="speak-btn" type="button">朗读题目</button></summary>
               <div class="result-body cue-card-body"><div class="speak-source">{{ result_data.cue_card | simple_md }}</div></div>
             </details>
 
-            <!-- ⏱️ 计时器 -->
-            <div class="result-body" style="margin: 1rem 0;">
-              <h3>⏱️ 计时器</h3>
-              <div class="timer-display" id="timerDisplay">01:00</div>
-              <div class="timer-controls">
-                <button class="timer-btn prep" id="btnPrep" onclick="startTimer(60, 'prep')">⏱️ 1分钟准备</button>
-                <button class="timer-btn speak" id="btnSpeak" onclick="startTimer(120, 'speak')">🎤 2分钟发言</button>
-                <button class="timer-btn stop" id="btnStop" onclick="stopTimer()">⏹️ 停止</button>
+            <div class="practice-workbench speaking-studio-grid">
+              <!-- 计时器 -->
+              <div class="timer-panel">
+                <div class="timer-head">
+                  <p class="eyebrow">TIMER</p>
+                  <span class="timer-phase" id="timerPhase">就绪</span>
+                </div>
+                <div class="timer-ring-wrap">
+                  <svg class="timer-ring" viewBox="0 0 120 120">
+                    <circle class="timer-ring-bg" cx="60" cy="60" r="54" />
+                    <circle class="timer-ring-fg" id="timerRingFg" cx="60" cy="60" r="54" />
+                  </svg>
+                  <div class="timer-time" id="timerDisplay">01:00</div>
+                </div>
+                <div class="timer-controls">
+                  <button class="timer-btn prep" id="btnPrep" onclick="startTimer(60, 'prep')">1分钟准备</button>
+                  <button class="timer-btn speak" id="btnSpeak" onclick="startTimer(120, 'speak')">2分钟发言</button>
+                </div>
+                <button class="timer-btn stop" id="btnStop" onclick="stopTimer()">停止</button>
               </div>
-              <p class="hint" id="timerHint">点击按钮开始计时练习</p>
-            </div>
 
-            <!-- 输入英文回答获取批改 -->
-            <form method="post" class="settings-form answer-form">
-              <input type="hidden" name="mode" value="speaking_feedback">
-              <input type="hidden" name="source_mode" value="part2">
-              <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
-              <input type="hidden" name="question" value="{{ result_data.cue_card }}">
-              <input type="hidden" name="target_score" value="{{ profile.target_score }}">
-              <label><span>你的 Part 2 回答</span><textarea name="user_response" rows="6" placeholder="计时结束后，在这里输入你的英文回答，AI 将给出评分和改进建议。"></textarea></label>
-              <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
-            </form>
+              <!-- 输入英文回答获取批改 -->
+              <form method="post" class="settings-form answer-form practice-answer-panel recording-studio-panel">
+                <input type="hidden" name="mode" value="speaking_feedback">
+                <input type="hidden" name="source_mode" value="part2">
+                <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                <input type="hidden" name="question" value="{{ result_data.cue_card }}">
+                <input type="hidden" name="target_score" value="{{ profile.target_score }}">
+                <div class="studio-heading">
+                  <div><p class="eyebrow">Recording</p><h3><span class="svg-icon icon-mic" aria-hidden="true"></span> 录音练习</h3></div>
+                  <span class="studio-duration">目标 02:00</span>
+                </div>
+                <label><span>你的 Part 2 回答</span><textarea name="user_response" rows="6" placeholder="点击录音按钮作答，也可以直接输入英文回答。完成后 AI 将给出评分和改进建议。"></textarea></label>
+                <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
+              </form>
+              <div class="speaking-preview-panel">
+                <p class="eyebrow">AI Preview</p>
+                <h3><span class="svg-icon icon-analysis" aria-hidden="true"></span> AI 反馈预览</h3>
+                <p class="empty-text">完成录音或输入回答后，将按以下维度给出评分：</p>
+                <div class="preview-criteria">
+                  <span><i></i>流利度与连贯性 <b>--</b></span>
+                  <span><i></i>词汇资源 <b>--</b></span>
+                  <span><i></i>语法多样性与准确性 <b>--</b></span>
+                  <span><i></i>发音表现 <b>--</b></span>
+                </div>
+                <strong class="preview-score">预计总分 --</strong>
+              </div>
+            </div>
 
             <!-- 参考答案（折叠） -->
             {% if result_data.model_answer %}
@@ -358,7 +367,7 @@
                   <input type="hidden" name="question" value="{{ result_data.cue_card }}">
                   <input type="hidden" name="part" value="Part 2">
                   <label><span>你的关键词</span><textarea name="keywords" rows="4" placeholder="输入你想用的关键词，每行一个或用逗号分隔&#10;例如：&#10;childhood memory, river, fishing, grandfather, patient, life lesson"></textarea></label>
-                  <button class="primary-btn" type="submit">✨ 生成完整答案</button>
+                  <button class="primary-btn" type="submit"><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 生成完整答案</button>
                 </form>
               </div>
             </details>
@@ -405,19 +414,8 @@
                 <div class="result-body">
                   {% if item.purpose %}<p><strong>考察点：</strong>{{ item.purpose }}</p>{% endif %}
                   {% if item.depth_required %}<p><strong>回答深度：</strong>{{ item.depth_required }}</p>{% endif %}
-                  
-                  <!-- 中文思路生成英文答案 -->
-                  <form method="post" class="settings-form answer-form">
-                    <input type="hidden" name="mode" value="answer_from_cn">
-                    <input type="hidden" name="source_mode" value="part3">
-                    <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
-                    <input type="hidden" name="question_index" value="{{ loop.index0 }}">
-                    <input type="hidden" name="question" value="{{ item.question }}">
-                    <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="用中文写下你的观点和例子"></textarea></label>
-                    <button class="ghost-btn small" type="submit">生成英文答案</button>
-                  </form>
-                  
-                  <!-- 输入英文回答获取批改 -->
+
+                  <!-- 输入英文回答获取批改 (主入口) -->
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="speaking_feedback">
                     <input type="hidden" name="source_mode" value="part3">
@@ -428,6 +426,22 @@
                     <label><span>输入英文回答，获取 AI 批改</span><textarea name="user_response" rows="3" placeholder="在这里输入你的英文回答..."></textarea></label>
                     <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
                   </form>
+
+                  <!-- 中文思路生成英文答案 (折叠) -->
+                  <details class="result-accordion nested-answer">
+                    <summary>💡 用中文思路生成英文答案</summary>
+                    <div class="result-body">
+                      <form method="post" class="settings-form answer-form">
+                        <input type="hidden" name="mode" value="answer_from_cn">
+                        <input type="hidden" name="source_mode" value="part3">
+                        <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                        <input type="hidden" name="question_index" value="{{ loop.index0 }}">
+                        <input type="hidden" name="question" value="{{ item.question }}">
+                        <label><span>输入中文思路</span><textarea name="chinese_answer" rows="3" placeholder="用中文写下你的观点和例子"></textarea></label>
+                        <button class="ghost-btn small" type="submit">生成英文答案</button>
+                      </form>
+                    </div>
+                  </details>
 
                   <details class="result-accordion nested-answer">
                     <summary>🔑 根据关键词生成完整答案</summary>
@@ -490,37 +504,14 @@
             {% if result_data.extended_vocabulary %}<details class="result-accordion"><summary>扩展词汇</summary><div class="result-body"><div class="phrase-list">{% for word in result_data.extended_vocabulary %}<span>{{ word }}</span>{% endfor %}</div></div></details>{% endif %}
           
           {% elif result_data and mode == 'speaking_feedback' %}
-            <details class="result-accordion" open><summary>🎯 口语批改反馈</summary>
+            <details class="result-accordion" open><summary><span class="svg-icon icon-target" aria-hidden="true"></span> 口语批改反馈</summary>
               <div class="result-body">
-                {% if result_data.overall_score %}
-                  <p><strong>总体评分：</strong>{{ result_data.overall_score }} / 9.0</p>
-                {% endif %}
-                {% if result_data.breakdown %}
-                  {% for key, label in [('fluency_coherence','流利度与连贯性'),('lexical_resource','词汇资源'),('grammatical_range_accuracy','语法范围与准确性'),('pronunciation','发音')] %}
-                    {% if result_data.breakdown[key] %}
-                      <details class="result-accordion"><summary>{{ label }} · {{ result_data.breakdown[key].score }}</summary>
-                        <div class="result-body">
-                          {% if result_data.breakdown[key].strengths %}<p><strong>优点：</strong></p><ul>{% for s in result_data.breakdown[key].strengths %}<li>{{ s }}</li>{% endfor %}</ul>{% endif %}
-                          {% if result_data.breakdown[key].weaknesses %}<p><strong>待改进：</strong></p><ul>{% for w in result_data.breakdown[key].weaknesses %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
-                          {% if result_data.breakdown[key].suggestions %}<p><strong>建议：</strong></p><ul>{% for s in result_data.breakdown[key].suggestions %}<li>{{ s }}</li>{% endfor %}</ul>{% endif %}
-                          {% if result_data.breakdown[key].vocabulary_analysis %}<p>{{ result_data.breakdown[key].vocabulary_analysis }}</p>{% endif %}
-                          {% if result_data.breakdown[key].grammar_analysis %}<p>{{ result_data.breakdown[key].grammar_analysis }}</p>{% endif %}
-                        </div>
-                      </details>
-                    {% endif %}
-                  {% endfor %}
-                {% endif %}
-                {% if result_data.improved_response %}
-                  <details class="result-accordion"><summary>✨ 优化后的回答示例</summary><div class="result-body"><p>{{ result_data.improved_response }}</p></div></details>
-                {% endif %}
-                {% if result_data.practice_recommendations %}
-                  <details class="result-accordion"><summary>📋 练习建议</summary><div class="result-body"><ul>{% for r in result_data.practice_recommendations %}<li>{{ r }}</li>{% endfor %}</ul></div></details>
-                {% endif %}
+                {{ result_data | record_result('口语反馈') }}
               </div>
             </details>
           
           {% elif result_data and mode == 'keyword_answer' %}
-            <details class="result-accordion" open><summary>✨ 基于关键词生成的完整答案</summary>
+            <details class="result-accordion" open><summary><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 基于关键词生成的完整答案</summary>
               <div class="result-body">
                 {% if result_data.full_answer %}
                   <details class="result-accordion nested-answer">
@@ -560,15 +551,17 @@
       {% endif %}
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701g') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
   <script>
     // ===== 计时器 =====
     let timerInterval = null;
     let remainingSeconds = 0;
+    let timerTotal = 60;
+    const RING_CIRCUMFERENCE = 339.292;
 
     function updateTimerDisplay() {
       const display = document.getElementById('timerDisplay');
-      const hint = document.getElementById('timerHint');
+      const ring = document.getElementById('timerRingFg');
       if (!display) return;
       const mins = Math.floor(remainingSeconds / 60);
       const secs = remainingSeconds % 60;
@@ -581,19 +574,20 @@
         display.classList.add('warning');
       }
 
-      if (hint) {
-        if (remainingSeconds > 0) {
-          hint.textContent = '计时进行中...';
-        } else {
-          hint.textContent = '⏰ 时间到！';
-        }
+      if (ring) {
+        const progress = timerTotal > 0 ? (timerTotal - remainingSeconds) / timerTotal : 1;
+        ring.style.strokeDashoffset = (RING_CIRCUMFERENCE * progress).toFixed(1);
       }
     }
 
     function startTimer(seconds, type) {
       stopTimer();
       remainingSeconds = seconds;
+      timerTotal = seconds;
       updateTimerDisplay();
+
+      const phase = document.getElementById('timerPhase');
+      if (phase) phase.textContent = type === 'prep' ? '准备中' : '发言中';
 
       const btnPrep = document.getElementById('btnPrep');
       const btnSpeak = document.getElementById('btnSpeak');
@@ -619,35 +613,21 @@
         clearInterval(timerInterval);
         timerInterval = null;
       }
+      const phase = document.getElementById('timerPhase');
+      if (phase) phase.textContent = '就绪';
       const btnPrep = document.getElementById('btnPrep');
       const btnSpeak = document.getElementById('btnSpeak');
       if (btnPrep) btnPrep.disabled = false;
       if (btnSpeak) btnSpeak.disabled = false;
     }
 
-    // ===== 语音朗读 =====
-    function speakText(text) {
-      if (!text || !window.speechSynthesis) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.78;
-      utterance.pitch = 1;
-      utterance.volume = 1;
-      const voices = speechSynthesis.getVoices();
-      const preferred = voices.find(v => /Microsoft Jenny|Microsoft Aria|Google US|Samantha|Alex|Daniel|Karen|Tingting/i.test(v.name)) ||
-        voices.find(v => /^en[-_](US|GB|AU)/i.test(v.lang));
-      if (preferred) utterance.voice = preferred;
-      setTimeout(() => speechSynthesis.speak(utterance), 80);
-    }
-
-    // 预加载语音
+    // 预加载语音，实际朗读统一由 static/app.js 处理
     if (window.speechSynthesis) {
       speechSynthesis.getVoices();
       speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
     }
   </script>
   <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
-  <script src="{{ url_for('static', filename='voice_input.js', v='20260701j') }}"></script>
+  <script src="{{ url_for('static', filename='voice_input.js', v='20260702c') }}"></script>
 </body>
 </html>

@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import json
 import pandas as pd
 from datetime import datetime, timezone, timedelta
@@ -8,6 +9,7 @@ import hmac
 import hashlib
 import random
 import uuid
+from functools import lru_cache
 from urllib.parse import urlencode, urlsplit, urlunsplit
 import ipaddress
 from agents import TongyiIELTSAssistant
@@ -274,6 +276,307 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+
+def _speech_text(value):
+    if isinstance(value, (list, tuple)):
+        value = " ".join(str(item) for item in value)
+    elif isinstance(value, dict):
+        value = " ".join(str(item) for item in value.values())
+    text = str(value or "")
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"[#*_>`~-]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _stable_speak_button(text, label="🔊 朗读", key_prefix="stable_speak"):
+    clean_text = _speech_text(text)
+    if not clean_text:
+        return
+    payload = json.dumps(clean_text, ensure_ascii=False)
+    element_id = f"{key_prefix}_{abs(hash(clean_text))}_{random.randint(1000, 9999)}"
+    components.html(
+        f"""
+        <button id="{element_id}" type="button" style="
+          border:1px solid #d9e2de;border-radius:999px;padding:5px 12px;
+          background:#fff;cursor:pointer;font-weight:650;font-size:13px;
+          color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+          {label}
+        </button>
+        <script>
+        (function() {{
+          const button = document.getElementById("{element_id}");
+          const text = {payload};
+          function loadVoices() {{
+            return new Promise((resolve) => {{
+              const synth = window.speechSynthesis;
+              if (!synth) return resolve([]);
+              const voices = synth.getVoices();
+              if (voices.length) return resolve(voices);
+              let done = false;
+              const finish = () => {{
+                if (done) return;
+                done = true;
+                resolve(synth.getVoices());
+              }};
+              synth.onvoiceschanged = finish;
+              setTimeout(finish, 700);
+            }});
+          }}
+          function pickVoice(voices) {{
+            const english = voices.filter(v => /^en[-_]/i.test(v.lang || ""));
+            const preferred = [/Microsoft Guy/i, /Microsoft David/i, /Microsoft Mark/i, /Google UK English Male/i, /Google US English Male/i, /Daniel/i, /Alex/i, /Microsoft Aria/i, /Microsoft Jenny/i, /Google US English/i, /Google UK English/i, /Samantha/i, /Karen/i];
+            for (const p of preferred) {{
+              const match = english.find(v => p.test(v.name || ""));
+              if (match) return match;
+            }}
+            return english.find(v => /^en[-_](US|GB|AU)/i.test(v.lang || "")) || english[0] || null;
+          }}
+          button.addEventListener("click", async () => {{
+            const synth = window.speechSynthesis;
+            if (!synth || !text) return;
+            synth.cancel();
+            const voice = pickVoice(await loadVoices());
+            const chunks = text.length <= 900 ? [text] : (text.match(/.{{1,650}}(\\s|$)/g) || [text]);
+            const speak = (index) => {{
+              if (index >= chunks.length) return;
+              const utterance = new SpeechSynthesisUtterance(chunks[index].trim());
+              utterance.lang = voice ? voice.lang : "en-US";
+              utterance.rate = 0.92;
+              utterance.pitch = 1;
+              utterance.volume = 1;
+              if (voice) utterance.voice = voice;
+              utterance.onend = () => speak(index + 1);
+              synth.speak(utterance);
+            }};
+            speak(0);
+          }});
+        }})();
+        </script>
+        """,
+        height=38,
+    )
+
+
+def _render_stable_model_answer(task_type, topic, context=None, key_prefix="writing_model_answer"):
+    topic = (topic or "").strip()
+    if not topic:
+        return
+    context = context if isinstance(context, dict) else {}
+    answer_key = f"{key_prefix}_{task_type.replace(' ', '_')}"
+    if st.button("✨ 生成参考范文", key=f"{answer_key}_btn"):
+        with st.spinner("正在生成高分参考范文..."):
+            result = st.session_state.tongyi_agent.generate_model_answer(
+                task_type,
+                topic,
+                context.get("chart_type", ""),
+                context.get("chart_data"),
+                context.get("table_data"),
+            )
+            st.session_state[answer_key] = result
+            save_user_progress(
+                st.session_state.user_profile.get("user_id", "default_user"),
+                "生成参考范文",
+                {
+                    "mode": "generate_model_answer",
+                    "task_type": task_type,
+                    "topic": topic,
+                    "result": result,
+                    "result_data": {**context, "task_type": task_type, "question": topic, "model_essay": result},
+                    "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+                },
+            )
+    if st.session_state.get(answer_key):
+        with st.expander("✨ 参考范文", expanded=True):
+            st.write(st.session_state[answer_key])
+            _stable_speak_button(st.session_state[answer_key], "🔊 朗读范文", f"{answer_key}_speak")
+
+
+@lru_cache(maxsize=2)
+def _stable_whisper_model(model_name, device, compute_type):
+    from faster_whisper import WhisperModel
+    return WhisperModel(model_name, device=device, compute_type=compute_type)
+
+
+def _stable_ai_config():
+    provider = st.session_state.get("ai_provider", "tongyi")
+    api_keys = st.session_state.get("ai_api_keys", {}) or {}
+    return {
+        "provider": provider,
+        "api_key": st.session_state.get("dashscope_api_key", ""),
+        "base_url": st.session_state.get("ai_base_url", ""),
+        "api_keys": api_keys,
+    }
+
+
+def _stable_transcribe_local(audio_path):
+    if os.getenv("LOCAL_TRANSCRIBE_ENABLED", "true").lower() not in {"1", "true", "yes", "on"}:
+        return "", "本地语音转写未启用。"
+    try:
+        from faster_whisper import WhisperModel  # noqa: F401
+    except Exception:
+        return "", "服务器未安装 faster-whisper，无法本地转写。"
+    try:
+        model = _stable_whisper_model(
+            os.getenv("LOCAL_TRANSCRIBE_MODEL", "base"),
+            os.getenv("LOCAL_TRANSCRIBE_DEVICE", "auto"),
+            os.getenv("LOCAL_TRANSCRIBE_COMPUTE_TYPE", "int8"),
+        )
+        segments, _ = model.transcribe(
+            audio_path,
+            language=os.getenv("LOCAL_TRANSCRIBE_LANGUAGE", "en"),
+            vad_filter=True,
+        )
+        text = " ".join(seg.text.strip() for seg in segments if seg.text.strip()).strip()
+        if not text:
+            return "", "本地转写没有识别到文字，请检查麦克风音量。"
+        return text, ""
+    except Exception as e:
+        return "", f"本地转写失败：{e}"
+
+
+def _stable_transcribe_api(audio_path):
+    config = _stable_ai_config()
+    api_keys = config.get("api_keys", {})
+    api_key = api_keys.get("openai") or (
+        config.get("api_key") if config.get("provider") in {"openai", "custom"} else ""
+    )
+    if not api_key:
+        return "", "没有可用的 OpenAI 语音识别 API。"
+    try:
+        from openai import OpenAI
+        kwargs = {"api_key": api_key}
+        if config.get("provider") == "custom" and config.get("base_url"):
+            kwargs["base_url"] = config["base_url"]
+        client = OpenAI(**kwargs)
+        with open(audio_path, "rb") as audio:
+            result = client.audio.transcriptions.create(
+                model=os.getenv("OPENAI_TRANSCRIBE_MODEL", "whisper-1"),
+                file=audio,
+            )
+        text = getattr(result, "text", "") or (result.get("text", "") if isinstance(result, dict) else "")
+        return text.strip(), ""
+    except Exception as e:
+        return "", f"语音识别 API 转写失败：{e}"
+
+
+def _stable_transcribe_audio(audio_path):
+    text, err = _stable_transcribe_local(audio_path)
+    if text:
+        return text, "", "local"
+    api_text, api_err = _stable_transcribe_api(audio_path)
+    if api_text:
+        return api_text, "", "api"
+    return "", f"{err} {api_err}".strip(), ""
+
+
+def _stable_audio_suffix(uploaded_audio):
+    mime = getattr(uploaded_audio, "type", "") or ""
+    name = getattr(uploaded_audio, "name", "") or ""
+    if "mp4" in mime or name.endswith((".m4a", ".mp4")):
+        return ".m4a"
+    if "webm" in mime or name.endswith(".webm"):
+        return ".webm"
+    return ".wav"
+
+
+def _extract_feedback_score(feedback_data):
+    if not isinstance(feedback_data, dict):
+        return None
+    for key in ("overall_score", "score", "overall_band", "band_score"):
+        score = _normalize_ielts_score(feedback_data.get(key))
+        if score is not None:
+            return score
+    breakdown = feedback_data.get("breakdown")
+    if isinstance(breakdown, dict):
+        scores = []
+        for item in breakdown.values():
+            if isinstance(item, dict):
+                score = _normalize_ielts_score(item.get("score"))
+                if score is not None:
+                    scores.append(score)
+        if scores:
+            return round(sum(scores) / len(scores) * 2) / 2
+    return None
+
+
+def _render_stable_recording_practice(question, part_label, key_prefix):
+    question = _speech_text(question)
+    if not question:
+        return
+    with st.expander("🎙️ 录音练习与 AI 评分", expanded=False):
+        st.caption("录音后可先回放；点击评分后会本地转写，再把文字提交给 AI 进行雅思口语评分。")
+        uploaded_audio = st.audio_input("录制你的英文回答", key=f"{key_prefix}_audio")
+        if uploaded_audio:
+            st.audio(uploaded_audio)
+        if uploaded_audio and st.button("转写并评分", key=f"{key_prefix}_score_btn"):
+            user_id = st.session_state.user_profile.get("user_id", "default_user")
+            suffix = _stable_audio_suffix(uploaded_audio)
+            audio_dir = os.path.join(os.path.dirname(__file__), "data", "audio", user_id)
+            os.makedirs(audio_dir, exist_ok=True)
+            fname = f"{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}{suffix}"
+            saved_path = os.path.join(audio_dir, fname)
+            saved_rel = f"data/audio/{user_id}/{fname}"
+            with open(saved_path, "wb") as f:
+                f.write(uploaded_audio.getvalue())
+            with st.spinner("正在转写录音并获取 AI 评分..."):
+                transcript, transcript_error, transcript_source = _stable_transcribe_audio(saved_path)
+                result = ""
+                feedback_data = None
+                score = None
+                if transcript:
+                    result = st.session_state.tongyi_agent.get_speaking_feedback_direct(
+                        question=question,
+                        user_response=transcript,
+                        target_score=st.session_state.user_profile["target_score"],
+                        part=part_label,
+                    )
+                    feedback_data = parse_json_response(result)
+                    score = _extract_feedback_score(feedback_data)
+                else:
+                    result = f"录音已保存，但转写失败：{transcript_error}"
+            st.session_state[f"{key_prefix}_recording_result"] = {
+                "audio_path": saved_path,
+                "audio_file": saved_rel,
+                "transcript": transcript,
+                "transcript_source": transcript_source,
+                "result": result,
+                "result_data": feedback_data,
+                "score": score,
+            }
+            save_user_progress(
+                user_id,
+                "口语录音练习",
+                {
+                    "mode": "speaking_recording",
+                    "question": question,
+                    "user_response": transcript,
+                    "transcript": transcript,
+                    "transcript_source": transcript_source,
+                    "score": score,
+                    "result": result,
+                    "result_data": feedback_data,
+                    "audio_file": saved_rel,
+                    "recorded_at": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+                    "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+                },
+            )
+    recording_result = st.session_state.get(f"{key_prefix}_recording_result")
+    if recording_result:
+        with st.expander("本题 AI 批改反馈", expanded=True):
+            if recording_result.get("audio_path"):
+                st.audio(recording_result["audio_path"])
+            if recording_result.get("transcript"):
+                st.markdown("**转写文本 / 我的回答：**")
+                st.write(recording_result["transcript"])
+            if recording_result.get("score") is not None:
+                st.metric("总体评分", f"{recording_result['score']:.1f}/9.0")
+            if isinstance(recording_result.get("result_data"), dict):
+                _display_speaking_feedback(recording_result["result_data"], save_record=False)
+            elif recording_result.get("result"):
+                st.write(recording_result["result"])
+
+
 # 口语Part 1界面函数
 def _render_speaking_part1():
     st.write("**Part 1: 自我介绍与日常话题**")
@@ -353,6 +656,7 @@ def _render_speaking_part1():
 
             for i, q in enumerate(question_data["questions"]):
                 with st.expander(f"问题 {i + 1}: {q.get('question', '')}"):
+                    _stable_speak_button(q.get("question", ""), "🔊 朗读题目", f"part1_q_{i}")
                     if "keywords" in q:
                         with st.expander("🔑 关键词提示"):
                             st.write(", ".join(q["keywords"]))
@@ -364,6 +668,7 @@ def _render_speaking_part1():
                     if "model_answer" in q:
                         with st.expander("📖 参考答案"):
                             st.write(q["model_answer"])
+                            _stable_speak_button(q["model_answer"], "🔊 朗读参考答案", f"part1_answer_{i}")
 
                     # 用户回答区域
                     user_response = st.text_area(
@@ -371,6 +676,7 @@ def _render_speaking_part1():
                         placeholder="在这里输入你的回答...",
                         key=f"part1_response_{i}"
                     )
+                    _render_stable_recording_practice(q["question"], "Part 1", f"part1_recording_{i}")
 
                     feedback_key = f"part1_feedback_result_{i}"
                     if user_response and st.button(f"获取反馈 {i + 1}", key=f"feedback_{i}"):
@@ -601,6 +907,8 @@ def _render_speaking_part2():
                 placeholder="在这里输入你的2分钟发言内容...",
                 height=200
             )
+            question_text_for_recording = card if isinstance(card, str) else card.get("prompt", "")
+            _render_stable_recording_practice(question_text_for_recording, "Part 2", "part2_recording")
 
             if user_response and st.button("获取专业反馈"):
                 with st.spinner("正在详细分析你的回答..."):
@@ -675,10 +983,11 @@ def _render_speaking_part2():
             if "model_answer" in question_data:
                 with st.expander("🌟 高分参考答案"):
                     model = question_data["model_answer"]
+                    answer_parts = []
                     if isinstance(model, str):
                         st.write(model)
+                        answer_parts.append(model)
                     else:
-                        answer_parts = []
                         if "introduction" in model:
                             st.write("**开头介绍:**")
                             st.write(model["introduction"])
@@ -697,6 +1006,8 @@ def _render_speaking_part2():
                             st.write("**结尾:**")
                             st.write(model["conclusion"])
                             answer_parts.append(str(model["conclusion"]))
+                    if answer_parts:
+                        _stable_speak_button(" ".join(answer_parts), "🔊 朗读参考答案", "part2_model_answer")
 
 # 口语Part 3界面函数
 def _render_speaking_part3():
@@ -794,6 +1105,7 @@ def _render_speaking_part3():
 
             for i, q in enumerate(question_data["discussion_questions"]):
                 with st.expander(f"讨论题 {i + 1}: {q.get('question', '')}"):
+                    _stable_speak_button(q.get("question", ""), "🔊 朗读题目", f"part3_q_{i}")
                     if "purpose" in q:
                         st.write(f"**考察目的:** {q['purpose']}")
 
@@ -801,6 +1113,7 @@ def _render_speaking_part3():
                     if "model_response" in q:
                         with st.expander("🌟 高分参考答案"):
                             st.write(q["model_response"])
+                            _stable_speak_button(q["model_response"], "🔊 朗读参考答案", f"part3_answer_{i}")
 
                     if "depth_required" in q:
                         st.write(f"**要求深度:** {q['depth_required']}")
@@ -811,6 +1124,7 @@ def _render_speaking_part3():
                         placeholder="在这里输入你的分析和观点...",
                         key=f"part3_response_{i}"
                     )
+                    _render_stable_recording_practice(q["question"], "Part 3", f"part3_recording_{i}")
 
                     if user_response and st.button(f"分析回答 {i + 1}", key=f"part3_feedback_{i}"):
                         with st.spinner("正在分析你的讨论回答..."):
@@ -921,11 +1235,15 @@ def _render_writing_task1():
                     st.dataframe(df, width='stretch', hide_index=True)
                 else:
                     st.dataframe(pd.DataFrame(cd))
+        if gen.get("question"):
+            _render_stable_model_answer("Task 1", gen["question"], gen, "task1_generated_model")
 
     # 显示导入的题目
     imported_q = st.session_state.get("imported_topic_question", None)
     if imported_q:
         st.info(f"📌 **已导入题目：**\n\n{imported_q}")
+        if st.session_state.get("generated_writing_topic", {}).get("task_type") == "Task 1":
+            _render_stable_model_answer("Task 1", imported_q, st.session_state.get("generated_writing_topic", {}), "task1_imported_model")
 
     col1, col2 = st.columns(2)
 
@@ -1040,11 +1358,15 @@ def _render_writing_task2():
         if gen.get("suggested_structure"):
             with st.expander("建议结构", expanded=False):
                 st.write(gen["suggested_structure"])
+        if gen.get("question"):
+            _render_stable_model_answer("Task 2", gen["question"], gen, "task2_generated_model")
 
     # 显示导入的题目
     imported_q = st.session_state.get("imported_topic_question", None)
     if imported_q:
         st.info(f"📌 **已导入题目：**\n\n{imported_q}")
+        if st.session_state.get("generated_writing_topic", {}).get("task_type") == "Task 2":
+            _render_stable_model_answer("Task 2", imported_q, st.session_state.get("generated_writing_topic", {}), "task2_imported_model")
 
     col1, col2 = st.columns(2)
 

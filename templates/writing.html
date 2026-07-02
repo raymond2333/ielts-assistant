@@ -14,13 +14,13 @@
         <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
       </div>
       <nav>
-        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a>
-        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
-        <a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a>
-        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
-        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
-        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
-        <a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>
+        <a href="{{ url_for('dashboard') }}" title="首页"><span class="svg-icon icon-home nav-svg" aria-hidden="true"></span><span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习"><span class="svg-icon icon-speaking nav-svg" aria-hidden="true"></span><span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('theme_linking') }}" title="口语串题"><span class="svg-icon icon-theme nav-svg" aria-hidden="true"></span><span class="nav-text">口语串题</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改"><span class="svg-icon icon-writing nav-svg" aria-hidden="true"></span><span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析"><span class="svg-icon icon-analysis nav-svg" aria-hidden="true"></span><span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词"><span class="svg-icon icon-vocabulary nav-svg" aria-hidden="true"></span><span class="nav-text">背单词</span></a>
+        <a href="{{ url_for('admin_panel') }}" title="管理员"><span class="svg-icon icon-admin nav-svg" aria-hidden="true"></span><span class="nav-text">管理员</span></a>
       </nav>
     </aside>
 
@@ -72,11 +72,11 @@
                 <div class="form-row">
                   <label><span>图表类型</span>
                     <select name="chart_type">
-                      <option value="柱状图">柱状图 (Bar Chart) 🖼️</option>
-                      <option value="线形图">线形图 (Line Graph) 🖼️</option>
-                      <option value="饼图">饼图 (Pie Chart) 🖼️</option>
+                      <option value="柱状图">柱状图 (Bar Chart)</option>
+                      <option value="线形图">线形图 (Line Graph)</option>
+                      <option value="饼图">饼图 (Pie Chart)</option>
                       <option value="表格">表格 (Table)</option>
-                      <option value="流程图">流程图 (Process/Flow Chart) 🖼️</option>
+                      <option value="流程图">流程图 (Process/Flow Chart)</option>
                       <option value="地图">地图 (Map)</option>
                     </select>
                   </label>
@@ -95,7 +95,7 @@
                     </select>
                   </label>
                 </div>
-                <p class="hint" style="font-size:0.85rem;color:var(--text-dim);margin-top:4px">🖼️ 表示可自动生成图表图片</p>
+                <p class="hint" style="font-size:0.85rem;color:var(--text-dim);margin-top:4px"><span class="svg-icon icon-picture" aria-hidden="true"></span> 以上图表题可自动生成图片</p>
                 <button class="primary-btn" type="submit">🎲 生成小作文题目</button>
               </form>
             </div>
@@ -179,7 +179,7 @@
           {% if result_data and mode == 'generate_topic' %}
             {% set target_task = result_data.task_type if result_data.task_type else 'Task 2' %}
             <details class="result-accordion" open>
-              <summary>{{ '📋 小作文题目' if target_task == 'Task 1' else '📝 大作文题目' }}</summary>
+              <summary><span class="svg-icon {{ 'icon-chart' if target_task == 'Task 1' else 'icon-writing' }}" aria-hidden="true"></span> {{ '小作文题目' if target_task == 'Task 1' else '大作文题目' }}</summary>
               <div class="result-body">
                 {% if target_task == 'Task 1' %}
                   <p><strong>图表类型：</strong>{{ result_data.chart_type }}</p>
@@ -202,7 +202,7 @@
                 {% endif %}
                 <p style="font-size:1.05rem;line-height:1.7;background:#f8fafc;padding:10px 14px;border-radius:8px;border:1px solid #e5e7eb"><strong>题目：</strong>{{ result_data.question }}</p>
                 {% if result_data.key_features %}
-                  <details class="result-accordion"><summary>📊 关键特征</summary><div class="result-body"><ul>{% for f in result_data.key_features %}<li>{{ f }}</li>{% endfor %}</ul></div></details>
+                  <details class="result-accordion"><summary><span class="svg-icon icon-analysis" aria-hidden="true"></span> 关键特征</summary><div class="result-body"><ul>{% for f in result_data.key_features %}<li>{{ f }}</li>{% endfor %}</ul></div></details>
                 {% endif %}
                 {% if result_data.chart_data %}
                   <details class="result-accordion"><summary>📋 表格数据（供 AI 互动使用）</summary><div class="result-body"><table class="data-table"><thead><tr><th>项目</th><th>数值</th></tr></thead><tbody>{% for row in result_data.chart_data %}<tr><td>{{ row.label }}</td><td>{{ row.value }}</td></tr>{% endfor %}</tbody></table></div></details>
@@ -215,13 +215,13 @@
                 {% endif %}
 
                 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                  <a class="primary-btn small" href="{{ url_for('writing', import_topic='1', import_question=result_data.question, import_task=target_task) }}">📝 导入题目开始练习</a>
+                  <a class="primary-btn small" href="{{ url_for('writing', import_topic='1', import_question=result_data.question, import_task=target_task) }}"><span class="svg-icon icon-writing" aria-hidden="true"></span> 导入题目开始练习</a>
                   <form method="post" class="settings-form" style="display:inline">
                     <input type="hidden" name="mode" value="generate_model_answer">
                     <input type="hidden" name="topic" value="{{ result_data.question }}">
                     <input type="hidden" name="task_type" value="{{ target_task }}">
                     <input type="hidden" name="topic_context" value="{{ result_data | tojson | forceescape }}">
-                    <button class="ghost-btn small" type="submit">✨ 生成参考范文</button>
+                    <button class="ghost-btn small" type="submit"><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 生成参考范文</button>
                   </form>
                 </div>
               </div>
@@ -229,7 +229,7 @@
           {% elif mode == 'generate_model_answer' %}
             {% if result_data %}
               <details class="result-accordion" open>
-                <summary>📌 题目与数据</summary>
+                <summary><span class="svg-icon icon-practice" aria-hidden="true"></span> 题目与数据</summary>
                 <div class="result-body">
                   {% set answer_task = result_data.task_type if result_data.task_type else 'Task 2' %}
                   {% if answer_task == 'Task 1' %}
@@ -258,7 +258,7 @@
                 </div>
               </details>
             {% endif %}
-            <details class="result-accordion" open><summary>✨ 参考范文</summary><div class="result-body">{{ result | simple_md }}</div></details>
+            <details class="result-accordion" open><summary><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 参考范文</summary><div class="result-body">{{ result | simple_md }}</div></details>
           {% elif result_data and mode == 'task1' %}
             {{ result_data | record_result('写作 Task 1 批改') }}
           {% elif result_data and mode == 'task2' %}
@@ -280,7 +280,7 @@
       {% endif %}
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701e') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
   <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
 </body>
 </html>

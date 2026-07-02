@@ -14,7 +14,7 @@
         <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
       </div>
       <nav>
-        <a href="{{ url_for('dashboard') }}" title="首页">🏠 <span class="nav-text">学习总览</span></a><a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a><a href="{{ url_for('theme_linking') }}" title="口语串题">🔗 <span class="nav-text">口语串题</span></a><a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a><a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a><a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a><a href="{{ url_for('admin_panel') }}" title="管理员">🛡️ <span class="nav-text">管理员</span></a>
+        <a href="{{ url_for('dashboard') }}" title="首页"><span class="svg-icon icon-home nav-svg" aria-hidden="true"></span><span class="nav-text">学习总览</span></a><a href="{{ url_for('speaking') }}" title="口语练习"><span class="svg-icon icon-speaking nav-svg" aria-hidden="true"></span><span class="nav-text">口语练习</span></a><a href="{{ url_for('theme_linking') }}" title="口语串题"><span class="svg-icon icon-theme nav-svg" aria-hidden="true"></span><span class="nav-text">口语串题</span></a><a href="{{ url_for('writing') }}" title="作文批改"><span class="svg-icon icon-writing nav-svg" aria-hidden="true"></span><span class="nav-text">作文批改</span></a><a href="{{ url_for('analysis') }}" title="学习分析"><span class="svg-icon icon-analysis nav-svg" aria-hidden="true"></span><span class="nav-text">学习分析</span></a><a href="{{ url_for('vocabulary') }}" title="背单词"><span class="svg-icon icon-vocabulary nav-svg" aria-hidden="true"></span><span class="nav-text">背单词</span></a><a href="{{ url_for('admin_panel') }}" title="管理员"><span class="svg-icon icon-admin nav-svg" aria-hidden="true"></span><span class="nav-text">管理员</span></a>
       </nav>
     </aside>
     <main class="main-panel">
@@ -32,7 +32,7 @@
       {% if result_data and result_data.get('unifying_theme') %}
       <section class="panel result-panel ai-output">
         <details class="result-accordion" open>
-          <summary>🎯 核心主题</summary>
+          <summary><span class="svg-icon icon-target" aria-hidden="true"></span> 核心主题</summary>
           <div class="result-body">
             <p><strong>中文</strong> {{ result_data.get('unifying_theme', '') }}</p>
             {% if result_data.get('unifying_theme_en') %}<p><strong>English</strong> {{ result_data.get('unifying_theme_en', '') }}</p>{% endif %}
@@ -41,7 +41,7 @@
 
         {% if result_data.get('linked_responses') %}
         <details class="result-accordion" open>
-          <summary>🔗 话题串联方案</summary>
+          <summary><span class="svg-icon icon-theme" aria-hidden="true"></span> 话题串联方案</summary>
           <div class="result-body">
             {% for item in result_data.linked_responses %}
             <div class="theme-card">
@@ -86,7 +86,7 @@
 
         {% if result_data.get('versatile_vocabulary') or result_data.get('versatile_vocabulary_en') %}
         <details class="result-accordion">
-          <summary>📚 通用词汇</summary>
+          <summary><span class="svg-icon icon-vocabulary" aria-hidden="true"></span> 通用词汇</summary>
           <div class="result-body">
             <div class="two-col">
               {% if result_data.get('versatile_vocabulary') %}<div><p class="eyebrow">中文</p>{% for v in result_data.versatile_vocabulary %}<span class="tag">{{ v }}</span>{% endfor %}</div>{% endif %}
@@ -105,7 +105,7 @@
 
         {% if result_data.get('study_plan') %}
         <details class="result-accordion">
-          <summary>📅 学习计划</summary>
+          <summary><span class="svg-icon icon-calendar" aria-hidden="true"></span> 学习计划</summary>
           <div class="result-body"><p>{{ result_data.get('study_plan', '') }}</p></div>
         </details>
         {% endif %}
@@ -126,7 +126,7 @@
       {% endif %}
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701e') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
   <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
 </body>
 </html>

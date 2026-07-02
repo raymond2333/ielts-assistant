@@ -14,12 +14,12 @@
         <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
       </div>
       <nav>
-        <a href="{{ url_for('dashboard') }}" title="学习总览">🏠 <span class="nav-text">学习总览</span></a>
-        <a href="{{ url_for('speaking') }}" title="口语练习">💬 <span class="nav-text">口语练习</span></a>
-        <a href="{{ url_for('writing') }}" title="作文批改">📝 <span class="nav-text">作文批改</span></a>
-        <a href="{{ url_for('analysis') }}" title="学习分析">📊 <span class="nav-text">学习分析</span></a>
-        <a href="{{ url_for('vocabulary') }}" title="背单词">📚 <span class="nav-text">背单词</span></a>
-        <a href="{{ url_for('admin_panel') }}" title="用户管理">🛡️ <span class="nav-text">用户管理</span></a>
+        <a href="{{ url_for('dashboard') }}" title="学习总览"><span class="svg-icon icon-home nav-svg" aria-hidden="true"></span><span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习"><span class="svg-icon icon-speaking nav-svg" aria-hidden="true"></span><span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改"><span class="svg-icon icon-writing nav-svg" aria-hidden="true"></span><span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析"><span class="svg-icon icon-analysis nav-svg" aria-hidden="true"></span><span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词"><span class="svg-icon icon-vocabulary nav-svg" aria-hidden="true"></span><span class="nav-text">背单词</span></a>
+        <a href="{{ url_for('admin_panel') }}" title="用户管理"><span class="svg-icon icon-admin nav-svg" aria-hidden="true"></span><span class="nav-text">用户管理</span></a>
       </nav>
     </aside>
 
@@ -187,6 +187,6 @@
       </section>
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260701e') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
 </body>
 </html>

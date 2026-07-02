@@ -77,21 +77,79 @@ document.addEventListener("DOMContentLoaded", () => {
     if (active) syncResults(active.dataset.tabTarget);
   });
 
-  function speakTextValue(text) {
+  function loadVoices() {
+    if (!window.speechSynthesis) return Promise.resolve([]);
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length) return Promise.resolve(voices);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve(window.speechSynthesis.getVoices());
+      };
+      window.speechSynthesis.onvoiceschanged = finish;
+      setTimeout(finish, 700);
+    });
+  }
+
+  function pickEnglishVoice(voices) {
+    const englishVoices = voices.filter((v) => /^en[-_]/i.test(v.lang || ""));
+    const preferredNames = [
+      /Microsoft Guy/i,
+      /Microsoft David/i,
+      /Microsoft Mark/i,
+      /Google UK English Male/i,
+      /Google US English Male/i,
+      /Daniel/i,
+      /Alex/i,
+      /Microsoft Aria/i,
+      /Microsoft Jenny/i,
+      /Google US English/i,
+      /Google UK English/i,
+      /Samantha/i,
+      /Karen/i,
+    ];
+    for (const pattern of preferredNames) {
+      const match = englishVoices.find((v) => pattern.test(v.name || ""));
+      if (match) return match;
+    }
+    return englishVoices.find((v) => /^en[-_](US|GB|AU)/i.test(v.lang || "")) || englishVoices[0] || null;
+  }
+
+  function chunkSpeechText(text) {
+    const cleanText = text.replace(/\s+/g, " ").trim();
+    if (!cleanText) return [];
+    if (cleanText.length <= 900) return [cleanText];
+    const sentenceChunks = cleanText.match(/[^.!?。！？]+[.!?。！？]?/g) || [cleanText];
+    const chunks = [];
+    let current = "";
+    sentenceChunks.forEach((sentence) => {
+      const trimmed = sentence.trim();
+      if (!trimmed) return;
+      if ((current + " " + trimmed).trim().length <= 650) {
+        current = (current + " " + trimmed).trim();
+        return;
+      }
+      if (current) chunks.push(current);
+      current = trimmed;
+    });
+    if (current) chunks.push(current);
+    return chunks;
+  }
+
+  async function speakTextValue(text) {
     if (!text || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const cleanText = text.replace(/\s+/g, " ").trim();
-    const maxChunkLength = 180;
-    const chunks = cleanText.match(new RegExp(`.{1,${maxChunkLength}}(\\s|$)`, "g")) || [cleanText];
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find((v) =>
-      /Microsoft Jenny|Microsoft Aria|Google US|Samantha|Alex|Daniel|Karen|Tingting/i.test(v.name)
-    ) || voices.find((v) => /^en[-_](US|GB|AU)/i.test(v.lang));
+    const chunks = chunkSpeechText(text);
+    if (!chunks.length) return;
+    const voices = await loadVoices();
+    const preferred = pickEnglishVoice(voices);
     const speakChunk = (index) => {
       if (index >= chunks.length) return;
-      const utterance = new SpeechSynthesisUtterance(chunks[index].trim());
-      utterance.lang = "en-US";
-      utterance.rate = 0.78;
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      utterance.lang = preferred ? preferred.lang : "en-US";
+      utterance.rate = 0.92;
       utterance.pitch = 1;
       utterance.volume = 1;
       if (preferred) utterance.voice = preferred;
