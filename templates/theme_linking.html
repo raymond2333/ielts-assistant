@@ -39,9 +39,57 @@
           </div>
         </details>
 
+        {% if result_data.get('cue_card') or result_data.get('unified_story_en') %}
+        <details class="result-accordion" open>
+          <summary><span class="svg-icon icon-theme" aria-hidden="true"></span> 统一 Part 2 故事</summary>
+          <div class="result-body">
+            {% if result_data.get('story_title') %}<h3>{{ result_data.get('story_title') }}</h3>{% endif %}
+            {% if result_data.get('cue_card') %}
+              <details class="result-accordion nested-answer" open>
+                <summary>可套用题目卡</summary>
+                <div class="result-body">{{ result_data.get('cue_card') | simple_md }}</div>
+              </details>
+            {% endif %}
+            {% if result_data.get('unified_story_cn') %}<p><strong>串题思路：</strong>{{ result_data.get('unified_story_cn') }}</p>{% endif %}
+            {% if result_data.get('unified_story_en') %}
+              <p><strong>English Story：</strong><button class="speak-btn" type="button">朗读故事</button></p>
+              <p class="speak-source theme-story">{{ result_data.get('unified_story_en') }}</p>
+            {% endif %}
+          </div>
+        </details>
+        {% endif %}
+
+        {% if result_data.get('covered_topics') %}
+        <details class="result-accordion" open>
+          <summary>主题融合方式</summary>
+          <div class="result-body">
+            {% for item in result_data.covered_topics %}
+              <p><strong>{{ item.get('topic', '') }}：</strong>{{ item.get('how_it_is_used', '') }}</p>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
+
+        {% if result_data.get('possible_part2_questions') %}
+        <details class="result-accordion">
+          <summary>可迁移 Part 2 题目</summary>
+          <div class="result-body"><ul>{% for q in result_data.possible_part2_questions %}<li>{{ q }}</li>{% endfor %}</ul></div>
+        </details>
+        {% endif %}
+
+        {% if result_data.get('story_structure') or result_data.get('versatile_phrases') %}
+        <details class="result-accordion">
+          <summary>故事结构与可迁移表达</summary>
+          <div class="result-body">
+            {% if result_data.get('story_structure') %}<p class="tag-row"><strong>结构：</strong>{% for item in result_data.story_structure %}<span class="tag">{{ item }}</span>{% endfor %}</p>{% endif %}
+            {% if result_data.get('versatile_phrases') %}<p class="tag-row"><strong>表达：</strong>{% for item in result_data.versatile_phrases %}<span class="tag tag-accent">{{ item }}</span>{% endfor %}</p>{% endif %}
+          </div>
+        </details>
+        {% endif %}
+
         {% if result_data.get('linked_responses') %}
         <details class="result-accordion" open>
-          <summary><span class="svg-icon icon-theme" aria-hidden="true"></span> 话题串联方案</summary>
+          <summary><span class="svg-icon icon-theme" aria-hidden="true"></span> 旧版分话题方案</summary>
           <div class="result-body">
             {% for item in result_data.linked_responses %}
             <div class="theme-card">

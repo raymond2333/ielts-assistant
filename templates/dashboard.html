@@ -79,7 +79,12 @@
         </div>
         <div class="metric-card">
           <span>考试日期</span>
-          <strong>{{ profile.exam_date or '未设置' }}</strong>
+          {% if exam_countdown %}
+            <strong>{{ exam_countdown.days }} 天</strong>
+            <small>倒计时 · {{ exam_countdown.date }}</small>
+          {% else %}
+            <strong>未设置</strong>
+          {% endif %}
         </div>
         <div class="metric-card">
           <span>每周学习</span>

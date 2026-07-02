@@ -870,6 +870,121 @@ def parse_model_output(raw):
     return None
 
 
+def _looks_like_part2_content(value: Any) -> bool:
+    if value in (None, ""):
+        return False
+    try:
+        text = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
+    except TypeError:
+        text = str(value)
+    lowered = text.lower()
+    markers = [
+        "ielts speaking - part 2",
+        "cue card",
+        "you should say",
+        "you will have to talk about the topic",
+        "one minute to think",
+        "1 to 2 minutes",
+    ]
+    return any(marker in lowered for marker in markers)
+
+
+def sanitize_speaking_result(mode: str, result_data: Any) -> Any:
+    """Keep generated speaking payloads scoped to their IELTS part."""
+    if not isinstance(result_data, dict):
+        return result_data
+    mode = (mode or "").lower()
+    data = dict(result_data)
+
+    if mode == "part1":
+        data.pop("cue_card", None)
+        data.pop("discussion_questions", None)
+        data.pop("model_answer", None)
+        cleaned_questions = []
+        for item in data.get("questions") or []:
+            if not isinstance(item, dict):
+                continue
+            question = item.get("question", "")
+            if _looks_like_part2_content(question):
+                continue
+            cleaned = dict(item)
+            answer = cleaned.get("model_answer")
+            if not isinstance(answer, str) or _looks_like_part2_content(answer):
+                cleaned.pop("model_answer", None)
+            cleaned_questions.append(cleaned)
+        data["questions"] = cleaned_questions
+        return data
+
+    if mode == "part2":
+        data.pop("questions", None)
+        data.pop("discussion_questions", None)
+        return data
+
+    if mode == "part3":
+        data.pop("questions", None)
+        data.pop("cue_card", None)
+        data.pop("model_answer", None)
+        return data
+
+    return data
+
+
+def _writing_answer_looks_like_task2(answer: Any) -> bool:
+    if not answer:
+        return False
+    text = str(answer).lower()
+    task2_markers = [
+        "in my opinion",
+        "i believe",
+        "this essay",
+        "discuss both views",
+        "some people believe",
+        "others argue",
+        "on the one hand",
+        "on the other hand",
+        "to what extent",
+        "advantages and disadvantages",
+    ]
+    return any(marker in text for marker in task2_markers)
+
+
+def _writing_answer_looks_like_task1(answer: Any) -> bool:
+    if not answer:
+        return False
+    text = str(answer).lower()
+    task1_markers = [
+        "the graph",
+        "the line graph",
+        "the bar chart",
+        "the pie chart",
+        "the table",
+        "the chart",
+        "the diagram",
+        "the map",
+        "overall",
+        "respectively",
+        "increased",
+        "decreased",
+        "rose",
+        "fell",
+    ]
+    return any(marker in text for marker in task1_markers)
+
+
+def sanitize_writing_model_answer(task_type: str, answer: Any) -> str:
+    if not isinstance(answer, str):
+        return ""
+    normalized_task = "Task 1" if task_type == "Task 1" else "Task 2"
+    cleaned = answer.strip()
+    if not cleaned:
+        return ""
+    if normalized_task == "Task 1" and _writing_answer_looks_like_task2(cleaned):
+        return ""
+    if normalized_task == "Task 2" and _writing_answer_looks_like_task1(cleaned) and not _writing_answer_looks_like_task2(cleaned):
+        return ""
+    return cleaned
+
+
 def _flexible_marker_search(text, marker_base):
     """Try to find a marker with both Chinese and English colons."""
     for variant in [marker_base, marker_base.replace("：", ":")]:

@@ -81,8 +81,8 @@ class TongyiIELTSAssistant:
     # ============================================================
     # 写作批改
     # ============================================================
-    def correct_writing_task1(self, task_type, essay_content, target_score):
-        prompt = WRITING_TASK1_CORRECTION_PROMPT.format(task_type=task_type, essay_content=essay_content, target_score=target_score)
+    def correct_writing_task1(self, task_type, essay_content, target_score, topic=""):
+        prompt = WRITING_TASK1_CORRECTION_PROMPT.format(task_type=task_type, topic=topic or "未提供", essay_content=essay_content, target_score=target_score)
         return self.llm.invoke(prompt).content
 
     def correct_writing_task2(self, topic, essay_type, essay_content, target_score):
@@ -170,13 +170,15 @@ class TongyiIELTSAssistant:
     def generate_model_answer(self, task_type, topic, chart_type="", chart_data=None, table_data=None):
         cd = json.dumps(chart_data, ensure_ascii=False) if chart_data else "无"
         td = json.dumps(table_data, ensure_ascii=False) if table_data else "无"
-        prompt = GENERATE_MODEL_ANSWER_PROMPT.format(
-            task_type=task_type,
-            topic=topic,
-            chart_type=chart_type or "无",
-            chart_data=cd,
-            table_data=td,
-        )
+        if task_type == "Task 1":
+            prompt = GENERATE_MODEL_ANSWER_TASK1_PROMPT.format(
+                topic=topic,
+                chart_type=chart_type or "无",
+                chart_data=cd,
+                table_data=td,
+            )
+        else:
+            prompt = GENERATE_MODEL_ANSWER_TASK2_PROMPT.format(topic=topic)
         return self.llm.invoke(prompt).content
 
     # ============================================================
@@ -219,7 +221,7 @@ class TongyiIELTSAssistant:
                 entry += f" 得分: {score}"
             history_summary.append(entry)
 
-        gap = target_score - current_level
+        gap = max(0.0, float(target_score) - float(current_level))
         weak_areas_text = ", ".join(weak_areas) if weak_areas else "未指定"
         history_text = "\n".join(history_summary) if history_summary else "暂无训练记录"
         prompt = IMPROVEMENT_SUGGESTIONS_PROMPT.format(
@@ -245,7 +247,7 @@ class TongyiIELTSAssistant:
                 entry += f" 得分: {score}"
             history_summary.append(entry)
 
-        gap = target_score - current_level
+        gap = max(0.0, float(target_score) - float(current_level))
         weak_areas_text = ", ".join(weak_areas) if weak_areas else "未指定"
         history_text = "\n".join(history_summary) if history_summary else "暂无训练记录"
         prompt = STUDY_PLAN_PROMPT.format(

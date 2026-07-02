@@ -22,6 +22,9 @@
       <section class="metric-grid">
         <div class="metric-card"><span>综合水平</span><strong>{{ '%.1f'|format(profile.current_level) }}</strong></div>
         <div class="metric-card"><span>目标分数</span><strong>{{ '%.1f'|format(profile.target_score) }}</strong></div>
+        {% if exam_countdown %}
+        <div class="metric-card"><span>考试倒计时</span><strong>{{ exam_countdown.days }} 天</strong><small>{{ exam_countdown.date }}</small></div>
+        {% endif %}
         <div class="metric-card"><span>学习记录</span><strong>{{ total_records }}</strong></div>
         <div class="metric-card"><span>生词本</span><strong>{{ user_words|length }}</strong></div>
       </section>

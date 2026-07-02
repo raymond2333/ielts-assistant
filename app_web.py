@@ -50,6 +50,8 @@ from utils import (
     learning_record_title,
     parse_generated_topic_md,
     parse_model_output,
+    sanitize_speaking_result,
+    sanitize_writing_model_answer,
     simple_md_filter as _simple_md_filter,
     verify_cross_token as _verify_cross_token,
 )
@@ -390,10 +392,9 @@ def record_result_filter(result_data, activity=""):
         )
         essay_content = result_data.get("_essay_content") or result_data.get("essay_content")
         if essay_content:
-            essay_html = escape(essay_content).replace("\n", "<br>")
             sections.append(
                 "<details class='result-accordion'><summary>我的作文原文</summary>"
-                f"<div class='result-body essay-original'><p>{essay_html}</p></div></details>"
+                f"<div class='result-body essay-original'><div>{escape(essay_content)}</div></div></details>"
             )
 
     if result_data.get("overall_score") is not None and isinstance(result_data.get("breakdown"), dict):
@@ -452,7 +453,7 @@ def record_result_filter(result_data, activity=""):
             )
         return Markup("".join(sections))
 
-    if result_data.get("unifying_theme") or isinstance(result_data.get("linked_responses"), list):
+    if result_data.get("unifying_theme") or result_data.get("unified_story_en") or isinstance(result_data.get("linked_responses"), list):
         theme_body = []
         if result_data.get("unifying_theme"):
             theme_body.append(f"<p><strong>中文：</strong>{escape(result_data['unifying_theme'])}</p>")
@@ -462,6 +463,60 @@ def record_result_filter(result_data, activity=""):
             sections.append(
                 "<details class='result-accordion' open><summary>核心主题</summary>"
                 f"<div class='result-body'>{''.join(theme_body)}</div></details>"
+            )
+
+        if result_data.get("cue_card") or result_data.get("unified_story_en"):
+            story_body = []
+            if result_data.get("story_title"):
+                story_body.append(f"<h3>{escape(result_data['story_title'])}</h3>")
+            if result_data.get("cue_card"):
+                story_body.append(
+                    "<details class='result-accordion nested-answer' open><summary>可套用题目卡</summary>"
+                    f"<div class='result-body'>{simple_md_filter(result_data.get('cue_card'))}</div></details>"
+                )
+            if result_data.get("unified_story_cn"):
+                story_body.append(f"<p><strong>串题思路：</strong>{escape(result_data['unified_story_cn'])}</p>")
+            if result_data.get("unified_story_en"):
+                english = str(result_data["unified_story_en"])
+                story_body.append(
+                    "<p><strong>English Story：</strong><button class='speak-btn' type='button'>朗读故事</button></p>"
+                    f"<p class='speak-source theme-story'>{escape(english)}</p>"
+                )
+            sections.append(
+                "<details class='result-accordion' open><summary>统一 Part 2 故事</summary>"
+                f"<div class='result-body'>{''.join(story_body)}</div></details>"
+            )
+
+        covered_topics = result_data.get("covered_topics") or []
+        if isinstance(covered_topics, list) and covered_topics:
+            rows = []
+            for item in covered_topics:
+                if isinstance(item, dict):
+                    rows.append(f"<p><strong>{escape(item.get('topic', ''))}：</strong>{escape(item.get('how_it_is_used', ''))}</p>")
+                else:
+                    rows.append(f"<p>{escape(item)}</p>")
+            sections.append(
+                "<details class='result-accordion' open><summary>主题融合方式</summary>"
+                f"<div class='result-body'>{''.join(rows)}</div></details>"
+            )
+
+        if result_data.get("possible_part2_questions"):
+            sections.append(
+                "<details class='result-accordion'><summary>可迁移 Part 2 题目</summary>"
+                f"<div class='result-body'>{_html_list(result_data['possible_part2_questions'])}</div></details>"
+            )
+
+        if result_data.get("story_structure") or result_data.get("versatile_phrases"):
+            body = []
+            if result_data.get("story_structure"):
+                body.append("<p><strong>结构：</strong></p>")
+                body.append(_html_list(result_data["story_structure"]))
+            if result_data.get("versatile_phrases"):
+                body.append("<p><strong>表达：</strong></p>")
+                body.append(_html_list(result_data["versatile_phrases"]))
+            sections.append(
+                "<details class='result-accordion'><summary>故事结构与可迁移表达</summary>"
+                f"<div class='result-body'>{''.join(body)}</div></details>"
             )
 
         linked_responses = result_data.get("linked_responses") or []
@@ -1281,22 +1336,23 @@ def _record_display_meta(record):
     data = record.get("data") if isinstance(record, dict) else {}
     data = data if isinstance(data, dict) else {}
     mode = data.get("mode", "")
+    source_mode = data.get("source_mode", "")
     task_type = data.get("task_type", "")
 
-    if "Part 1" in activity or mode == "part1":
+    if "Part 1" in activity or mode == "part1" or source_mode == "part1":
         return {"icon": "speaking", "title": "口语 Part 1 训练", "badge": "Speaking"}
-    if "Part 2" in activity or mode == "part2":
+    if "Part 2" in activity or mode == "part2" or source_mode == "part2":
         return {"icon": "target", "title": "口语 Part 2 训练", "badge": "Cue Card"}
-    if "Part 3" in activity or mode == "part3":
+    if "Part 3" in activity or mode == "part3" or source_mode == "part3":
         return {"icon": "brain", "title": "口语 Part 3 训练", "badge": "Discussion"}
     if "口语串题" in activity:
         return {"icon": "theme", "title": "口语串题训练", "badge": "Theme"}
-    if "口语" in activity or mode in {"speaking_feedback", "speaking_recording"}:
-        return {"icon": "mic", "title": "口语训练", "badge": "Speaking"}
     if "Task 1" in activity or task_type == "Task 1" or mode == "task1":
         return {"icon": "chart", "title": "写作 Task 1 训练", "badge": "Writing"}
     if "Task 2" in activity or task_type == "Task 2" or mode == "task2":
         return {"icon": "writing", "title": "写作 Task 2 训练", "badge": "Writing"}
+    if "口语" in activity or mode in {"speaking_feedback", "speaking_recording"}:
+        return {"icon": "mic", "title": "口语训练", "badge": "Speaking"}
     if "作文" in activity or "写作" in activity:
         return {"icon": "writing", "title": "写作训练", "badge": "Writing"}
     if "背单词" in activity or "词" in activity:
@@ -1617,13 +1673,14 @@ def skill_score_overview(profile):
     overview = []
     for label, icon, key in items:
         score = round_ielts_band(profile_band(profile, key, 5.0))
+        completion = 100 if target <= 0 else int((score / target) * 100)
         overview.append({
             "label": label,
             "icon": icon,
             "score": score,
             "target": target,
-            "percent": max(0, min(100, int((score / 9.0) * 100))),
-            "target_percent": max(0, min(100, int((target / 9.0) * 100))),
+            "percent": max(0, min(100, completion)),
+            "target_percent": 100,
             "gap": round_ielts_band(max(0.0, target - score)),
         })
     return overview
@@ -2579,14 +2636,20 @@ def admin_panel():
     users = list_users()
     for item in users:
         item["is_admin"] = bool(item.get("is_admin")) or is_admin_user(item.get("user_id"))
+    users.sort(key=lambda item: (not item.get("is_admin"), str(item.get("user_id", "")).lower()))
+    admin_count = sum(1 for item in users if item.get("is_admin"))
+    total_user_records = sum(int(item.get("record_count") or 0) for item in users)
     selected_profile = load_user_profile(selected_user) if selected_user else None
     selected_ai_config = load_user_ai_config(selected_user) if selected_user else None
     selected_is_admin = is_admin_user(selected_user) if selected_user else False
     records = prepare_progress(get_all_progress(limit=500, user_id=selected_user))
+    records.sort(key=lambda item: str(item.get("timestamp", "")), reverse=True)
     return render_template(
         "admin.html",
         users=users,
         records=records,
+        admin_count=admin_count,
+        total_user_records=total_user_records,
         selected_user=selected_user,
         selected_profile=selected_profile,
         selected_ai_config=selected_ai_config,
@@ -2743,6 +2806,7 @@ def speaking():
                 difficulty,
             )
             result_data = parse_model_output(result)
+            result_data = sanitize_speaking_result(mode, result_data)
             save_progress(session["user_id"], "口语Part 1题目生成", {
                 "mode": mode,
                 "topic": topic,
@@ -2758,6 +2822,7 @@ def speaking():
                 cue_type,
             )
             result_data = parse_model_output(result)
+            result_data = sanitize_speaking_result(mode, result_data)
             save_progress(session["user_id"], "口语Part 2题目生成", {
                 "mode": mode,
                 "topic": topic,
@@ -2773,6 +2838,7 @@ def speaking():
                 discussion_type,
             )
             result_data = parse_model_output(result)
+            result_data = sanitize_speaking_result(mode, result_data)
             save_progress(session["user_id"], "口语Part 3题目生成", {
                 "mode": mode,
                 "topic": part2_topic,
@@ -2969,6 +3035,7 @@ def speaking():
                     except (TypeError, ValueError):
                         result_data = None
     if isinstance(result_data, dict) and mode in {"part1", "part2", "part3"}:
+        result_data = sanitize_speaking_result(mode, result_data)
         result_data = decorate_current_speaking_result(session["user_id"], result_data)
         result = json.dumps(result_data, ensure_ascii=False)
     return render_template("speaking.html", result=result, result_data=result_data, mode=mode, **common_context())
@@ -3038,6 +3105,19 @@ def writing():
             result_data = build_task1_chart_assets(result_data, raw_text=result)
             session["generated_topic_text"] = result_data.get("question", "")
             session["generated_topic_task"] = task_type
+            # 同步生成参考范文
+            topic_q = result_data.get("question", "")
+            if topic_q:
+                try:
+                    model_answer = assistant.generate_model_answer(
+                        task_type, topic_q,
+                        result_data.get("chart_type", ""),
+                        result_data.get("chart_data"),
+                        result_data.get("table_data"),
+                    )
+                    result_data["model_answer"] = sanitize_writing_model_answer(task_type, model_answer)
+                except Exception:
+                    pass
             # Store only chart/table fields (not full result_data) to stay within cookie size limit
             session["generated_chart_data"] = json.dumps({
                 "chart_type": result_data.get("chart_type", ""),
@@ -3048,6 +3128,7 @@ def writing():
                 "task_type": task_type,
                 "topic_category": result_data.get("topic_category", ""),
                 "essay_type": result_data.get("essay_type", ""),
+                "model_answer": result_data.get("model_answer", ""),
             }, ensure_ascii=False)
             save_progress(session["user_id"], "生成作文题目", {
                 "mode": mode,
@@ -3068,6 +3149,7 @@ def writing():
             session["writing_ideas_question"] = question
             save_progress(session["user_id"], "作文思路互动", {
                 "mode": mode,
+                "task_type": session.get("generated_topic_task", "Task 2"),
                 "topic": topic,
                 "chart_data": chart_data,
                 "table_data": table_data,
@@ -3078,12 +3160,14 @@ def writing():
         elif mode == "task1":
             task_type = request.form.get("task_type", "图表描述")
             essay_content = request.form.get("essay_content", "")
+            topic = request.form.get("topic", "").strip()
             target_score = float_field("target_score", 6.5)
             reference_note = reference_essay_note_for_submission(essay_content)
             result = assistant.correct_writing_task1(
                 task_type,
                 essay_content,
                 target_score,
+                topic=topic,
             )
             result_data = parse_model_output(result)
             result_data = normalize_writing_scores(result_data, "Task 1")
@@ -3093,6 +3177,8 @@ def writing():
             save_progress(session["user_id"], "写作 Task 1 批改", {
                 "mode": mode,
                 "task_type": task_type,
+                "topic": topic,
+                "question": topic,
                 "essay_content": essay_content,
                 "target_score": target_score,
                 "score": result_data.get("overall_score") if isinstance(result_data, dict) else None,
@@ -3102,12 +3188,13 @@ def writing():
             refresh_user_level_tracking(session["user_id"])
         elif mode == "task2":
             topic_category = request.form.get("topic_category", "教育")
+            topic = request.form.get("topic", "").strip()
             essay_type = request.form.get("essay_type", "议论文")
             essay_content = request.form.get("essay_content", "")
             target_score = float_field("target_score", 6.5)
             reference_note = reference_essay_note_for_submission(essay_content)
             result = assistant.correct_writing_task2(
-                topic_category,
+                topic or topic_category,
                 essay_type,
                 essay_content,
                 target_score,
@@ -3121,6 +3208,8 @@ def writing():
                 "mode": mode,
                 "topic_category": topic_category,
                 "essay_type": essay_type,
+                "topic": topic,
+                "question": topic,
                 "essay_content": essay_content,
                 "target_score": target_score,
                 "score": result_data.get("overall_score") if isinstance(result_data, dict) else None,
@@ -3147,6 +3236,7 @@ def writing():
             chart_data = topic_data.get("chart_data")
             table_data = topic_data.get("table_data")
             result = assistant.generate_model_answer(task_type, topic, chart_type, chart_data, table_data)
+            result = sanitize_writing_model_answer(task_type, result)
             session["latest_model_answer"] = result
             result_data = {
                 **topic_data,
@@ -3167,6 +3257,9 @@ def writing():
                 "result": result,
                 "result_data": result_data,
             })
+            session["inline_model_answer"] = result
+            flash("参考范文已生成，显示在题目下方。", "success")
+            return redirect(url_for("writing"))
         if result is not None:
             session["writing_result"] = result
             session["writing_result_data"] = json.dumps(result_data) if result_data is not None else None
@@ -3201,6 +3294,28 @@ def writing():
     # 生成的作文题目自动填充（无需手动导入）
     gen_topic_text = session.pop("generated_topic_text", None)
     gen_topic_task = session.pop("generated_topic_task", None)
+    generated_topic_data = {}
+    stored_generated_topic = session.get("generated_chart_data", "")
+    if stored_generated_topic:
+        try:
+            generated_topic_data = json.loads(stored_generated_topic)
+        except (TypeError, ValueError):
+            generated_topic_data = {}
+    if isinstance(generated_topic_data, dict) and generated_topic_data.get("model_answer"):
+        task_for_answer = generated_topic_data.get("task_type", "Task 2")
+        generated_topic_data["model_answer"] = sanitize_writing_model_answer(
+            task_for_answer,
+            generated_topic_data.get("model_answer", ""),
+        )
+        session["generated_chart_data"] = json.dumps(generated_topic_data, ensure_ascii=False)
+    if isinstance(result_data, dict) and mode == "generate_topic" and result_data.get("model_answer"):
+        result_data["model_answer"] = sanitize_writing_model_answer(
+            result_data.get("task_type", "Task 2"),
+            result_data.get("model_answer", ""),
+        )
+
+    # 内联参考范文（从 generate_model_answer 重定向回来时）
+    inline_model_answer = session.pop("inline_model_answer", None)
 
     return render_template("writing.html",
         result=result, result_data=result_data, mode=mode,
@@ -3211,7 +3326,30 @@ def writing():
         ideas_question=ideas_question,
         generated_topic_text=gen_topic_text,
         generated_topic_task=gen_topic_task,
+        generated_topic_data=generated_topic_data,
+        inline_model_answer=inline_model_answer,
         **common_context())
+
+
+@app.get("/writing/clear")
+@login_required
+def clear_writing_topic():
+    for key in [
+        "generated_topic_text",
+        "generated_topic_task",
+        "generated_chart_data",
+        "writing_result",
+        "writing_result_data",
+        "writing_mode",
+        "inline_model_answer",
+        "latest_model_answer",
+        "writing_ideas_topic",
+        "writing_ideas_question",
+    ]:
+        session.pop(key, None)
+    target_mode = request.args.get("mode", "task1")
+    flash("当前作文题目已清除，可以重新生成或手动输入。", "success")
+    return redirect(url_for("writing", mode=target_mode))
 
 
 @app.route("/analysis")
@@ -3232,6 +3370,7 @@ def analysis():
     context = common_context()
     context["profile"] = tracked_profile
     context["skill_scores"] = skill_score_overview(context["profile"])
+    context["exam_countdown"] = exam_countdown(tracked_profile)
     return render_template(
         "analysis.html",
         progress=progress,

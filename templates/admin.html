@@ -48,37 +48,49 @@
 
       <section class="metric-grid">
         <div class="metric-card"><span>用户数</span><strong>{{ users|length }}</strong></div>
+        <div class="metric-card"><span>管理员</span><strong>{{ admin_count }}</strong></div>
         <div class="metric-card"><span>当前用户</span><strong>{{ selected_user or '未选择' }}</strong></div>
-        <div class="metric-card"><span>该用户记录</span><strong>{{ records|length }}</strong></div>
+        <div class="metric-card"><span>{{ '该用户记录' if selected_user else '总练习记录' }}</span><strong>{{ records|length if selected_user else total_user_records }}</strong></div>
       </section>
 
       <section class="panel">
         <div class="panel-heading"><div><p class="eyebrow">Users</p><h2>成员列表</h2></div></div>
         {% if users %}
-          <div class="timeline">
+          <div class="admin-user-grid">
             {% for u in users %}
-              <details class="timeline-item" {% if selected_user == u.user_id %}open{% endif %}>
-                <summary>
-                  <strong><a href="{{ url_for('admin_panel', user_id=u.user_id) }}">{{ u.user_id }}</a>{% if u.is_admin %} · 管理员{% endif %}</strong>
-                  <span>{{ u.record_count }} 条记录</span>
-                </summary>
-                <div class="result-body">
-                  {% if u.full_name %}<p class="record-meta"><strong>姓名：</strong>{{ u.full_name }}</p>{% endif %}
-                  {% if u.email %}<p class="record-meta"><strong>邮箱：</strong>{{ u.email }}</p>{% endif %}
-                  <p class="record-meta"><strong>当前水平：</strong>{{ '%.1f'|format(u.current_level) }} · <strong>目标：</strong>{{ '%.1f'|format(u.target_score) }}</p>
-                  <p class="record-meta"><strong>创建时间：</strong>{{ u.created_at | beijing_time }}</p>
-                  <a class="primary-btn small" href="{{ url_for('admin_panel', user_id=u.user_id) }}">打开用户详情</a>
+              <article class="admin-user-card {% if selected_user == u.user_id %}selected{% endif %}">
+                <div class="admin-user-top">
+                  <a class="admin-user-avatar" href="{{ url_for('admin_panel', user_id=u.user_id) }}" aria-label="打开 {{ u.user_id }} 的用户详情">
+                    <span class="svg-icon icon-admin" aria-hidden="true"></span>
+                  </a>
+                  <div class="admin-user-main">
+                    <h3><a href="{{ url_for('admin_panel', user_id=u.user_id) }}">{{ u.user_id }}</a></h3>
+                    <p>{{ u.full_name or u.email or '未填写个人信息' }}</p>
+                  </div>
+                  {% if u.is_admin %}<span class="admin-role-badge">管理员</span>{% endif %}
+                </div>
+                <div class="admin-user-stats">
+                  <span><b>{{ '%.1f'|format(u.current_level) }}</b>当前</span>
+                  <span><b>{{ '%.1f'|format(u.target_score) }}</b>目标</span>
+                  <span><b>{{ u.record_count }}</b>记录</span>
+                </div>
+                <div class="admin-user-meta">
+                  {% if u.email %}<span>{{ u.email }}</span>{% endif %}
+                  <span>创建于 {{ u.created_at | beijing_time }}</span>
+                </div>
+                <div class="admin-user-actions">
+                  <a class="primary-btn small" href="{{ url_for('admin_panel', user_id=u.user_id) }}">查看与编辑</a>
                   {% if u.user_id != user_id %}
-                    <form method="post" action="{{ url_for('admin_update_user_role', target_user=u.user_id) }}" style="display:inline-block;margin-left:8px">
+                    <form method="post" action="{{ url_for('admin_update_user_role', target_user=u.user_id) }}">
                       <input type="hidden" name="is_admin" value="{{ '0' if u.is_admin else '1' }}">
                       <button class="ghost-btn small" type="submit">{{ '取消管理员' if u.is_admin else '设为管理员' }}</button>
                     </form>
-                    <form method="post" action="{{ url_for('admin_delete_user', target_user=u.user_id) }}" style="display:inline-block;margin-left:8px" onsubmit="return confirm('确定删除用户 {{ u.user_id }} 吗？该用户所有记录也会被删除。')">
+                    <form method="post" action="{{ url_for('admin_delete_user', target_user=u.user_id) }}" onsubmit="return confirm('确定删除用户 {{ u.user_id }} 吗？该用户所有记录也会被删除。')">
                       <button class="ghost-btn small" type="submit" style="color:var(--danger)">删除用户</button>
                     </form>
                   {% endif %}
                 </div>
-              </details>
+              </article>
             {% endfor %}
           </div>
         {% else %}
@@ -158,7 +170,21 @@
           <div class="timeline">
             {% for item in records %}
               <details class="timeline-item">
-                <summary><strong>{{ item.activity }}</strong><span>{{ item.user_id }} · {{ item.timestamp | beijing_time }}</span></summary>
+                <summary class="record-summary">
+                  <span class="record-icon"><span class="svg-icon icon-{{ item.display_icon or 'analysis' }}" aria-hidden="true"></span></span>
+                  <strong>{{ item.display_title or (item.activity | record_title) }}</strong>
+                  {% if item.display_badge %}<span class="record-badge">{{ item.display_badge }}</span>{% endif %}
+                  {% if item.display_score %}<span class="record-score-chip">{{ '%.1f'|format(item.display_score) }}分</span>{% endif %}
+                  <time>{{ item.user_id }} · {{ item.timestamp | beijing_time }}</time>
+                  {% if item.progress_summary %}
+                    <span class="record-overview">
+                      <b>{{ item.progress_summary.generated }} 题生成</b>
+                      <b>{{ item.progress_summary.practiced }} 题已练</b>
+                      <b>{{ item.progress_summary.best_score if item.progress_summary.best_score is not none else '--' }} 分</b>
+                      <i><span style="width: {{ item.progress_summary.percent }}%"></span></i>
+                    </span>
+                  {% endif %}
+                </summary>
                 <div class="result-body">
                   <p class="record-meta"><strong>记录ID：</strong>{{ item.id }}</p>
                   <p class="record-meta"><strong>用户：</strong>{{ item.user_id }}</p>

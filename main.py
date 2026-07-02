@@ -30,6 +30,7 @@ from utils import (
     parse_generated_topic_md,
     parse_json_response,
     register_user,
+    sanitize_speaking_result,
     save_user_ai_config,
     save_user_api_key,
     save_user_profile,
@@ -606,6 +607,7 @@ def _render_speaking_part1():
                         difficulty=difficulty
                     )
                     parsed_result = parse_json_response(result)
+                    parsed_result = sanitize_speaking_result("part1", parsed_result)
                     
                     # 验证结果格式
                     if isinstance(parsed_result, dict) and "questions" in parsed_result:
@@ -753,6 +755,7 @@ def _render_speaking_part2():
                     )
                     # Part 2 输出是 Markdown 格式，直接存储原始结果
                     parsed_result = parse_json_response(result)
+                    parsed_result = sanitize_speaking_result("part2", parsed_result)
                     
                     # 检查是否是 JSON 格式（结构化数据）还是 Markdown 格式
                     if isinstance(parsed_result, dict) and "answer" in parsed_result and len(parsed_result) == 1:
@@ -1057,6 +1060,7 @@ def _render_speaking_part3():
                     discussion_type=discussion_type
                 )
                 parsed_result = parse_json_response(result)
+                parsed_result = sanitize_speaking_result("part3", parsed_result)
                 
                 # 验证结果格式
                 if isinstance(parsed_result, dict) and "discussion_questions" in parsed_result:
@@ -1180,6 +1184,7 @@ def _render_writing_task1():
     gen_col1, gen_col2 = st.columns([3, 1])
     with gen_col1:
         st.caption("点击生成随机小作文题目（含图表），题目将自动填入下方练习区")
+        st.caption("可生成图片：柱状图、线形图、饼图、表格、流程图；地图仅生成题目描述")
     with gen_col2:
         if st.button("🎲 生成小作文题目", width='stretch', key="gen_task1"):
             with st.spinner("正在生成小作文题目..."):
@@ -1248,9 +1253,11 @@ def _render_writing_task1():
     col1, col2 = st.columns(2)
 
     with col1:
+        task_type_options = ["线形图", "柱状图", "饼图", "表格", "流程图", "地图"]
         task_type = st.selectbox(
             "图表类型",
-            ["线形图", "柱状图", "饼图", "表格", "流程图", "地图"]
+            task_type_options,
+            format_func=lambda item: f"{item} - {'仅生成题目描述' if item == '地图' else '可生成图片'}",
         )
 
         essay_content = st.text_area(
@@ -2647,7 +2654,8 @@ if st.session_state.active_tab.startswith("🏠"):
 
         st.metric("当前综合水平", f"{current_level:.1f}分")
         st.metric("目标分数", f"{target_score:.1f}分")
-        st.metric("需要提升", f"{(target_score - current_level):.1f}分")
+        improvement_needed = max(0.0, float(target_score) - float(current_level))
+        st.metric("需要提升", "已达标" if improvement_needed <= 0 else f"{improvement_needed:.1f}分")
 
         # 进度可视化
         progress = min((current_level - 1) / 8 * 100, 100)
@@ -2986,8 +2994,11 @@ if st.session_state.active_tab.startswith("📊"):
             except (ValueError, TypeError):
                 st.metric("距离考试", "日期格式错误")
         with col3:
-            improvement_needed = st.session_state.user_profile['target_score'] - _profile_overall_level(st.session_state.user_profile)
-            st.metric("需要提升", f"{improvement_needed:.1f}分")
+            improvement_needed = max(
+                0.0,
+                float(st.session_state.user_profile['target_score']) - float(_profile_overall_level(st.session_state.user_profile))
+            )
+            st.metric("需要提升", "已达标" if improvement_needed <= 0 else f"{improvement_needed:.1f}分")
 
         user_id = st.session_state.user_profile.get("user_id", "default_user")
         user_progress = get_user_progress(user_id)

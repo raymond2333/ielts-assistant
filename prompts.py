@@ -37,7 +37,9 @@ SPEAKING_PART1_PROMPT = """你是雅思口语考官，请生成 Part 1 的题目
 
 要求：
 - 生成 4 道题，每道题相互独立
+- 顶层只能包含 questions、common_themes、preparation_advice 三个字段，绝对不要输出 cue_card、discussion_questions、顶层 model_answer、vocabulary_highlight 等 Part 2/Part 3 字段
 - 参考答案不要写在题目里，只放在 model_answer 字段
+- 每一道题的 model_answer 必须是该题对应的 Part 1 简短回答，绝对不要包含 "IELTS SPEAKING - PART 2"、"CUE CARD"、"You should say"、1-2 分钟陈述或任何 Part 2 题目卡内容
 - model_answer 必须是 Band 8.0-8.5 水平的高分示范：回答自然、具体、有个人细节，词汇准确灵活，句式有变化，不能写成低分、短句堆砌或模板化答案
 - Part 1 每个 model_answer 建议 4-5 句、约 55-85 个英文词；必须包含直接回答、原因解释、具体例子或个人经历、自然收束，不能只有泛泛的两三句
 - 参考答案要像真实高分考生现场回答：口语化但信息充分，至少使用 1 个自然的复杂句和 2-3 个准确的主题词汇；拿去按雅思口语标准评分时应通常达到 Band 8.0-8.5
@@ -196,11 +198,15 @@ SPEAKING_FEEDBACK_SIMPLE_PROMPT = """你是专业的雅思口语考官，请对�
 WRITING_TASK1_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 1 考官，请对以下小作文进行专业评分和反馈。
 
 图表类型：{task_type}
+题目描述：{topic}
 考生作文：{essay_content}
 目标分数：{target_score}
 
 评分要求：
 - 严格按照 IELTS Writing Task 1 四项标准评分：Task Achievement、Coherence and Cohesion、Lexical Resource、Grammatical Range and Accuracy。
+- 反馈语言必须是简体中文：band_description、comments、strengths、improvements、suggested_corrections 都必须用中文表达；可以在中文解释中保留必要英文词组或句子示例。
+- 不要在 JSON 中重复输出、改写或转义“考生作文原文”；系统会在前端单独展示用户提交的原文。
+- corrected_essay/model_answer 如需给出英文范文或英文修改示例，可以使用英文，但标题、解释和建议必须是中文。
 - 目标分数只用于建议方向，不能作为评分锚点；请根据作文实际质量独立评分。
 - overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0 ... 9.0。
 - overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
@@ -214,32 +220,32 @@ WRITING_TASK1_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 1 考官
   "band_description": "分数段说明",
   "task_achievement": {{
     "score": 8.0,
-    "comments": "任务完成度评价",
-    "strengths": ["优点1", "优点2"],
-    "improvements": ["改进建议1"]
+    "comments": "用中文评价任务完成度",
+    "strengths": ["中文优点1", "中文优点2"],
+    "improvements": ["中文改进建议1"]
   }},
   "coherence_cohesion": {{
     "score": 8.0,
-    "comments": "连贯与衔接评价",
-    "strengths": ["优点1"],
-    "improvements": ["改进建议1"]
+    "comments": "用中文评价连贯与衔接",
+    "strengths": ["中文优点1"],
+    "improvements": ["中文改进建议1"]
   }},
   "lexical_resource": {{
     "score": 8.0,
-    "comments": "词汇评价",
-    "strengths": ["优点1"],
-    "improvements": ["改进建议1"]
+    "comments": "用中文评价词汇资源",
+    "strengths": ["中文优点1"],
+    "improvements": ["中文改进建议1"]
   }},
   "grammatical_range": {{
     "score": 8.0,
-    "comments": "语法评价",
-    "strengths": ["优点1"],
-    "improvements": ["改进建议1"]
+    "comments": "用中文评价语法多样性与准确性",
+    "strengths": ["中文优点1"],
+    "improvements": ["中文改进建议1"]
   }},
-  "strengths": ["总体优点1", "总体优点2"],
-  "improvements": ["总体改进建议1", "总体改进建议2"],
-  "suggested_corrections": "语法和词汇修正建议",
-  "model_answer": "如需优化，可给出一版更高分范文"
+  "strengths": ["中文总体优点1", "中文总体优点2"],
+  "improvements": ["中文总体改进建议1", "中文总体改进建议2"],
+  "suggested_corrections": "用中文说明语法、词汇和数据描述如何修改；可附英文替换句",
+  "model_answer": "英文高分 Task 1 范文或空字符串"
 }}"""
 
 # ============================================================
@@ -254,6 +260,9 @@ WRITING_TASK2_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 2 考官
 
 评分要求：
 - 严格按照 IELTS Writing Task 2 四项标准评分：Task Response、Coherence and Cohesion、Lexical Resource、Grammatical Range and Accuracy。
+- 反馈语言必须是简体中文：band_description、comments、strengths、improvements、suggested_corrections 都必须用中文表达；可以在中文解释中保留必要英文词组或句子示例。
+- 不要在 JSON 中重复输出、改写或转义“考生作文原文”；系统会在前端单独展示用户提交的原文。
+- corrected_essay/model_essay 如需给出英文范文或英文修改示例，可以使用英文，但标题、解释和建议必须是中文。
 - 目标分数只用于建议方向，不能作为评分锚点；请根据作文实际质量独立评分。
 - overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0 ... 9.0。
 - overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
@@ -267,38 +276,38 @@ WRITING_TASK2_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 2 考官
   "band_description": "分数段说明",
   "task_response": {{
     "score": 8.0,
-    "comments": "任务回应评价",
-    "strengths": ["优点1", "优点2"],
-    "improvements": ["改进建议1"]
+    "comments": "用中文评价任务回应",
+    "strengths": ["中文优点1", "中文优点2"],
+    "improvements": ["中文改进建议1"]
   }},
   "coherence_cohesion": {{
     "score": 8.0,
-    "comments": "连贯与衔接评价",
-    "strengths": ["优点1"],
-    "improvements": ["改进建议1"]
+    "comments": "用中文评价连贯与衔接",
+    "strengths": ["中文优点1"],
+    "improvements": ["中文改进建议1"]
   }},
   "lexical_resource": {{
     "score": 8.0,
-    "comments": "词汇评价",
-    "strengths": ["优点1"],
-    "improvements": ["改进建议1"]
+    "comments": "用中文评价词汇资源",
+    "strengths": ["中文优点1"],
+    "improvements": ["中文改进建议1"]
   }},
   "grammatical_range": {{
     "score": 8.0,
-    "comments": "语法评价",
-    "strengths": ["优点1"],
-    "improvements": ["改进建议1"]
+    "comments": "用中文评价语法多样性与准确性",
+    "strengths": ["中文优点1"],
+    "improvements": ["中文改进建议1"]
   }},
-  "strengths": ["总体优点1", "总体优点2"],
-  "improvements": ["总体改进建议1", "总体改进建议2"],
-  "suggested_corrections": "语法和词汇修正建议",
-  "model_essay": "如需优化，可给出一版更高分范文"
+  "strengths": ["中文总体优点1", "中文总体优点2"],
+  "improvements": ["中文总体改进建议1", "中文总体改进建议2"],
+  "suggested_corrections": "用中文说明论证、结构、词汇和语法如何修改；可附英文替换句",
+  "model_essay": "英文高分 Task 2 范文或空字符串"
 }}"""
 
 # ============================================================
 # 口语串题
 # ============================================================
-THEME_LINKING_PROMPT = """你是雅思口语串题专家，请将以下话题进行有机串联。
+THEME_LINKING_PROMPT = """你是雅思口语 Part 2 串题故事专家。用户会给出几个不同主题，你的任务不是分别回答这些主题，而是把它们融合成一个可复用的 Part 2 高分故事。
 
 需要串联的话题：{topics}
 核心主题：{main_theme}
@@ -307,17 +316,19 @@ THEME_LINKING_PROMPT = """你是雅思口语串题专家，请将以下话题进
 {{
   "unifying_theme": "中文核心主题",
   "unifying_theme_en": "English core theme",
-  "linked_responses": [
+  "cue_card": "Describe a [person/place/event/object/experience] that can naturally cover the given topics. You should say: ...",
+  "story_title": "English story title",
+  "unified_story_cn": "中文说明：这个故事如何把所有主题串起来",
+  "unified_story_en": "一个完整的 IELTS Speaking Part 2 英文高分回答文段",
+  "covered_topics": [
     {{
-      "topic": "话题名称",
-      "topic_en": "Topic in English",
-      "adapted_response": "适应核心主题的中文回答",
-      "adapted_response_en": "English response adapted to core theme",
-      "possible_questions": ["Possible IELTS Part 2 question 1", "Possible IELTS Part 2 question 2"],
-      "key_elements": ["元素1", "元素2"],
-      "transition_phrases": ["短语1", "短语2"]
+      "topic": "用户给出的原始主题",
+      "how_it_is_used": "这个主题在统一故事中的作用"
     }}
   ],
+  "possible_part2_questions": ["这个故事可以套用的 Part 2 题目1", "题目2", "题目3"],
+  "story_structure": ["开头铺垫", "关键事件", "细节展开", "情感反应", "反思总结"],
+  "versatile_phrases": ["可迁移英文短语1", "可迁移英文短语2"],
   "versatile_vocabulary": ["中文词汇1", "中文词汇2"],
   "versatile_vocabulary_en": ["English vocab 1", "English vocab 2"],
   "practice_strategy": "练习策略建议",
@@ -325,10 +336,13 @@ THEME_LINKING_PROMPT = """你是雅思口语串题专家，请将以下话题进
 }}
 
 要求：
-- 每个话题都必须出现在 linked_responses 中
-- possible_questions 必须是数组，列出 2-4 个与该答案高度相关、考场上可能出现的英文雅思口语题
-- key_elements 和 transition_phrases 必须是数组
-- adapted_response_en 必须按 Band 8.0-8.5 高分口语答案写作：表达自然、内容具体、逻辑清楚、可灵活迁移，不能根据目标分数降低答案质量
+- 必须只生成一个统一故事，不要为每个主题分别写一段答案。
+- unified_story_en 必须是一个完整连续的英文文段，适合 IELTS Speaking Part 2 1.5-2 分钟表达，约 190-240 个英文词。
+- unified_story_en 必须自然覆盖用户给出的所有主题；不要生硬堆砌主题词，要通过同一个人物、地点、事件或经历串起来。
+- covered_topics 必须逐一列出用户给出的每个主题，并说明它在统一故事中如何被使用。
+- possible_part2_questions 必须列出 3-5 个这个故事可以迁移使用的英文 Part 2 题目。
+- story_structure、versatile_phrases、versatile_vocabulary、versatile_vocabulary_en 都必须是数组。
+- 语言必须达到 Band 8.0-8.5：表达自然、细节具体、逻辑清楚，有场景、情绪和反思；不要生成低分短句或模板化答案。
 - 只输出 JSON"""
 
 # ============================================================
@@ -484,6 +498,54 @@ ANSWER_FROM_CN_PROMPT = f"""你是雅思口语教练。请把学生的中文思�
 # ============================================================
 # 生成参考范文
 # ============================================================
+GENERATE_MODEL_ANSWER_TASK1_PROMPT = f"""你是 IELTS Writing Task 1 高分范文作者。请只为以下小作文图表题撰写一篇 Band 8.0-8.5 参考范文。
+
+题目：
+{{topic}}
+
+图表类型：
+{{chart_type}}
+
+图表数据 (chart_data)：
+{{chart_data}}
+
+表格数据 (table_data)：
+{{table_data}}
+
+强制要求：
+- 只能写 IELTS Writing Task 1 图表描述报告，不得写 Task 2 议论文。
+- 不要表达个人观点，不要使用 "I believe", "In my opinion", "This essay will discuss", "some people believe" 等 Task 2 议论文表达。
+- 必须按照 Simon 老师常用的 Task 1 四段式组织，但不要提到 Simon：
+  1. Introduction：用 1 句话改写题目，说明图表展示什么。
+  2. Overview：用 2 句话概括最显著的 2-3 个总体趋势、最高/最低点或主要对比；不要写具体小数据堆砌。
+  3. Details 1：围绕第一组主要数据展开，比较、排序或描述趋势，引用关键数值。
+  4. Details 2：围绕第二组主要数据展开，形成对比或补充，引用关键数值。
+- 不要写结论段；Task 1 的 overview 就承担总结功能。
+- 如果提供了 chart_data 或 table_data，必须引用其中的实际数值、趋势、对比或关键特征。
+- 建议 170-210 词，4 个自然段，每段之间空一行；正式、客观、准确。
+- 直接输出完整英文范文，不要额外解释，不要加中文标题，不要用项目符号。
+
+{OUTPUT_RULES}"""
+
+GENERATE_MODEL_ANSWER_TASK2_PROMPT = f"""你是 IELTS Writing Task 2 高分范文作者。请只为以下大作文议论文题目撰写一篇 Band 8.0-8.5 参考范文。
+
+题目：
+{{topic}}
+
+强制要求：
+- 只能写 IELTS Writing Task 2 议论文，不得写 Task 1 图表描述报告。
+- 必须按照 Simon 老师常用的 Task 2 清晰四段式组织，但不要提到 Simon：
+  1. Introduction：改写题目背景，并在最后一句直接给出清晰立场或回答方向。
+  2. Body 1：只展开第一个核心观点；使用 topic sentence + explanation + example/result 的结构。
+  3. Body 2：只展开第二个核心观点，或在讨论双方观点题中展开另一方并说明自己的判断；同样使用清晰解释和例子。
+  4. Conclusion：用 1-2 句话总结立场，不引入新观点。
+- 每个主体段只围绕一个中心思想，不要堆砌很多小点；论证要清楚、直接、容易模仿。
+- 建议 280-330 词，4 个自然段，每段之间空一行。
+- 不要描述 chart_data/table_data，不要写 overview 段。
+- 直接输出完整英文范文，不要额外解释，不要加中文标题，不要用项目符号。
+
+{OUTPUT_RULES}"""
+
 GENERATE_MODEL_ANSWER_PROMPT = f"""你是雅思写作考官。请为以下作文题目撰写一篇高分参考范文。
 
 作文类型：{{task_type}}

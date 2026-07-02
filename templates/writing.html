@@ -56,12 +56,13 @@
       {% endwith %}
 
       <section class="panel" data-tab-group>
+        {% set current_generated_task = generated_topic_task or (result_data.task_type if result_data and result_data.task_type else '') %}
         <div class="subtabs" role="tablist">
-          <button type="button" data-tab-target="task1" class="{{ 'active' if mode in ['task1', 'ideas', 'generate_topic'] else '' }}">小作文 Task 1</button>
-          <button type="button" data-tab-target="task2" class="{{ 'active' if mode == 'task2' else '' }}">大作文 Task 2</button>
+          <button type="button" data-tab-target="task1" class="{{ 'active' if (mode in ['task1', 'ideas'] and not (import_topic and import_task == 'Task 2')) or (mode == 'generate_topic' and current_generated_task != 'Task 2') or (import_topic and import_task == 'Task 1') else '' }}">小作文 Task 1</button>
+          <button type="button" data-tab-target="task2" class="{{ 'active' if mode == 'task2' or (mode == 'generate_topic' and current_generated_task == 'Task 2') or (import_topic and import_task == 'Task 2') else '' }}">大作文 Task 2</button>
         </div>
 
-        <div class="tab-panel {{ 'active' if mode in ['task1', 'ideas', 'generate_topic'] or (import_topic and import_task == 'Task 1') else '' }}" data-tab-panel="task1">
+        <div class="tab-panel {{ 'active' if (mode in ['task1', 'ideas'] and not (import_topic and import_task == 'Task 2')) or (mode == 'generate_topic' and current_generated_task != 'Task 2') or (import_topic and import_task == 'Task 1') else '' }}" data-tab-panel="task1">
           <details class="result-accordion idea-box">
             <summary>🎲 随机生成小作文题目</summary>
             <div class="result-body">
@@ -72,12 +73,12 @@
                 <div class="form-row">
                   <label><span>图表类型</span>
                     <select name="chart_type">
-                      <option value="柱状图">柱状图 (Bar Chart)</option>
-                      <option value="线形图">线形图 (Line Graph)</option>
-                      <option value="饼图">饼图 (Pie Chart)</option>
-                      <option value="表格">表格 (Table)</option>
-                      <option value="流程图">流程图 (Process/Flow Chart)</option>
-                      <option value="地图">地图 (Map)</option>
+                      <option value="柱状图">柱状图 (Bar Chart) - 可生成图片</option>
+                      <option value="线形图">线形图 (Line Graph) - 可生成图片</option>
+                      <option value="饼图">饼图 (Pie Chart) - 可生成图片</option>
+                      <option value="表格">表格 (Table) - 可生成图片</option>
+                      <option value="流程图">流程图 (Process/Flow Chart) - 可生成图片</option>
+                      <option value="地图">地图 (Map) - 仅生成题目描述</option>
                     </select>
                   </label>
                   <label><span>话题</span>
@@ -95,7 +96,14 @@
                     </select>
                   </label>
                 </div>
-                <p class="hint" style="font-size:0.85rem;color:var(--text-dim);margin-top:4px"><span class="svg-icon icon-picture" aria-hidden="true"></span> 以上图表题可自动生成图片</p>
+                <div class="chart-capability-row" aria-label="Task 1 图表生成能力">
+                  <span><span class="svg-icon icon-picture" aria-hidden="true"></span> 柱状图</span>
+                  <span><span class="svg-icon icon-picture" aria-hidden="true"></span> 线形图</span>
+                  <span><span class="svg-icon icon-picture" aria-hidden="true"></span> 饼图</span>
+                  <span><span class="svg-icon icon-picture" aria-hidden="true"></span> 表格</span>
+                  <span><span class="svg-icon icon-picture" aria-hidden="true"></span> 流程图</span>
+                  <span class="muted">地图仅生成题目描述</span>
+                </div>
                 <button class="primary-btn" type="submit">🎲 生成小作文题目</button>
               </form>
             </div>
@@ -112,17 +120,74 @@
             </div>
           </details>
 
+          {% set _generated_task1 = generated_topic_data if generated_topic_data and generated_topic_data.task_type == 'Task 1' else {} %}
+          {% set _t1_topic = (generated_topic_text if generated_topic_text and generated_topic_task == 'Task 1' else (import_question if import_topic and import_task == 'Task 1' else (_generated_task1.question if _generated_task1 else ''))) %}
+          {% set _active_task1 = result_data if mode == 'generate_topic' and result_data and (result_data.task_type if result_data.task_type else 'Task 2') == 'Task 1' else _generated_task1 %}
+          {% set _task1_model_answer = _active_task1.model_answer if _active_task1 else '' %}
           <form method="post" class="settings-form">
             <input type="hidden" name="mode" value="task1">
+            {% if _t1_topic %}<input type="hidden" name="topic" value="{{ _t1_topic }}">{% endif %}
             <div class="form-row">
               <label><span>图表类型</span><select name="task_type"><option>线形图</option><option>柱状图</option><option>饼图</option><option>表格</option><option>流程图</option><option>地图</option></select></label>
             </div>
-            <label><span>小作文内容</span><textarea name="essay_content" rows="12" placeholder="粘贴 Task 1 作文" class="no-voice">{{ generated_topic_text if generated_topic_text and generated_topic_task == 'Task 1' else (import_question if import_topic and import_task == 'Task 1' else '') }}</textarea></label>
+            {% if _t1_topic %}
+              <div class="record-question generated-topic-card ai-output">
+                <div class="generated-topic-head">
+                  <div class="generated-topic-title">
+                    <span class="svg-icon icon-chart" aria-hidden="true"></span>
+                    <div><strong>题目</strong><p>{{ _t1_topic }}</p></div>
+                  </div>
+                  {% if _active_task1 and _active_task1.chart_image %}
+                    <span class="topic-image-badge"><span class="svg-icon icon-picture" aria-hidden="true"></span> 图表图片已生成</span>
+                  {% endif %}
+                  <a class="ghost-btn small" href="{{ url_for('clear_writing_topic', mode='task1') }}">清除题目</a>
+                </div>
+                {% if _active_task1 and (_active_task1.chart_image or _active_task1.chart_data or _active_task1.table_data) %}
+                  <details class="result-accordion nested-answer generated-chart-toggle">
+                    <summary><span class="svg-icon icon-picture" aria-hidden="true"></span> 查看图表图片与数据</summary>
+                    <div class="result-body">
+                      {% if _active_task1.chart_type %}<p><strong>图表类型：</strong>{{ _active_task1.chart_type }}</p>{% endif %}
+                      {% if _active_task1.chart_image %}
+                        <div class="generated-chart-image">
+                          <img src="/{{ _active_task1.chart_image }}" alt="Task 1 chart">
+                        </div>
+                      {% endif %}
+                      {% if _active_task1.table_data %}
+                        <div style="margin-top:12px;overflow-x:auto">
+                          <table class="data-table" style="width:100%">
+                            <thead><tr>{% for h in _active_task1.table_data.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+                            <tbody>{% for row in _active_task1.table_data.rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+                          </table>
+                        </div>
+                      {% endif %}
+                      {% if _active_task1.chart_data %}
+                        <details class="result-accordion nested-answer">
+                          <summary>表格形式数据（供 AI 互动使用）</summary>
+                          <div class="result-body">
+                            <table class="data-table"><thead><tr><th>项目</th><th>数值</th></tr></thead><tbody>{% for row in _active_task1.chart_data %}<tr><td>{{ row.label }}</td><td>{{ row.value }}</td></tr>{% endfor %}</tbody></table>
+                          </div>
+                        </details>
+                      {% endif %}
+                    </div>
+                  </details>
+                {% endif %}
+                {% if _active_task1 and _active_task1.key_features %}
+                  <details class="result-accordion nested-answer"><summary><span class="svg-icon icon-analysis" aria-hidden="true"></span> 关键特征</summary><div class="result-body"><ul>{% for f in _active_task1.key_features %}<li>{{ f }}</li>{% endfor %}</ul></div></details>
+                {% endif %}
+                {% if _task1_model_answer %}
+                  <details class="result-accordion nested-answer">
+                    <summary><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 参考范文</summary>
+                    <div class="result-body"><button class="speak-btn" type="button" data-speak="{{ _task1_model_answer|e }}">朗读</button>{{ _task1_model_answer | simple_md }}</div>
+                  </details>
+                {% endif %}
+              </div>
+            {% endif %}
+            <label><span>小作文内容</span><textarea name="essay_content" rows="12" placeholder="在此粘贴或输入你的 Task 1 作文" class="no-voice"></textarea></label>
             <button class="primary-btn" type="submit">批改小作文</button>
           </form>
         </div>
 
-        <div class="tab-panel {{ 'active' if mode == 'task2' or (import_topic and import_task == 'Task 2') else '' }}" data-tab-panel="task2">
+        <div class="tab-panel {{ 'active' if mode == 'task2' or (mode == 'generate_topic' and current_generated_task == 'Task 2') or (import_topic and import_task == 'Task 2') else '' }}" data-tab-panel="task2">
           <details class="result-accordion idea-box">
             <summary>🎲 随机生成大作文题目</summary>
             <div class="result-body">
@@ -160,19 +225,47 @@
             </div>
           </details>
 
+          {% set _generated_task2 = generated_topic_data if generated_topic_data and generated_topic_data.task_type == 'Task 2' else {} %}
+          {% set _t2_topic = (generated_topic_text if generated_topic_text and generated_topic_task == 'Task 2' else (import_question if import_topic and import_task == 'Task 2' else (_generated_task2.question if _generated_task2 else ''))) %}
+          {% set _active_task2 = result_data if mode == 'generate_topic' and result_data and (result_data.task_type if result_data.task_type else 'Task 2') == 'Task 2' else _generated_task2 %}
+          {% set _task2_model_answer = _active_task2.model_answer if _active_task2 else '' %}
           <form method="post" class="settings-form">
             <input type="hidden" name="mode" value="task2">
+            {% if _t2_topic %}<input type="hidden" name="topic" value="{{ _t2_topic }}">{% endif %}
             <div class="form-row">
               <label><span>话题类别</span><select name="topic_category"><option>教育</option><option>科技</option><option>环境</option><option>社会</option><option>文化</option><option>工作</option><option>政府</option><option>全球化</option></select></label>
               <label><span>作文类型</span><select name="essay_type"><option>同意不同意型</option><option>讨论双方观点型</option><option>利弊分析型</option><option>问题解决型</option></select></label>
             </div>
-            <label><span>大作文内容</span><textarea name="essay_content" rows="12" placeholder="粘贴 Task 2 作文" class="no-voice">{{ generated_topic_text if generated_topic_text and generated_topic_task == 'Task 2' else (import_question if import_topic and import_task == 'Task 2' else '') }}</textarea></label>
+            {% if _t2_topic %}
+              <div class="record-question generated-topic-card ai-output">
+                <div class="generated-topic-head">
+                  <div class="generated-topic-title">
+                    <span class="svg-icon icon-writing" aria-hidden="true"></span>
+                    <div><strong>题目</strong><p>{{ _t2_topic }}</p></div>
+                  </div>
+                  <a class="ghost-btn small" href="{{ url_for('clear_writing_topic', mode='task2') }}">清除题目</a>
+                </div>
+                {% if _active_task2 and _active_task2.key_points %}
+                  <details class="result-accordion nested-answer"><summary>关键论点</summary><div class="result-body"><ul>{% for pt in _active_task2.key_points %}<li>{{ pt }}</li>{% endfor %}</ul></div></details>
+                {% endif %}
+                {% if _active_task2 and _active_task2.suggested_structure %}
+                  <details class="result-accordion nested-answer"><summary>建议结构</summary><div class="result-body"><p>{{ _active_task2.suggested_structure }}</p></div></details>
+                {% endif %}
+                {% if _task2_model_answer %}
+                  <details class="result-accordion nested-answer">
+                    <summary><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 参考范文</summary>
+                    <div class="result-body"><button class="speak-btn" type="button" data-speak="{{ _task2_model_answer|e }}">朗读</button>{{ _task2_model_answer | simple_md }}</div>
+                  </details>
+                {% endif %}
+              </div>
+            {% endif %}
+            <label><span>大作文内容</span><textarea name="essay_content" rows="12" placeholder="在此粘贴或输入你的 Task 2 作文" class="no-voice"></textarea></label>
             <button class="primary-btn" type="submit">批改大作文</button>
           </form>
         </div>
       </section>
 
-      {% if result %}
+      {% if result and mode != 'generate_topic' %}
       <section class="panel result-panel">
         <div class="panel-heading"><div><p class="eyebrow">Result</p><h2>{{ '生成题目' if mode == 'generate_topic' else ('思路建议' if mode == 'ideas' else ('参考范文' if mode == 'generate_model_answer' else '批改结果')) }}</h2></div></div>
         <div class="result-stack ai-output">
@@ -214,8 +307,18 @@
                   <details class="result-accordion"><summary>📐 建议结构</summary><div class="result-body"><p>{{ result_data.suggested_structure }}</p></div></details>
                 {% endif %}
 
+                {% set _model_ans = result_data.model_answer or inline_model_answer %}
+                {% if _model_ans %}
+                <details class="result-accordion nested-answer">
+                  <summary>📖 参考范文</summary>
+                  <div class="result-body">
+                    <button class="speak-btn" type="button" data-speak="{{ _model_ans|e }}">🔊 朗读</button>
+                    {{ _model_ans | simple_md }}
+                  </div>
+                </details>
+                {% endif %}
                 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                  <a class="primary-btn small" href="{{ url_for('writing', import_topic='1', import_question=result_data.question, import_task=target_task) }}"><span class="svg-icon icon-writing" aria-hidden="true"></span> 导入题目开始练习</a>
+                  {% if not _model_ans %}
                   <form method="post" class="settings-form" style="display:inline">
                     <input type="hidden" name="mode" value="generate_model_answer">
                     <input type="hidden" name="topic" value="{{ result_data.question }}">
@@ -223,6 +326,7 @@
                     <input type="hidden" name="topic_context" value="{{ result_data | tojson | forceescape }}">
                     <button class="ghost-btn small" type="submit"><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 生成参考范文</button>
                   </form>
+                  {% endif %}
                 </div>
               </div>
             </details>
