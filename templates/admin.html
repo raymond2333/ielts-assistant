@@ -20,6 +20,7 @@
         <a href="{{ url_for('analysis') }}" title="学习分析"><span class="svg-icon icon-analysis nav-svg" aria-hidden="true"></span><span class="nav-text">学习分析</span></a>
         <a href="{{ url_for('vocabulary') }}" title="背单词"><span class="svg-icon icon-vocabulary nav-svg" aria-hidden="true"></span><span class="nav-text">背单词</span></a>
         <a href="{{ url_for('admin_panel') }}" title="用户管理"><span class="svg-icon icon-admin nav-svg" aria-hidden="true"></span><span class="nav-text">用户管理</span></a>
+        <a href="{{ url_for('admin_vocabulary') }}" title="词库维护"><span class="svg-icon icon-vocabulary nav-svg" aria-hidden="true"></span><span class="nav-text">词库维护</span></a>
       </nav>
     </aside>
 
@@ -50,7 +51,7 @@
         <div class="metric-card"><span>用户数</span><strong>{{ users|length }}</strong></div>
         <div class="metric-card"><span>管理员</span><strong>{{ admin_count }}</strong></div>
         <div class="metric-card"><span>当前用户</span><strong>{{ selected_user or '未选择' }}</strong></div>
-        <div class="metric-card"><span>{{ '该用户记录' if selected_user else '总练习记录' }}</span><strong>{{ records|length if selected_user else total_user_records }}</strong></div>
+        <a class="metric-card admin-vocab-entry" href="{{ url_for('admin_vocabulary') }}"><span>词库维护</span><strong>进入</strong><small>批量补全释义、音标和话题</small></a>
       </section>
 
       <section class="panel">
@@ -99,26 +100,43 @@
       </section>
 
       {% if selected_user and selected_profile %}
-      <section class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">Member</p><h2>{{ selected_user }} 的全部信息</h2></div></div>
+      <section class="panel settings-module">
+        <div class="panel-heading"><span class="module-icon"><span class="svg-icon icon-admin" aria-hidden="true"></span></span><div><p class="eyebrow">Member</p><h2>{{ selected_user }} 的全部信息</h2></div></div>
         <form method="post" action="{{ url_for('admin_update_user_profile', target_user=selected_user) }}" class="settings-form">
+          <div class="settings-submodule">
+            <div class="settings-submodule-title"><span class="svg-icon icon-target" aria-hidden="true"></span><strong>基本资料</strong></div>
           <div class="form-row">
             <label><span>姓名</span><input name="full_name" value="{{ selected_profile.full_name }}"></label>
             <label><span>邮箱</span><input name="email" value="{{ selected_profile.email }}"></label>
           </div>
+          </div>
+          <div class="settings-submodule">
+            <div class="settings-submodule-title"><span class="svg-icon icon-analysis" aria-hidden="true"></span><strong>四项水平</strong></div>
           <div class="form-row">
             <label><span>听力</span><select name="listening_level">{% for score in score_options %}<option value="{{ score }}" {% if selected_profile.listening_level == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
             <label><span>口语</span><select name="speaking_level">{% for score in score_options %}<option value="{{ score }}" {% if selected_profile.speaking_level == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
             <label><span>阅读</span><select name="reading_level">{% for score in score_options %}<option value="{{ score }}" {% if selected_profile.reading_level == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
             <label><span>写作</span><select name="writing_level">{% for score in score_options %}<option value="{{ score }}" {% if selected_profile.writing_level == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
           </div>
+          </div>
+          <div class="settings-submodule">
+            <div class="settings-submodule-title"><span class="svg-icon icon-calendar" aria-hidden="true"></span><strong>目标与计划</strong></div>
           <div class="form-row">
             <label><span>目标分数</span><select name="target_score">{% for score in target_options %}<option value="{{ score }}" {% if selected_profile.target_score == score %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
             <label><span>每周学习时间</span><input type="number" name="study_time" min="1" max="80" value="{{ selected_profile.study_time }}"></label>
+            <label><span>每日背词目标</span><input type="number" name="daily_vocab_goal" min="5" max="300" value="{{ selected_profile.daily_vocab_goal or 30 }}"></label>
             <label><span>考试日期</span><input type="date" name="exam_date" value="{{ selected_profile.exam_date }}"></label>
           </div>
+          </div>
           <label><span>学习目标</span><textarea name="learning_goal" rows="3">{{ selected_profile.learning_goal }}</textarea></label>
-          <label><span>弱项领域</span><select name="weak_areas" multiple size="4">{% for area in ['听力','口语','阅读','写作'] %}<option value="{{ area }}" {% if area in selected_profile.weak_areas %}selected{% endif %}>{{ area }}</option>{% endfor %}</select></label>
+          <div class="settings-submodule">
+            <div class="settings-submodule-title"><span class="svg-icon icon-target" aria-hidden="true"></span><strong>重点弱项</strong></div>
+            <div class="weak-area-grid">
+              {% for area, icon in [('听力','icon-listening'),('口语','icon-speaking'),('阅读','icon-reading'),('写作','icon-writing')] %}
+                <label class="weak-area-card"><input type="checkbox" name="weak_areas" value="{{ area }}" {% if area in selected_profile.weak_areas %}checked{% endif %}><span class="svg-icon {{ icon }}" aria-hidden="true"></span><strong>{{ area }}</strong><em>{{ '重点突破' if area in selected_profile.weak_areas else '加入重点' }}</em></label>
+              {% endfor %}
+            </div>
+          </div>
           <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="is_admin" value="1" {% if selected_is_admin %}checked{% endif %}> 设置为管理员</label>
           <button class="primary-btn" type="submit">保存用户资料</button>
         </form>
@@ -153,18 +171,11 @@
         <section class="panel"><p class="empty-text">点击成员列表中的用户名，查看和编辑该用户的全部信息。</p></section>
       {% endif %}
 
+      {% if selected_user %}
       <section class="panel">
         <div class="panel-heading">
           <div><p class="eyebrow">Records</p><h2>练习记录管理</h2></div>
-          <form method="get" style="display:flex;gap:8px;align-items:center">
-            <select name="user_id" onchange="this.form.submit()">
-              <option value="">全部用户</option>
-              {% for u in users %}
-                <option value="{{ u.user_id }}" {% if selected_user == u.user_id %}selected{% endif %}>{{ u.user_id }}</option>
-              {% endfor %}
-            </select>
-            {% if selected_user %}<a href="{{ url_for('admin_panel') }}" class="ghost-btn small">查看全部记录</a>{% endif %}
-          </form>
+          <a href="{{ url_for('admin_panel') }}" class="ghost-btn small">返回成员列表</a>
         </div>
         {% if records %}
           <div class="timeline">
@@ -174,7 +185,7 @@
                   <span class="record-icon"><span class="svg-icon icon-{{ item.display_icon or 'analysis' }}" aria-hidden="true"></span></span>
                   <strong>{{ item.display_title or (item.activity | record_title) }}</strong>
                   {% if item.display_badge %}<span class="record-badge">{{ item.display_badge }}</span>{% endif %}
-                  {% if item.display_score %}<span class="record-score-chip">{{ '%.1f'|format(item.display_score) }}分</span>{% endif %}
+                  {% if item.admin_score %}<span class="record-score-chip">{{ '%.1f'|format(item.admin_score) }}分</span>{% endif %}
                   <time>{{ item.user_id }} · {{ item.timestamp | beijing_time }}</time>
                   {% if item.progress_summary %}
                     <span class="record-overview">
@@ -211,8 +222,9 @@
           <p class="empty-text">暂无练习记录。</p>
         {% endif %}
       </section>
+      {% endif %}
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260703tts5') }}"></script>
 </body>
 </html>

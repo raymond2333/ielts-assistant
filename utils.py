@@ -985,6 +985,211 @@ def sanitize_writing_model_answer(task_type: str, answer: Any) -> str:
     return cleaned
 
 
+_STUDY_PLAN_PLACEHOLDERS = (
+    "{gap}",
+    "{{gap}}",
+    "{weeks}",
+    "{{weeks}}",
+    "{current_level}",
+    "{{current_level}}",
+    "总体评价内容",
+    "优先提升领域1",
+    "优先提升领域2",
+    "本周主题",
+    "本周重点",
+    "具体任务1",
+    "具体任务2",
+    "具体任务3",
+    "本周目标",
+    "学习建议1",
+    "学习建议2",
+    "阶段性检查点1",
+    "阶段性检查点2",
+)
+
+
+def study_plan_is_placeholder(plan: Any) -> bool:
+    if not plan:
+        return True
+    try:
+        text = json.dumps(plan, ensure_ascii=False) if not isinstance(plan, str) else plan
+    except TypeError:
+        text = str(plan)
+    return any(marker in text for marker in _STUDY_PLAN_PLACEHOLDERS)
+
+
+def build_personalized_study_plan(
+    current_level: float,
+    target_score: float,
+    weak_areas: List[str],
+    weeks: int,
+    history_count: int = 0,
+    exam_date: str = "",
+) -> Dict[str, Any]:
+    current = _round_to_ielts_score(current_level)
+    target = _round_to_ielts_score(target_score)
+    gap = max(0.0, target - current)
+    weeks = max(1, min(int(weeks or 12), 16))
+    weak_areas = [str(area) for area in (weak_areas or []) if str(area).strip()] or ["口语", "写作"]
+    primary = weak_areas[0]
+    secondary = weak_areas[1] if len(weak_areas) > 1 else ("写作" if primary != "写作" else "口语")
+    if gap <= 0:
+        assessment = f"你目前的综合水平约为 {current:.1f}，已经达到目标 {target:.1f}。接下来的重点不是盲目提分，而是保持稳定输出、减少失误，并把弱项维持在目标分以上。"
+    else:
+        assessment = f"你目前的综合水平约为 {current:.1f}，目标为 {target:.1f}，还需要提升约 {gap:.1f} 分。结合已有 {history_count} 条训练记录，建议优先突破{primary}，同时保持{secondary}的持续输入和复盘。"
+
+    schedule = []
+    for week in range(1, weeks + 1):
+        if week == 1:
+            theme = "诊断复盘与基础校准"
+            focus = f"梳理最近练习中的{primary}问题，建立固定复盘表。"
+            tasks = [
+                f"回看最近 3 次{primary}练习，记录失分原因和高频错误。",
+                "完成 1 次限时训练，并把 AI 反馈中的优点和改进建议各摘录 3 条。",
+                "整理 10 个可复用表达，加入生词本或个人素材库。",
+            ]
+        elif week == weeks:
+            theme = "考前整合与稳定输出"
+            focus = "用模拟训练检验节奏，减少低级错误。"
+            tasks = [
+                "完成 1 套综合模拟练习，严格按考试时间完成。",
+                f"重点复盘{primary}和{secondary}中仍低于目标的评分维度。",
+                "整理最终版错题清单和高分表达清单，保留最常用的素材。",
+            ]
+        elif week % 2 == 0:
+            theme = f"{primary}专项突破"
+            focus = f"围绕{primary}提高完整度、准确度和稳定性。"
+            tasks = [
+                f"完成 3 次{primary}专项训练，每次训练后立即查看评分维度。",
+                "把 AI 反馈中的 2 条建议改写成下一次训练前的检查清单。",
+                "选择 1 次训练进行二次提交，对比前后分数和问题变化。",
+            ]
+        else:
+            theme = f"{secondary}巩固与迁移"
+            focus = f"保持{secondary}训练频率，并把新表达迁移到真实题目中。"
+            tasks = [
+                f"完成 2 次{secondary}练习，重点检查结构是否清晰。",
+                "复习 20 个雅思核心词，至少写出 5 个可用于作文或口语的搭配。",
+                "从学习记录中挑 1 道旧题重新练习，比较本周改进幅度。",
+            ]
+        schedule.append({
+            "week": week,
+            "theme": theme,
+            "focus": focus,
+            "tasks": tasks,
+            "goal": f"本周结束时，让{primary}至少完成 2-3 次有效训练，并形成可复用的改进清单。",
+        })
+
+    daily_schedule = []
+    try:
+        today = datetime.now().date()
+        exam_day = datetime.strptime(exam_date, "%Y-%m-%d").date() if exam_date else None
+        days_until_exam = (exam_day - today).days if exam_day else 0
+    except (TypeError, ValueError):
+        exam_day = None
+        days_until_exam = 0
+
+    if exam_day and days_until_exam >= 0:
+        task_patterns = [
+            (
+                f"{primary}诊断复盘",
+                [
+                    f"完成 1 次{primary}专项训练，并记录最明显的 1 个失分原因。",
+                    "复盘最近一次 AI 反馈，把可立即执行的建议写成检查清单。",
+                    "整理 5 个今天训练中可复用的表达或句型。",
+                ],
+                "用 3 句话总结今天最需要修正的问题。",
+            ),
+            (
+                "写作结构与表达",
+                [
+                    "完成 1 段 Task 2 主体段或 1 篇 Task 1 overview 练习。",
+                    "检查主题句、例证和结论句是否各自承担清晰功能。",
+                    "替换 3 个过于简单或重复的表达。",
+                ],
+                "标出今天作文中最影响分数的 1 个维度。",
+            ),
+            (
+                "口语流利度与素材",
+                [
+                    "完成 2 道 Part 1 或 1 道 Part 2 录音练习。",
+                    "听回录音，标出停顿、重复或表达卡壳的位置。",
+                    "把一个中文思路改写成自然英文回答。",
+                ],
+                "记录一个明天要继续复用的口语素材。",
+            ),
+            (
+                "词汇与旧题回练",
+                [
+                    "复习 20 个雅思核心词或生词本词汇。",
+                    "选择 1 道旧题重新练习，对比上次反馈。",
+                    f"把词汇迁移到{secondary}练习中，至少使用 5 个搭配。",
+                ],
+                "对比重练前后的得分或反馈变化。",
+            ),
+            (
+                "限时模拟与纠错",
+                [
+                    "完成 1 次限时训练，严格控制答题时间。",
+                    "按评分维度复盘，不只看总分。",
+                    "整理 3 条考前必须避免的低级错误。",
+                ],
+                "判断今天是否更接近目标分的稳定输出。",
+            ),
+        ]
+        total_days = days_until_exam + 1
+        for index in range(total_days):
+            current_date = today + timedelta(days=index)
+            focus, tasks, review = task_patterns[index % len(task_patterns)]
+            if index >= max(0, total_days - 3):
+                focus = "考前稳定输出"
+                tasks = [
+                    "完成轻量模拟或错题回看，不再大量引入新材料。",
+                    f"复盘{primary}和{secondary}最终检查清单。",
+                    "准备考试节奏：计时、审题、答题顺序和休息安排。",
+                ]
+                review = "确认明天只保留最关键的 3 个注意点。"
+            daily_schedule.append({
+                "date": current_date.strftime("%Y-%m-%d"),
+                "day": index + 1,
+                "focus": focus,
+                "tasks": tasks,
+                "review": review,
+            })
+
+    return {
+        "title": f"{weeks} 周雅思个性化学习计划",
+        "overall_assessment": assessment,
+        "priority_areas": weak_areas[:3],
+        "skill_diagnosis": [
+            {
+                "skill": primary,
+                "weakness": "近期得分或反馈最集中暴露的问题",
+                "reason": f"结合已有 {history_count} 条训练记录，{primary}需要优先稳定输出质量。",
+                "action": f"每天安排一个可评分的{primary}练习，并把反馈转成下一次提交前的检查项。",
+            },
+            {
+                "skill": secondary,
+                "weakness": "迁移和稳定性",
+                "reason": f"{secondary}需要保持训练频率，避免单项突破时其他能力回落。",
+                "action": f"每周至少完成 2 次{secondary}训练，并重练 1 道旧题观察变化。",
+            },
+        ],
+        "daily_schedule": daily_schedule,
+        "weekly_schedule": schedule,
+        "study_tips": [
+            "每次训练后只追踪 1-2 个最关键问题，避免反馈太多但没有执行。",
+            "把 AI 反馈中的高频问题整理成固定检查表，下次提交前先自查。",
+            "每周至少重练 1 道旧题，用分数变化判断方法是否有效。",
+        ],
+        "milestones": [
+            f"第 {max(1, weeks // 3)} 周：完成第一次阶段复盘，确认{primary}是否有稳定提升。",
+            f"第 {max(2, (weeks * 2) // 3)} 周：进行一次限时综合模拟，检查四项能力是否接近目标。",
+            f"第 {weeks} 周：整理最终错题和素材清单，进入考前稳定输出。",
+        ],
+    }
+
+
 def _flexible_marker_search(text, marker_base):
     """Try to find a marker with both Chinese and English colons."""
     for variant in [marker_base, marker_base.replace("：", ":")]:

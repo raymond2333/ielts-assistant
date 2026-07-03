@@ -138,15 +138,118 @@ document.addEventListener("DOMContentLoaded", () => {
     return chunks;
   }
 
-  async function speakTextValue(text) {
+  function setTtsStatus(button, message, kind = "") {
+    if (!button) return;
+    let status = button.nextElementSibling && button.nextElementSibling.classList.contains("tts-status")
+      ? button.nextElementSibling
+      : null;
+    if (!status && button.insertAdjacentElement) {
+      status = document.createElement("span");
+      status.className = "tts-status";
+      button.insertAdjacentElement("afterend", status);
+    }
+    if (!status) return;
+    status.textContent = message || "";
+    status.dataset.kind = kind;
+    button.title = message || button.title || "";
+  }
+
+  function shortenTtsError(message) {
+    const clean = String(message || "").replace(/\s+/g, " ").trim();
+    if (!clean) return "云端 TTS 暂时不可用";
+    return clean.length > 96 ? `${clean.slice(0, 96)}...` : clean;
+  }
+
+  async function speakCloudTextValue(text, button = null) {
+    if (!text) return;
+    const cleanText = text.replace(/\s+/g, " ").trim();
+    if (!cleanText) return;
+    const originalText = button ? button.textContent : "";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "☁️ 云端朗读中...";
+      setTtsStatus(button, "正在调用云端 AI 语音", "loading");
+    }
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text: cleanText})
+      });
+      if (response.ok && (response.headers.get("content-type") || "").includes("audio/")) {
+        window.speechSynthesis.cancel();
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        const provider = response.headers.get("X-TTS-Provider") || "AI";
+        const model = response.headers.get("X-TTS-Model") || "";
+        const voice = response.headers.get("X-TTS-Voice") || "";
+        setTtsStatus(button, `${provider}${model ? ` · ${model}` : ""}${voice ? ` · ${voice}` : ""}`, "ok");
+        audio.onended = () => {
+          URL.revokeObjectURL(url);
+          if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "☁️ 云端朗读";
+          }
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(url);
+          if (button) {
+            button.disabled = false;
+            button.textContent = originalText || "☁️ 云端朗读";
+            setTtsStatus(button, "音频播放失败，已回退浏览器朗读", "warn");
+          }
+        };
+        await audio.play();
+        return;
+      }
+      let errorMessage = "云端 TTS 没有返回音频";
+      try {
+        const data = await response.json();
+        errorMessage = data.error || errorMessage;
+      } catch (parseError) {
+        errorMessage = `${errorMessage}（HTTP ${response.status}）`;
+      }
+      setTtsStatus(button, `${shortenTtsError(errorMessage)}，已回退浏览器朗读`, "warn");
+    } catch (error) {
+      setTtsStatus(button, `${shortenTtsError(error.message)}，已回退浏览器朗读`, "warn");
+    }
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || "☁️ 云端朗读";
+    }
+  }
+
+  async function speakLocalTextValue(text, button = null) {
     if (!text || !window.speechSynthesis) return;
+    const cleanText = text.replace(/\s+/g, " ").trim();
+    if (!cleanText) return;
+    const originalText = button ? button.textContent : "";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "🔊 朗读中...";
+      setTtsStatus(button, "正在使用浏览器本地朗读", "loading");
+    }
     window.speechSynthesis.cancel();
-    const chunks = chunkSpeechText(text);
-    if (!chunks.length) return;
+    const chunks = chunkSpeechText(cleanText);
+    if (!chunks.length) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || "🔊 朗读";
+      }
+      return;
+    }
     const voices = await loadVoices();
     const preferred = pickEnglishVoice(voices);
     const speakChunk = (index) => {
-      if (index >= chunks.length) return;
+      if (index >= chunks.length) {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText || "🔊 朗读";
+          setTtsStatus(button, "朗读完成", "ok");
+        }
+        return;
+      }
       const utterance = new SpeechSynthesisUtterance(chunks[index]);
       utterance.lang = preferred ? preferred.lang : "en-US";
       utterance.rate = 0.92;
@@ -159,20 +262,66 @@ document.addEventListener("DOMContentLoaded", () => {
     speakChunk(0);
   }
 
-  window.speakText = speakTextValue;
-
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest(".speak-btn");
-    if (!button) return;
+  function getSpeakButtonText(button) {
     const directText = button.dataset.speak || "";
     const nearest = button.closest(".result-body, .cue-card-body, details, summary");
     const source = (nearest ? nearest.querySelector(".speak-source") : null) ||
       (button.closest("details") ? button.closest("details").querySelector(".speak-source") : null);
-    const text = directText || (source ? source.textContent : "");
+    return directText || (source ? source.textContent : "");
+  }
+
+  function localizeSpeakButtons() {
+    document.querySelectorAll(".speak-btn").forEach((button) => {
+      if (button.classList.contains("cloud-speak-btn")) return;
+      if (button.dataset.localReady === "1") return;
+      button.dataset.localReady = "1";
+      if (!button.dataset.originalLabel) button.dataset.originalLabel = button.textContent.trim();
+      const label = button.textContent.replace(/🔊/g, "").replace(/朗读/g, "").trim();
+      button.textContent = label ? `🔊 朗读${label}` : "🔊 朗读";
+      button.title = "使用浏览器本地语音，响应更快";
+    });
+  }
+
+  async function installCloudSpeakButtons() {
+    localizeSpeakButtons();
+    let status = null;
+    try {
+      const response = await fetch("/api/tts-status", {headers: {"Accept": "application/json"}});
+      if (!response.ok) return;
+      status = await response.json();
+    } catch (error) {
+      return;
+    }
+    if (!status || !status.enabled) return;
+    document.querySelectorAll(".speak-btn").forEach((button) => {
+      if (button.nextElementSibling && button.nextElementSibling.classList.contains("cloud-speak-btn")) return;
+      const cloudButton = document.createElement("button");
+      cloudButton.type = "button";
+      cloudButton.className = "speak-btn cloud-speak-btn";
+      cloudButton.dataset.cloudReady = "1";
+      if (button.dataset.speak) cloudButton.dataset.speak = button.dataset.speak;
+      cloudButton.textContent = "☁️ 云端朗读";
+      cloudButton.title = `${status.provider_label || "云端 TTS"}${status.model ? ` · ${status.model}` : ""}${status.voice ? ` · ${status.voice}` : ""}`;
+      button.insertAdjacentElement("afterend", cloudButton);
+    });
+  }
+
+  window.speakText = speakLocalTextValue;
+  window.speakCloudText = speakCloudTextValue;
+  installCloudSpeakButtons();
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest(".speak-btn, .cloud-speak-btn");
+    if (!button) return;
+    const text = getSpeakButtonText(button);
     if (!text) return;
     event.preventDefault();
     event.stopPropagation();
-    speakTextValue(text);
+    if (button.classList.contains("cloud-speak-btn")) {
+      speakCloudTextValue(text, button);
+    } else {
+      speakLocalTextValue(text, button);
+    }
   });
 
   const focusedFeedback = document.querySelector("[data-feedback-focus='1']");

@@ -31,6 +31,8 @@ from utils import (
     parse_json_response,
     register_user,
     sanitize_speaking_result,
+    study_plan_is_placeholder,
+    build_personalized_study_plan,
     save_user_ai_config,
     save_user_api_key,
     save_user_profile,
@@ -248,6 +250,42 @@ AI_PROVIDERS = {
         "default_model": "gpt-4o-mini",
         "base_url": "",
         "env_key": "OPENAI_API_KEY",
+    },
+    "siliconflow": {
+        "label": "硅基流动",
+        "default_model": "Qwen/Qwen2.5-72B-Instruct",
+        "base_url": "https://api.siliconflow.cn/v1",
+        "env_key": "SILICONFLOW_API_KEY",
+    },
+    "moonshot": {
+        "label": "Moonshot Kimi",
+        "default_model": "moonshot-v1-8k",
+        "base_url": "https://api.moonshot.cn/v1",
+        "env_key": "MOONSHOT_API_KEY",
+    },
+    "zhipu": {
+        "label": "智谱 GLM",
+        "default_model": "glm-4-flash",
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "env_key": "ZHIPU_API_KEY",
+    },
+    "volcengine": {
+        "label": "火山方舟",
+        "default_model": "doubao-1-5-lite-32k-250115",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "env_key": "VOLCENGINE_API_KEY",
+    },
+    "xunfei": {
+        "label": "讯飞星火",
+        "default_model": "generalv3.5",
+        "base_url": "https://spark-api-open.xf-yun.com/v1",
+        "env_key": "XUNFEI_API_KEY",
+    },
+    "mimo": {
+        "label": "小米 MiMo",
+        "default_model": "mimo-v2.5-pro",
+        "base_url": "https://api.xiaomimimo.com/v1",
+        "env_key": "MIMO_API_KEY",
     },
     "custom": {
         "label": "OpenAI兼容接口",
@@ -1927,6 +1965,9 @@ def _display_record_result_data(result_data, key_prefix=""):
 
 
 def _display_study_plan(plan):
+    if study_plan_is_placeholder(plan):
+        st.info("已保存的学习计划是旧模板内容，请点击重新生成获取个性化计划。")
+        return
     if isinstance(plan, str):
         parsed = parse_json_response(plan)
         if isinstance(parsed, dict) and "formatted_text" not in parsed:
@@ -2452,13 +2493,13 @@ with st.sidebar:
     )
 
     base_url_value = ""
-    if selected_provider in {"deepseek", "custom"}:
+    if selected_defaults.get("base_url") or selected_provider != "tongyi":
         base_url_value = st.text_input(
             "Base URL",
             value=st.session_state.get("ai_base_url", selected_defaults["base_url"])
             if selected_provider == st.session_state.get("ai_provider", "tongyi")
             else selected_defaults["base_url"],
-            help="OpenAI兼容接口地址，例如 https://api.deepseek.com"
+            help="OpenAI兼容接口地址，例如 https://api.deepseek.com 或 https://api.xiaomimimo.com/v1"
         )
 
     api_key = st.text_input(
@@ -3199,7 +3240,7 @@ if st.session_state.active_tab.startswith("📊"):
                             parsed_plan = parse_json_response(saved_plan)
                             if isinstance(parsed_plan, dict) and "formatted_text" not in parsed_plan:
                                 saved_plan = parsed_plan
-                        if saved_plan:
+                        if saved_plan and not study_plan_is_placeholder(saved_plan):
                             st.session_state.saved_study_plan = saved_plan
                             break
 
@@ -3264,6 +3305,14 @@ if st.session_state.active_tab.startswith("📊"):
                             )
                             parsed_plan = parse_json_response(raw_study_plan)
                             study_plan = parsed_plan if isinstance(parsed_plan, dict) and "formatted_text" not in parsed_plan else raw_study_plan
+                            if study_plan_is_placeholder(study_plan):
+                                study_plan = build_personalized_study_plan(
+                                    current_level=current_level,
+                                    target_score=st.session_state.user_profile["target_score"],
+                                    weak_areas=weak_areas,
+                                    weeks=study_weeks,
+                                    history_count=len(user_progress),
+                                )
 
                             st.session_state.saved_study_plan = study_plan
                             _display_study_plan(study_plan)

@@ -1,3 +1,8 @@
+import json
+import re
+from pathlib import Path
+
+
 IELTS_WORDS = [
     {
         "word": "alleviate",
@@ -142,3 +147,151 @@ IELTS_WORDS.extend([
     {"word": "trend", "phonetic": "/trend/", "meaning": "趋势", "phrases": ["upward trend", "recent trend", "global trend"], "essay_use": "The graph shows an upward trend in the use of public transport.", "topic": "小作文"},
     {"word": "welfare", "phonetic": "/ˈwelfeə/", "meaning": "福利，福祉", "phrases": ["public welfare", "animal welfare", "social welfare"], "essay_use": "Governments have a responsibility to protect public welfare through healthcare and education.", "topic": "政府 / 社会"},
 ])
+
+
+TOPIC_KEYWORDS = {
+    "教育": [
+        "academic", "school", "student", "teacher", "education", "curriculum", "subject",
+        "university", "college", "learn", "literacy", "classroom", "qualification",
+        "教育", "学校", "学生", "老师", "学术", "课程", "大学", "学习",
+    ],
+    "科技": [
+        "technology", "digital", "internet", "online", "computer", "software", "data",
+        "innovation", "automation", "device", "media", "network",
+        "科技", "技术", "数字", "网络", "电脑", "数据", "创新", "自动",
+    ],
+    "环境": [
+        "environment", "climate", "pollution", "energy", "sustainable", "waste",
+        "carbon", "ecological", "wildlife", "conservation", "resource",
+        "环境", "气候", "污染", "能源", "可持续", "废物", "碳", "生态", "资源",
+    ],
+    "健康": [
+        "health", "medical", "disease", "exercise", "diet", "mental", "stress",
+        "hospital", "patient", "nutrition", "wellbeing",
+        "健康", "医疗", "疾病", "运动", "饮食", "心理", "压力", "医院", "营养",
+    ],
+    "工作 / 经济": [
+        "work", "job", "career", "income", "economy", "economic", "industry",
+        "business", "employment", "salary", "market", "trade", "investment",
+        "工作", "职业", "收入", "经济", "产业", "商业", "就业", "工资", "市场", "贸易", "投资",
+    ],
+    "城市 / 交通": [
+        "urban", "city", "transport", "traffic", "housing", "vehicle", "road",
+        "infrastructure", "commute", "public transport",
+        "城市", "交通", "住房", "车辆", "道路", "基础设施", "通勤",
+    ],
+    "政府 / 社会": [
+        "government", "policy", "law", "social", "public", "crime", "welfare",
+        "poverty", "inequality", "community", "rights", "regulation",
+        "政府", "政策", "法律", "社会", "公共", "犯罪", "福利", "贫困", "不平等", "社区", "权利", "监管",
+    ],
+    "文化 / 媒体": [
+        "culture", "cultural", "media", "advertising", "art", "museum", "language",
+        "tradition", "entertainment", "tourism",
+        "文化", "媒体", "广告", "艺术", "博物馆", "语言", "传统", "娱乐", "旅游",
+    ],
+    "家庭 / 个人": [
+        "family", "parent", "child", "children", "individual", "personal",
+        "friend", "lifestyle", "habit",
+        "家庭", "父母", "孩子", "儿童", "个人", "朋友", "生活方式", "习惯",
+    ],
+    "小作文": [
+        "increase", "decrease", "trend", "proportion", "figure", "percentage",
+        "graph", "chart", "table", "rate", "compare",
+        "增加", "减少", "趋势", "比例", "图表", "表格", "比较",
+    ],
+    "写作": [
+        "essay", "argument", "viewpoint", "evidence", "paragraph", "coherence",
+        "grammar", "vocabulary", "structure",
+        "作文", "论点", "观点", "证据", "段落", "语法", "词汇", "结构",
+    ],
+}
+
+
+def _infer_topic(word, meaning="", phrases=None):
+    text = " ".join([word or "", meaning or "", " ".join(phrases or [])]).lower()
+    scores = {}
+    for topic, keywords in TOPIC_KEYWORDS.items():
+        score = 0
+        for keyword in keywords:
+            if re.search(rf"\b{re.escape(keyword)}\b", text):
+                score += 2
+            elif keyword in text:
+                score += 1
+        if score:
+            scores[topic] = score
+    if scores:
+        return max(scores.items(), key=lambda item: item[1])[0]
+    return "通用学术词"
+
+
+def _load_extra_words():
+    extra_path = Path(__file__).resolve().parent / "data" / "ielts_extra_vocab.json"
+    if not extra_path.exists():
+        return []
+    try:
+        data = json.loads(extra_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    existing = {item.get("word", "").lower() for item in IELTS_WORDS}
+    cleaned = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        word = str(item.get("word", "")).strip()
+        if not word or word.lower() in existing:
+            continue
+        phrases = item.get("phrases", []) if isinstance(item.get("phrases"), list) else []
+        raw_topic = str(item.get("topic", "") or "").strip()
+        generic_topics = {"", "雅思核心词", "雅思中文词表", "IELTS", "ielts"}
+        topic = raw_topic if raw_topic not in generic_topics else _infer_topic(word, item.get("meaning", ""), phrases)
+        if topic == "经济 / 工作":
+            topic = "工作 / 经济"
+        cleaned.append({
+            "word": word,
+            "phonetic": item.get("phonetic", ""),
+            "meaning": item.get("meaning", ""),
+            "phrases": phrases,
+            "essay_use": item.get("essay_use", ""),
+            "topic": topic,
+        })
+        existing.add(word.lower())
+    return cleaned
+
+
+IELTS_WORDS.extend(_load_extra_words())
+
+
+def _apply_ai_overrides():
+    override_path = Path(__file__).resolve().parent / "data" / "vocab_ai_overrides.json"
+    if not override_path.exists():
+        return
+    try:
+        data = json.loads(override_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(data, dict):
+        return
+    by_word = {item.get("word", "").lower(): item for item in IELTS_WORDS}
+    for word, override in data.items():
+        if not isinstance(override, dict):
+            continue
+        item = by_word.get(str(word).lower())
+        if not item:
+            continue
+        if override.get("meaning"):
+            item["meaning"] = override["meaning"]
+        if override.get("phonetic"):
+            item["phonetic"] = override["phonetic"]
+        if override.get("topic"):
+            item["topic"] = override["topic"]
+        if isinstance(override.get("phrases"), list) and override["phrases"]:
+            item["phrases"] = override["phrases"]
+        if override.get("essay_use"):
+            item["essay_use"] = override["essay_use"]
+        item["ai_enriched"] = True
+
+
+_apply_ai_overrides()

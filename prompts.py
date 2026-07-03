@@ -702,6 +702,7 @@ IMPROVEMENT_SUGGESTIONS_PROMPT = """你是雅思备考教练。请根据学生�
 请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
 {{
   "summary": "总体评价内容",
+  "data_basis": ["基于最近一次/某几次训练得出的依据1", "依据2"],
   "priority_areas": ["领域1", "领域2"],
   "suggestions": [
     {{
@@ -718,7 +719,12 @@ IMPROVEMENT_SUGGESTIONS_PROMPT = """你是雅思备考教练。请根据学生�
 
 要求：
 - priority_areas 和 study_tips 必须是数组
+- data_basis 必须引用最近训练记录中的真实题型、分数或反馈重点；如果暂无训练记录，则说明“暂无足够训练数据”
 - suggestions 中每个对象必须包含 area、current_issue、action、weekly_goal、estimated_improvement 字段
+- estimated_improvement 只能写雅思半分制或区间，例如“0.5 分”“0.5-1.0 分”，禁止出现 0.33、0.67、0.25 这类非 IELTS 分数
+- 必须给出高度个性化建议：要对应最近训练中的题型、分项分、作答问题或作文问题，禁止只写“多练习、多背词、多总结”等泛泛建议
+- 禁止照抄示例词：总体评价内容、领域1、领域2、技巧1、技巧2
+- 所有内容使用简体中文
 - 只输出 JSON"""
 
 # ============================================================
@@ -743,8 +749,15 @@ WRITING_IDEAS_OLD_PROMPT = f"""你是雅思写作教练。请围绕以下作文�
 
 WORD_EXPLANATION_PROMPT_FULL = """请解释雅思学习中这个英文词/短语：{word}
 
+要求：
+- translation 必须是简洁准确的中文释义，可以附一个英文补充但中文必须放在前面。
+- phonetic 返回英式音标，使用 /.../ 格式；如果无法确定，返回空字符串。
+- topic 必须从以下雅思话题中选择最贴近的一个：教育、科技、环境、政府 / 社会、城市 / 交通、健康、工作 / 经济、文化 / 媒体、家庭 / 个人、小作文、写作。
+- phrases 给出 3-5 个真实常用搭配，不要写 “word in context” 这种模板。
+- usage 必须是一句完整、自然、可用于雅思作文的英文例句。
+
 请输出纯 JSON，不要包含 ```json 或其他标记，格式如下：
-{{"translation":"中文释义","phrases":["搭配1","搭配2","搭配3"],"usage":"雅思作文例句"}}"""
+{{"translation":"中文释义","phonetic":"/音标/","topic":"教育","phrases":["搭配1","搭配2","搭配3"],"usage":"雅思作文例句"}}"""
 
 # ============================================================
 # 生成学习计划
@@ -752,20 +765,40 @@ WORD_EXPLANATION_PROMPT_FULL = """请解释雅思学习中这个英文词/短语
 STUDY_PLAN_PROMPT = """你是雅思备考教练。请根据以下学生信息，生成一份个性化学习计划。
 
 学生情况：
-- 当前综合水平：{{current_level}}
-- 目标分数：{{target_score}}
-- 弱项领域：{{weak_areas_text}}
-- 需要提升：{{gap}} 分
-- 学习周期：{{weeks}} 周
+- 当前综合水平：{current_level}
+- 目标分数：{target_score}
+- 弱项领域：{weak_areas_text}
+- 需要提升：{gap} 分
+- 学习周期：{weeks} 周
+- 考试日期：{exam_date_text}
+- 距离考试：{days_until_exam_text}
 
 最近训练记录：
-{{history_text}}
+{history_text}
 
 请只输出有效 JSON，不要输出 Markdown，不要使用代码块：
 {{
   "title": "学习计划",
   "overall_assessment": "总体评价内容",
+  "data_basis": ["最近训练依据1", "最近训练依据2"],
   "priority_areas": ["优先提升领域1", "优先提升领域2"],
+  "skill_diagnosis": [
+    {{
+      "skill": "口语",
+      "weakness": "薄弱维度",
+      "reason": "根据训练记录判断出的原因",
+      "action": "对应行动"
+    }}
+  ],
+  "daily_schedule": [
+    {{
+      "date": "YYYY-MM-DD",
+      "day": 1,
+      "focus": "当天重点",
+      "tasks": ["当天任务1", "当天任务2", "当天任务3"],
+      "review": "当天复盘方式"
+    }}
+  ],
   "weekly_schedule": [
     {{
       "week": 1,
@@ -780,6 +813,14 @@ STUDY_PLAN_PROMPT = """你是雅思备考教练。请根据以下学生信息，
 }}
 
 要求：
-- weekly_schedule 必须按实际学习周期列出，从第 1 周到第 {{weeks}} 周
-- priority_areas、tasks、study_tips、milestones 必须是数组
+- weekly_schedule 必须按实际学习周期列出，从第 1 周到第 {weeks} 周
+- 如果提供了明确考试日期，必须额外输出 daily_schedule，并从今天开始逐日列出到考试前一天或考试当天的安排；每一天都要有 date、day、focus、tasks、review
+- daily_schedule 每天任务要细化到听、说、读、写或词汇中的具体动作，不能每天重复同一句模板
+- skill_diagnosis 必须细分口语和写作的薄弱维度，例如口语流利度/词汇/语法/发音，写作任务回应/连贯衔接/词汇/语法
+- data_basis、priority_areas、skill_diagnosis、tasks、study_tips、milestones 必须是数组
+- data_basis 必须引用最近训练记录中的真实题型、分数、维度分或反馈重点；如果暂无训练记录，则说明“暂无足够训练数据”
+- 必须结合最近训练记录和弱项领域生成具体内容，禁止照抄示例词：总体评价内容、优先提升领域1、优先提升领域2、本周主题、本周重点、具体任务1、具体任务2、具体任务3、本周目标、学习建议1、阶段性检查点1
+- 不要输出任何花括号占位符；最终 JSON 中不能出现未替换变量或模板词
+- 提到分数差距、目标或预计提升时，只能使用 IELTS 半分制：0、0.5、1.0、1.5……9.0；禁止出现 0.33、0.67、0.25 等小数
+- 所有内容使用简体中文；任务必须具体到可执行动作，例如“完成 2 篇 Task 1 图表描述并对照 overview 检查趋势是否完整”
 - 只输出 JSON"""

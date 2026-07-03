@@ -44,24 +44,26 @@
           {% endfor %}
         </div>
       </section>
-      <section class="panel">
+      <section class="panel analysis-guidance-panel analysis-plan-summary">
         <div class="panel-heading">
-          <div><p class="eyebrow">Study Plan</p><h2>个性化学习计划</h2></div>
-          {% if not study_plan %}
-          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin:0"><button class="primary-btn" type="submit">生成详细学习计划</button></form>
-          {% endif %}
+          <div><p class="eyebrow">Plan Snapshot</p><h2>AI 学习方案摘要</h2><p class="record-meta">完整每日计划放在学习总览，这里只保留复盘用的关键信息。</p></div>
+          <a class="primary-btn small" href="{{ url_for('dashboard') }}">查看完整方案</a>
         </div>
-        {% if study_plan %}
-          <details class="result-accordion">
-            <summary>查看已生成的学习计划</summary>
-            <div class="result-body">{{ study_plan | study_plan_result }}</div>
-          </details>
-          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px"><button class="ghost-btn" type="submit">重新生成</button></form>
-        {% else %}
-          <p class="empty-text">生成后会自动保存；之后每次打开页面都会显示最新一次计划，直到你重新生成。</p>
+        <div class="analysis-plan-strip">
+          <span><b>{% if guidance_overview.latest_score is not none %}{{ '%.1f'|format(guidance_overview.latest_score) }}{% else %}--{% endif %}</b><em>最近得分</em></span>
+          <span><b>{% if guidance_overview.best_score is not none %}{{ '%.1f'|format(guidance_overview.best_score) }}{% else %}--{% endif %}</b><em>最佳得分</em></span>
+          <span><b>{{ guidance_overview.scored_count }}</b><em>评分记录</em></span>
+          <span><b>{% if guidance_overview.latest_guidance_date %}{{ guidance_overview.latest_guidance_date }}{% else %}未生成{% endif %}</b><em>方案更新</em></span>
+        </div>
+        {% if guidance_overview.dimensions %}
+        <div class="analysis-weak-tags">
+          {% for dim in guidance_overview.dimensions[:4] %}
+            <span>{{ dim.label }} · {{ '%.1f'|format(dim.score) }}</span>
+          {% endfor %}
+        </div>
         {% endif %}
       </section>
-      <section class="panel">
+      <section class="panel analysis-records-panel">
         <div class="panel-heading"><div><p class="eyebrow">Records</p><h2>学习记录</h2></div></div>
         <form method="get" class="filter-bar">
           <select name="type" onchange="this.form.submit()">
@@ -116,9 +118,9 @@
           </div></details>
         {% endif %}
       </div></details>{% endfor %}</div><div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;flex-wrap:wrap">{% if page > 1 %}<a class="ghost-btn small" href="{{ url_for('analysis', page=page-1, type=type_filter) }}">上一页</a>{% endif %}<span class="record-meta">第 {{ page }} / {{ total_pages }} 页 · 共 {{ total_records }} 条</span>{% if page < total_pages %}<a class="ghost-btn small" href="{{ url_for('analysis', page=page+1, type=type_filter) }}">下一页</a>{% endif %}</div>{% else %}<p class="empty-text">暂无学习记录。</p>{% endif %}</section>
-      <section class="panel"><h2>生词本概览</h2>{% if user_words %}<div class="phrase-list">{% for item in user_words[:30] %}<span>{{ item.word }}</span>{% endfor %}</div>{% else %}<p class="empty-text">选中 AI 输出中的单词即可收藏到生词本。</p>{% endif %}</section>
+      <section class="panel analysis-vocab-panel"><h2>生词本概览</h2>{% if user_words %}<div class="phrase-list">{% for item in user_words[:30] %}<span>{{ item.word }}</span>{% endfor %}</div>{% else %}<p class="empty-text">选中 AI 输出中的单词即可收藏到生词本。</p>{% endif %}</section>
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260703tts5') }}"></script>
 </body>
 </html>

@@ -70,6 +70,23 @@
       {% endwith %}
 
       <section class="panel">
+        <div class="vocab-plan-hero">
+          <div class="vocab-plan-copy">
+            <p class="eyebrow">Daily Review</p>
+            <h2>今天背 {{ daily_goal }} 个词</h2>
+            <p>剩余 {{ remaining_count }} 个未掌握，按当前计划预计 {{ finish_date }} 背完。</p>
+          </div>
+          <div class="vocab-plan-stats">
+            <span><strong>{{ learned_count }}</strong><em>已掌握</em></span>
+            <span><strong>{{ days_to_finish or 0 }}</strong><em>预计天数</em></span>
+          </div>
+          <a class="primary-btn vocab-review-cta icon-btn" href="{{ url_for('vocabulary_review', q=query, topic=selected_topic, count=daily_goal) }}">
+            <span class="svg-icon icon-flashcard" aria-hidden="true"></span>开始今日闪卡
+          </a>
+        </div>
+      </section>
+
+      <section class="panel">
         <form method="get" class="form-row">
           <label>
             <span>搜索单词或释义</span>
@@ -84,8 +101,10 @@
               {% endfor %}
             </select>
           </label>
-          <button class="primary-btn filter-btn" type="submit">筛选</button>
+          <button class="primary-btn filter-btn icon-btn" type="submit"><span class="svg-icon icon-search" aria-hidden="true"></span>筛选</button>
+          <a class="ghost-btn filter-btn icon-btn" href="{{ url_for('vocabulary_review', q=query, topic=selected_topic) }}"><span class="svg-icon icon-flashcard" aria-hidden="true"></span>闪卡复习</a>
         </form>
+        <p class="record-meta" style="margin-top:10px">共 {{ filtered_count }} 个匹配词，当前第 {{ page }} / {{ total_pages }} 页。</p>
       </section>
 
       <section class="panel">
@@ -112,28 +131,105 @@
             <div class="word-top">
               <div>
                 <h2>{{ item.word }}</h2>
-                <span>{{ item.phonetic }} · {{ item.topic }}</span>
+                <span>{% if item.phonetic %}{{ item.phonetic }} · {% endif %}{{ item.topic }}</span>
               </div>
               <form method="post" action="{{ url_for('vocabulary_progress', word=item.word) }}">
                 <input type="hidden" name="status" value="{{ 'learning' if state.status == 'learned' else 'learned' }}">
                 <button class="ghost-btn small" type="submit">{{ '复习中' if state.status == 'learned' else '标记掌握' }}</button>
               </form>
             </div>
-            <p class="meaning">{{ item.meaning }}</p>
+            <div class="word-meaning-block">
+              <p class="meaning" data-word-meaning="{{ item.word }}">{{ item.meaning }}</p>
+              {% if item.needs_enrichment %}
+                <button class="ghost-btn small icon-btn vocab-enrich-btn" type="button" data-vocab-enrich="{{ item.word }}">
+                  <span class="svg-icon icon-sparkle" aria-hidden="true"></span>AI 补全词条
+                </button>
+              {% endif %}
+            </div>
             <div class="phrase-list">
               {% for phrase in item.phrases %}
                 <span>{{ phrase }}</span>
               {% endfor %}
             </div>
             <div class="essay-use">
-              <strong>作文使用</strong>
+              <strong>作文例句</strong>
               <p>{{ item.essay_use }}</p>
             </div>
           </article>
         {% endfor %}
       </section>
+      {% if total_pages > 1 %}
+      <div class="pagination vocab-pagination catalog-pagination">
+        {% if page > 1 %}
+          <a class="page-pill" href="{{ url_for('vocabulary', page=page-1, q=query, topic=selected_topic) }}">上一页</a>
+        {% endif %}
+        {% for item in page_items %}
+          {% if item == '...' %}
+            <span class="page-ellipsis">...</span>
+          {% elif item == page %}
+            <span class="page-pill active">{{ item }}</span>
+          {% else %}
+            <a class="page-pill" href="{{ url_for('vocabulary', page=item, q=query, topic=selected_topic) }}">{{ item }}</a>
+          {% endif %}
+        {% endfor %}
+        <form class="page-jump-form" method="get">
+          <input type="hidden" name="q" value="{{ query }}">
+          <input type="hidden" name="topic" value="{{ selected_topic }}">
+          <input name="page" type="number" min="1" max="{{ total_pages }}" value="{{ page }}" aria-label="跳转页码">
+          <button class="page-pill" type="submit">跳转</button>
+        </form>
+        {% if page < total_pages %}
+          <a class="page-pill" href="{{ url_for('vocabulary', page=page+1, q=query, topic=selected_topic) }}">下一页</a>
+        {% endif %}
+      </div>
+      {% endif %}
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260703tts5') }}"></script>
+  <script>
+    document.querySelectorAll("[data-vocab-enrich]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const word = button.dataset.vocabEnrich;
+        const meaning = document.querySelector(`[data-word-meaning="${CSS.escape(word)}"]`);
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="svg-icon icon-sparkle" aria-hidden="true"></span>补全中';
+        try {
+          const response = await fetch(`/vocabulary/${encodeURIComponent(word)}/enrich`, {
+            method: "POST",
+            headers: { "X-Requested-With": "fetch" }
+          });
+          const data = await response.json();
+          if (!data.ok) throw new Error(data.error || "补全失败");
+          if (meaning) meaning.textContent = data.meaning;
+          const meta = button.closest(".word-card")?.querySelector(".word-top span");
+          if (meta) {
+            const pieces = [];
+            if (data.phonetic) pieces.push(data.phonetic);
+            pieces.push(data.topic || meta.textContent.split("·").pop().trim());
+            meta.textContent = pieces.join(" · ");
+          }
+          const card = button.closest(".word-card");
+          if (card && Array.isArray(data.phrases) && data.phrases.length) {
+            const phraseList = card.querySelector(".phrase-list");
+            phraseList.replaceChildren(...data.phrases.map((item) => {
+              const span = document.createElement("span");
+              span.textContent = item;
+              return span;
+            }));
+          }
+          if (card && data.essay_use) {
+            const essayUse = card.querySelector(".essay-use p");
+            essayUse.textContent = data.essay_use;
+          }
+          button.remove();
+        } catch (error) {
+          alert(error.message || "补全失败，请稍后再试。");
+          button.disabled = false;
+          button.innerHTML = original;
+        }
+      });
+    });
+  </script>
 </body>
 </html>

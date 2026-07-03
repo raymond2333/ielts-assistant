@@ -8,9 +8,34 @@ from prompts import *
 class TongyiIELTSAssistant:
     def __init__(self, api_key, provider="tongyi", model=None, base_url=None):
         self.provider = provider
-        self.model = model
+        self.requested_model = model
         self.base_url = base_url
-        self.llm = self._create_llm(api_key, provider, model, base_url)
+        self.model = self._safe_chat_model(provider, model)
+        self.used_model_fallback = bool(model and self.model != model)
+        self.llm = self._create_llm(api_key, provider, self.model, base_url)
+
+    def _safe_chat_model(self, provider, model=None):
+        provider = (provider or "tongyi").lower()
+        model_defaults = {
+            "tongyi": "qwen-turbo",
+            "deepseek": "deepseek-chat",
+            "openai": "gpt-4o-mini",
+            "siliconflow": "Qwen/Qwen2.5-72B-Instruct",
+            "moonshot": "moonshot-v1-8k",
+            "zhipu": "glm-4-flash",
+            "volcengine": "doubao-1-5-lite-32k-250115",
+            "xunfei": "generalv3.5",
+            "mimo": "mimo-v2.5-pro",
+            "custom": "gpt-4o-mini",
+        }
+        selected = (model or "").strip()
+        non_chat_markers = [
+            "tts", "asr", "speech", "audio", "whisper", "transcribe",
+            "voice", "embedding", "rerank", "vision-only",
+        ]
+        if selected and not any(marker in selected.lower() for marker in non_chat_markers):
+            return selected
+        return model_defaults.get(provider, selected or "gpt-4o-mini")
 
     def _create_llm(self, api_key, provider, model=None, base_url=None):
         provider = (provider or "tongyi").lower()
@@ -18,6 +43,12 @@ class TongyiIELTSAssistant:
             "tongyi": "qwen-turbo",
             "deepseek": "deepseek-chat",
             "openai": "gpt-4o-mini",
+            "siliconflow": "Qwen/Qwen2.5-72B-Instruct",
+            "moonshot": "moonshot-v1-8k",
+            "zhipu": "glm-4-flash",
+            "volcengine": "doubao-1-5-lite-32k-250115",
+            "xunfei": "generalv3.5",
+            "mimo": "mimo-v2.5-pro",
             "custom": model or "gpt-4o-mini",
         }
         if provider == "tongyi":
@@ -26,6 +57,18 @@ class TongyiIELTSAssistant:
             return ChatOpenAI(model=model or model_defaults["deepseek"], api_key=api_key, base_url=base_url or "https://api.deepseek.com", temperature=0.7)
         if provider == "openai":
             return ChatOpenAI(model=model or model_defaults["openai"], api_key=api_key, base_url=base_url or None, temperature=0.7)
+        if provider == "siliconflow":
+            return ChatOpenAI(model=model or model_defaults["siliconflow"], api_key=api_key, base_url=base_url or "https://api.siliconflow.cn/v1", temperature=0.7)
+        if provider == "moonshot":
+            return ChatOpenAI(model=model or model_defaults["moonshot"], api_key=api_key, base_url=base_url or "https://api.moonshot.cn/v1", temperature=0.7)
+        if provider == "zhipu":
+            return ChatOpenAI(model=model or model_defaults["zhipu"], api_key=api_key, base_url=base_url or "https://open.bigmodel.cn/api/paas/v4", temperature=0.7)
+        if provider == "volcengine":
+            return ChatOpenAI(model=model or model_defaults["volcengine"], api_key=api_key, base_url=base_url or "https://ark.cn-beijing.volces.com/api/v3", temperature=0.7)
+        if provider == "xunfei":
+            return ChatOpenAI(model=model or model_defaults["xunfei"], api_key=api_key, base_url=base_url or "https://spark-api-open.xf-yun.com/v1", temperature=0.7)
+        if provider == "mimo":
+            return ChatOpenAI(model=model or model_defaults["mimo"], api_key=api_key, base_url=base_url or "https://api.xiaomimimo.com/v1", temperature=0.7)
         if provider == "custom":
             return ChatOpenAI(model=model_defaults["custom"], api_key=api_key, base_url=base_url, temperature=0.7)
         raise ValueError(f"不支持的AI供应商: {provider}")
@@ -208,25 +251,104 @@ class TongyiIELTSAssistant:
     # ============================================================
     # 提升建议（根据学习记录生成）
     # ============================================================
-    def generate_improvement_suggestions(self, progress_records, weak_areas, target_score, current_level):
-        history_summary = []
-        for r in progress_records[-15:]:
-            activity = r.get("activity", "")
-            score = r.get("score") or r.get("data", {}).get("score", "")
-            topic = r.get("data", {}).get("topic", "")
-            entry = f"- {activity}"
-            if topic:
-                entry += f" (话题: {topic})"
-            if score:
-                entry += f" 得分: {score}"
-            history_summary.append(entry)
+    def _progress_record_summary(self, record):
+        data = record.get("data", {}) if isinstance(record, dict) else {}
+        if not isinstance(data, dict):
+            data = {}
+        result_data = data.get("result_data", {})
+        if not isinstance(result_data, dict):
+            result_data = {}
 
-        gap = max(0.0, float(target_score) - float(current_level))
+        activity = record.get("activity", "") or data.get("mode", "训练")
+        timestamp = (record.get("timestamp") or "")[:16]
+        score = (
+            result_data.get("overall_score")
+            or data.get("score")
+            or record.get("score")
+            or ""
+        )
+        topic = (
+            data.get("question")
+            or data.get("topic")
+            or result_data.get("question")
+            or result_data.get("topic")
+            or ""
+        )
+
+        dimensions = []
+        breakdown = result_data.get("breakdown")
+        if isinstance(breakdown, dict):
+            for key, value in breakdown.items():
+                if isinstance(value, dict) and value.get("score") not in (None, ""):
+                    dimensions.append(f"{key}: {value.get('score')}")
+        for key in [
+            "task_achievement",
+            "task_response",
+            "coherence_cohesion",
+            "lexical_resource",
+            "grammatical_range_accuracy",
+        ]:
+            value = result_data.get(key)
+            if isinstance(value, dict) and value.get("score") not in (None, ""):
+                dimensions.append(f"{key}: {value.get('score')}")
+
+        feedback_bits = []
+        for key in ["practice_recommendations", "improvements", "suggestions", "strengths"]:
+            value = result_data.get(key)
+            if isinstance(value, list):
+                feedback_bits.extend(str(item) for item in value[:2])
+            elif isinstance(value, str):
+                feedback_bits.append(value)
+        if not feedback_bits:
+            for key in ["band_description", "overall_feedback", "comments"]:
+                value = result_data.get(key)
+                if isinstance(value, str) and value.strip():
+                    feedback_bits.append(value.strip())
+
+        answer = data.get("transcript") or data.get("user_response") or data.get("essay_content") or ""
+        if answer:
+            answer = str(answer).replace("\n", " ")[:110]
+
+        parts = [f"- {timestamp} {activity}".strip()]
+        if score not in (None, ""):
+            parts.append(f"得分 {score}")
+        if topic:
+            parts.append(f"题目/话题：{str(topic).replace(chr(10), ' ')[:130]}")
+        if dimensions:
+            parts.append("维度分：" + "；".join(dimensions[:4]))
+        if feedback_bits:
+            parts.append("反馈重点：" + "；".join(str(item).replace("\n", " ")[:80] for item in feedback_bits[:3]))
+        if answer:
+            parts.append(f"学生作答摘录：{answer}")
+        return " | ".join(parts)
+
+    def _progress_history_text(self, progress_records, limit=15):
+        summaries = []
+        for record in progress_records[-limit:]:
+            if not isinstance(record, dict):
+                continue
+            activity = record.get("activity", "")
+            if activity in {"个性化学习计划", "重点提升建议"}:
+                continue
+            summary = self._progress_record_summary(record)
+            if summary:
+                summaries.append(summary)
+        return "\n".join(summaries) if summaries else "暂无训练记录"
+
+    @staticmethod
+    def _round_ielts(value):
+        try:
+            return max(0.0, min(9.0, round(float(value) * 2) / 2))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def generate_improvement_suggestions(self, progress_records, weak_areas, target_score, current_level):
+        gap = self._round_ielts(max(0.0, float(target_score) - float(current_level)))
         weak_areas_text = ", ".join(weak_areas) if weak_areas else "未指定"
-        history_text = "\n".join(history_summary) if history_summary else "暂无训练记录"
+        history_text = self._progress_history_text(progress_records)
         prompt = IMPROVEMENT_SUGGESTIONS_PROMPT.format(
-            current_level=current_level,
-            target_score=target_score,
+            current_level=f"{self._round_ielts(current_level):.1f}",
+            target_score=f"{self._round_ielts(target_score):.1f}",
             weak_areas_text=weak_areas_text,
             gap=f"{gap:.1f}",
             history_text=history_text,
@@ -234,28 +356,29 @@ class TongyiIELTSAssistant:
         )
         return self.llm.invoke(prompt).content
 
-    def generate_study_plan(self, current_level, target_score, weak_areas, weeks, progress_records):
-        history_summary = []
-        for r in progress_records[-15:]:
-            activity = r.get("activity", "")
-            score = r.get("score") or r.get("data", {}).get("score", "")
-            topic = r.get("data", {}).get("topic", "")
-            entry = f"- {activity}"
-            if topic:
-                entry += f" (话题: {topic})"
-            if score:
-                entry += f" 得分: {score}"
-            history_summary.append(entry)
-
-        gap = max(0.0, float(target_score) - float(current_level))
+    def generate_study_plan(
+        self,
+        current_level,
+        target_score,
+        weak_areas,
+        weeks,
+        progress_records,
+        exam_date="",
+        days_until_exam=None,
+    ):
+        gap = self._round_ielts(max(0.0, float(target_score) - float(current_level)))
         weak_areas_text = ", ".join(weak_areas) if weak_areas else "未指定"
-        history_text = "\n".join(history_summary) if history_summary else "暂无训练记录"
+        history_text = self._progress_history_text(progress_records)
+        exam_date_text = exam_date or "未设置"
+        days_until_exam_text = f"{days_until_exam} 天" if days_until_exam not in (None, "") else "未设置"
         prompt = STUDY_PLAN_PROMPT.format(
-            current_level=current_level,
-            target_score=target_score,
+            current_level=f"{self._round_ielts(current_level):.1f}",
+            target_score=f"{self._round_ielts(target_score):.1f}",
             weak_areas_text=weak_areas_text,
             gap=f"{gap:.1f}",
             weeks=weeks,
+            exam_date_text=exam_date_text,
+            days_until_exam_text=days_until_exam_text,
             history_text=history_text,
         )
         return self.llm.invoke(prompt).content

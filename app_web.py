@@ -2,11 +2,13 @@ import hmac
 import html
 import hashlib
 import json
+import math
 import os
 import random
 import re
 import uuid
-from datetime import datetime
+import base64
+from datetime import date, datetime, timedelta
 from difflib import SequenceMatcher
 from functools import lru_cache, wraps
 from importlib.util import find_spec
@@ -36,6 +38,7 @@ from database import (
     save_user_ai_config,
     save_user_ai_config_map,
     save_user_profile,
+    save_user_tts_config,
     save_user_word,
     save_vocab_progress,
     set_user_admin,
@@ -52,6 +55,8 @@ from utils import (
     parse_model_output,
     sanitize_speaking_result,
     sanitize_writing_model_answer,
+    study_plan_is_placeholder,
+    build_personalized_study_plan,
     simple_md_filter as _simple_md_filter,
     verify_cross_token as _verify_cross_token,
 )
@@ -71,24 +76,70 @@ AI_PROVIDERS = {
         "model": "qwen-turbo",
         "base_url": "",
         "hint": "适合中文交互和日常雅思练习",
+        "capabilities": ["文本生成", "写作批改", "口语评分", "TTS"],
     },
     "deepseek": {
         "label": "DeepSeek",
         "model": "deepseek-chat",
         "base_url": "https://api.deepseek.com",
         "hint": "OpenAI兼容接口，性价比高",
+        "capabilities": ["文本生成", "写作批改", "口语评分"],
     },
     "openai": {
         "label": "OpenAI",
         "model": "gpt-4o-mini",
         "base_url": "",
         "hint": "适合高质量反馈和长文本批改",
+        "capabilities": ["文本生成", "写作批改", "口语评分", "语音识别"],
+    },
+    "siliconflow": {
+        "label": "硅基流动",
+        "model": "Qwen/Qwen2.5-72B-Instruct",
+        "base_url": "https://api.siliconflow.cn/v1",
+        "hint": "OpenAI兼容，适合接入多种国产开源模型",
+        "capabilities": ["文本生成", "写作批改", "口语评分"],
+    },
+    "moonshot": {
+        "label": "Moonshot Kimi",
+        "model": "moonshot-v1-8k",
+        "base_url": "https://api.moonshot.cn/v1",
+        "hint": "OpenAI兼容，适合长文本理解和中文交互",
+        "capabilities": ["文本生成", "写作批改"],
+    },
+    "zhipu": {
+        "label": "智谱 GLM",
+        "model": "glm-4-flash",
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "hint": "OpenAI兼容，适合中文场景和通用练习",
+        "capabilities": ["文本生成", "写作批改"],
+    },
+    "volcengine": {
+        "label": "火山方舟",
+        "model": "doubao-1-5-lite-32k-250115",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "hint": "OpenAI兼容，可接入豆包等模型",
+        "capabilities": ["文本生成", "写作批改", "语音识别"],
+    },
+    "xunfei": {
+        "label": "讯飞星火",
+        "model": "generalv3.5",
+        "base_url": "https://spark-api-open.xf-yun.com/v1",
+        "hint": "OpenAI兼容配置入口，适合国产模型接入",
+        "capabilities": ["文本生成", "语音识别"],
+    },
+    "mimo": {
+        "label": "小米 MiMo",
+        "model": "mimo-v2.5-pro",
+        "base_url": "https://api.xiaomimimo.com/v1",
+        "hint": "OpenAI/Anthropic兼容，支持 MiMo V2.5 系列和 ASR/TTS 能力",
+        "capabilities": ["文本生成", "语音识别", "TTS", "多模态"],
     },
     "custom": {
         "label": "OpenAI兼容接口",
         "model": "gpt-4o-mini",
         "base_url": "",
         "hint": "可接入自定义代理或兼容服务",
+        "capabilities": ["文本生成", "自定义能力"],
     },
 }
 
@@ -152,6 +203,10 @@ def _html_list(items):
     if isinstance(items, str):
         return f"<p>{escape(items)}</p>"
     return "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
+
+
+def _chunk_items(items, size):
+    return [items[index:index + size] for index in range(0, len(items), size)]
 
 
 def score_encouragement_html(score):
@@ -848,6 +903,25 @@ def study_plan_result_filter(plan):
         return Markup(f"<pre>{escape(str(plan))}</pre>")
 
     sections = []
+    daily = plan.get("daily_schedule")
+    weekly = plan.get("weekly_schedule")
+    priority_count = len(plan.get("priority_areas") or []) if isinstance(plan.get("priority_areas"), list) else 0
+    daily_count = len(daily) if isinstance(daily, list) else 0
+    weekly_count = len(weekly) if isinstance(weekly, list) else 0
+    plan_title = escape(plan.get("title") or "个性化学习计划")
+    sections.append(
+        "<div class='plan-hero'>"
+        "<div>"
+        "<span class='plan-kicker'>Personal Plan</span>"
+        f"<h4>{plan_title}</h4>"
+        "</div>"
+        "<div class='plan-hero-stats'>"
+        f"<span><b>{daily_count or '--'}</b><em>每日任务</em></span>"
+        f"<span><b>{weekly_count or '--'}</b><em>周计划</em></span>"
+        f"<span><b>{priority_count or '--'}</b><em>重点领域</em></span>"
+        "</div>"
+        "</div>"
+    )
     if plan.get("overall_assessment"):
         sections.append(
             "<details class='result-accordion' open><summary>总体评价</summary>"
@@ -858,30 +932,104 @@ def study_plan_result_filter(plan):
             "<details class='result-accordion'><summary>优先提升领域</summary>"
             f"<div class='result-body'>{_html_list(plan['priority_areas'])}</div></details>"
         )
-    weekly = plan.get("weekly_schedule")
+    diagnosis = plan.get("skill_diagnosis")
+    if isinstance(diagnosis, list):
+        cards = []
+        for item in diagnosis:
+            if not isinstance(item, dict):
+                continue
+            cards.append(
+                "<div class='plan-diagnosis-card'>"
+                f"<strong>{escape(item.get('skill', '能力诊断'))}</strong>"
+                f"<p><b>薄弱点：</b>{escape(item.get('weakness', ''))}</p>"
+                f"<p><b>原因：</b>{escape(item.get('reason', ''))}</p>"
+                f"<p><b>行动：</b>{escape(item.get('action', ''))}</p>"
+                "</div>"
+            )
+        if cards:
+            sections.append(
+                "<details class='result-accordion' open><summary>薄弱维度诊断</summary>"
+                f"<div class='plan-diagnosis-grid'>{''.join(cards)}</div></details>"
+            )
+    if isinstance(daily, list) and daily:
+        def day_card(item, compact=False):
+            if not isinstance(item, dict):
+                return ""
+            raw_date = str(item.get("date", ""))
+            date = escape(raw_date)
+            date_short = escape(raw_date[5:] if len(raw_date) >= 10 else raw_date)
+            day = escape(item.get("day", ""))
+            focus = escape(item.get("focus", ""))
+            tasks = item.get("tasks") if isinstance(item.get("tasks"), list) else []
+            task_html = "".join(f"<li>{escape(task)}</li>" for task in tasks[:3])
+            more = len(tasks) - 3
+            if more > 0:
+                task_html += f"<li class='muted-task'>另有 {more} 项细节任务</li>"
+            review = escape(item.get("review", ""))
+            compact_class = " compact" if compact else ""
+            return (
+                f"<div class='daily-card{compact_class}'>"
+                f"<div class='daily-card-date' title='{date}'><strong>{date_short}</strong><span>Day {day}</span></div>"
+                f"<div class='daily-card-body'><h5>{focus}</h5><ul>{task_html}</ul>"
+                f"<p><b>复盘：</b>{review}</p></div>"
+                "</div>"
+            )
+
+        preview_days = daily[:7]
+        preview_html = "".join(day_card(item) for item in preview_days)
+        rest_groups = _chunk_items(daily[7:], 7)
+        rest_html = []
+        for index, group in enumerate(rest_groups, start=2):
+            if not group:
+                continue
+            first = group[0].get("date", "") if isinstance(group[0], dict) else ""
+            last = group[-1].get("date", "") if isinstance(group[-1], dict) else ""
+            first_short = first[5:] if isinstance(first, str) and len(first) >= 10 else first
+            last_short = last[5:] if isinstance(last, str) and len(last) >= 10 else last
+            group_cards = "".join(day_card(item, compact=True) for item in group)
+            rest_html.append(
+                "<details class='result-accordion nested-answer daily-week-group'>"
+                f"<summary>第 {index} 周 · {escape(first_short)} 至 {escape(last_short)}</summary>"
+                f"<div class='daily-week-grid'>{group_cards}</div></details>"
+            )
+        daily_summary = (
+            f"<div class='daily-plan-summary'><strong>最近 7 天</strong>"
+            f"<span>共 {daily_count} 天安排，后续按周折叠展示</span></div>"
+        )
+        daily_body = (
+            daily_summary
+            + f"<div class='daily-card-grid'>{preview_html}</div>"
+            + ("<div class='daily-rest-groups'>" + "".join(rest_html) + "</div>" if rest_html else "")
+        )
+        sections.append(
+            "<details class='result-accordion' open><summary>每日备考安排</summary>"
+            f"<div class='daily-plan-board'>{daily_body}</div></details>"
+        )
     if isinstance(weekly, list):
-        week_blocks = []
+        week_cards = []
         for item in weekly:
             if not isinstance(item, dict):
                 continue
             week = escape(item.get("week", ""))
             theme = escape(item.get("theme", ""))
-            body = []
-            if item.get("focus"):
-                body.append(f"<p><strong>重点：</strong>{escape(item['focus'])}</p>")
-            if item.get("tasks"):
-                body.append("<p><strong>具体任务：</strong></p>")
-                body.append(_html_list(item["tasks"]))
-            if item.get("goal"):
-                body.append(f"<p><strong>本周目标：</strong>{escape(item['goal'])}</p>")
-            week_blocks.append(
-                f"<details class='result-accordion nested-answer'><summary>第 {week} 周：{theme}</summary>"
-                f"<div class='result-body'>{''.join(body)}</div></details>"
+            focus = escape(item.get("focus", ""))
+            tasks = item.get("tasks") if isinstance(item.get("tasks"), list) else []
+            goal = escape(item.get("goal", ""))
+            task_items = "".join(f"<li>{escape(task)}</li>" for task in tasks[:4])
+            week_cards.append(
+                "<div class='weekly-plan-card'>"
+                f"<span>Week {week}</span>"
+                f"<h5>{theme}</h5>"
+                f"<p>{focus}</p>"
+                f"<ul>{task_items}</ul>"
+                f"<strong>{goal}</strong>"
+                "</div>"
             )
-        sections.append(
-            "<details class='result-accordion' open><summary>每周安排</summary>"
-            f"<div class='result-body'>{''.join(week_blocks)}</div></details>"
-        )
+        if week_cards:
+            sections.append(
+                "<details class='result-accordion'><summary>周计划概览</summary>"
+                f"<div class='weekly-plan-grid'>{''.join(week_cards)}</div></details>"
+            )
     if plan.get("study_tips"):
         sections.append(
             "<details class='result-accordion'><summary>学习建议</summary>"
@@ -895,6 +1043,11 @@ def study_plan_result_filter(plan):
     if not sections:
         sections.append(f"<pre>{escape(json.dumps(plan, ensure_ascii=False, indent=2))}</pre>")
     return Markup("".join(sections))
+
+
+@app.template_filter("simple_list")
+def simple_list_filter(items):
+    return Markup(_html_list(items if isinstance(items, list) else [items]))
 
 
 def login_required(view):
@@ -936,6 +1089,7 @@ def default_profile(user_id):
         "learning_goal": "",
         "weak_areas": ["口语", "写作"],
         "study_time": 10,
+        "daily_vocab_goal": 30,
         "exam_date": "",
     }
 
@@ -968,6 +1122,32 @@ def int_query(name, default=1):
         return int(request.args.get(name, default))
     except (TypeError, ValueError):
         return default
+
+
+def clamp_int(value, default, low, high):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(low, min(parsed, high))
+
+
+def pagination_window(current, total, radius=2):
+    if total <= 1:
+        return []
+    pages = {1, total}
+    for value in range(current - radius, current + radius + 1):
+        if 1 <= value <= total:
+            pages.add(value)
+    ordered = sorted(pages)
+    result = []
+    last = None
+    for value in ordered:
+        if last is not None and value - last > 1:
+            result.append("...")
+        result.append(value)
+        last = value
+    return result
 
 
 
@@ -1005,6 +1185,9 @@ def current_assistant():
         model=config.get("model", ""),
         base_url=config.get("base_url", ""),
     )
+    config["effective_model"] = assistant.model
+    config["requested_model"] = assistant.requested_model
+    config["used_model_fallback"] = assistant.used_model_fallback
     return assistant, config
 
 
@@ -1015,6 +1198,176 @@ def local_transcribe_available():
 def provider_status_for(ai_config):
     api_keys = ai_config.get("api_keys", {})
     return {key: bool(api_keys.get(key)) for key in AI_PROVIDERS}
+
+
+def _provider_client_params(provider, api_key, base_url=""):
+    defaults = AI_PROVIDERS.get(provider, AI_PROVIDERS["custom"])
+    resolved_base_url = base_url or defaults.get("base_url", "")
+    if provider == "tongyi":
+        resolved_base_url = resolved_base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    return {"api_key": api_key, "base_url": resolved_base_url or None}
+
+
+def fetch_provider_models(provider, api_key, base_url=""):
+    if not api_key:
+        return [], "请先填写 API Key。"
+    try:
+        from openai import OpenAI
+        params = _provider_client_params(provider, api_key, base_url)
+        client_kwargs = {"api_key": params["api_key"]}
+        if params.get("base_url"):
+            client_kwargs["base_url"] = params["base_url"]
+        client = OpenAI(**client_kwargs)
+        models = client.models.list()
+        items = []
+        for item in getattr(models, "data", []) or []:
+            model_id = getattr(item, "id", "") or (item.get("id") if isinstance(item, dict) else "")
+            if model_id:
+                items.append(model_id)
+        return sorted(set(items))[:200], ""
+    except Exception as exc:
+        return [], str(exc)
+
+
+def classify_model_usage(model_name):
+    name = (model_name or "").lower()
+    if any(token in name for token in ["tts", "speech", "voice", "audio-speech"]):
+        return {"kind": "tts", "label": "适合朗读 / TTS", "recommended_for": "tts"}
+    if any(token in name for token in ["asr", "whisper", "transcribe", "stt", "audio-transcription"]):
+        return {"kind": "asr", "label": "适合语音识别 / ASR", "recommended_for": "asr"}
+    if "ocr" in name:
+        return {"kind": "ocr", "label": "适合 OCR 识别", "recommended_for": "other"}
+    if any(token in name for token in ["embedding", "embed", "rerank", "moderation"]):
+        return {"kind": "other", "label": "工具模型，不适合生成", "recommended_for": "other"}
+    if any(token in name for token in ["vision", "vl", "omni", "4o", "chat", "instruct", "qwen", "deepseek", "glm", "moonshot", "mimo", "doubao", "spark"]):
+        return {"kind": "text", "label": "适合生成题目 / 批改", "recommended_for": "text"}
+    return {"kind": "text", "label": "可能适合文本生成", "recommended_for": "text"}
+
+
+def describe_models(models):
+    return [
+        {"id": model, **classify_model_usage(model)}
+        for model in models
+    ]
+
+
+def default_tts_voices(provider):
+    if provider == "openai":
+        return ["marin", "cedar", "coral", "alloy", "ash", "ballad", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"]
+    if provider == "mimo":
+        return ["Chloe", "Mia", "Milo", "Dean", "mimo_default", "冰糖", "茉莉", "苏打", "白桦"]
+    if provider == "tongyi":
+        return ["Cherry", "Serena", "Ethan", "Chelsie"]
+    return ["default", "alloy", "male", "female"]
+
+
+def tts_voice_candidates(provider, configured_voice):
+    voices = []
+    if configured_voice:
+        voices.append(configured_voice)
+    voices.extend(default_tts_voices(provider))
+    if provider == "openai":
+        voices.extend(["coral", "alloy"])
+    elif provider == "mimo":
+        voices.extend(["Chloe", "Mia", "mimo_default"])
+    else:
+        voices.extend(["default", "alloy"])
+    return list(dict.fromkeys([voice.strip() for voice in voices if voice and voice.strip()]))
+
+
+def synthesize_tts_audio(provider, api_key, model, base_url, voice, text):
+    provider = (provider or "").lower()
+    model = model or ("mimo-v2.5-tts" if provider == "mimo" else "gpt-4o-mini-tts")
+    base_url = base_url or AI_PROVIDERS.get(provider, {}).get("base_url", "")
+    attempted = []
+    last_error = None
+    from openai import OpenAI
+
+    if provider == "mimo":
+        client = OpenAI(api_key=api_key, base_url=base_url or "https://api.xiaomimimo.com/v1")
+        instruction = "Natural IELTS examiner voice. Clear pronunciation, steady pace, warm and professional tone."
+        for candidate_voice in tts_voice_candidates(provider, voice or "Chloe"):
+            attempted.append(candidate_voice)
+            try:
+                completion = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "user", "content": instruction},
+                        {"role": "assistant", "content": text},
+                    ],
+                    audio={"format": "wav", "voice": candidate_voice},
+                )
+                message = completion.choices[0].message
+                audio = getattr(message, "audio", None)
+                audio_data = None
+                if isinstance(audio, dict):
+                    audio_data = audio.get("data")
+                elif audio is not None:
+                    audio_data = getattr(audio, "data", None)
+                if not audio_data:
+                    raise RuntimeError("接口未返回 message.audio.data")
+                return base64.b64decode(audio_data), "audio/wav", candidate_voice, attempted
+            except Exception as exc:
+                last_error = exc
+                continue
+        raise RuntimeError(f"MiMo TTS 调用失败：{last_error}")
+
+    if provider != "openai":
+        label = AI_PROVIDERS.get(provider, {}).get("label", provider or "未知供应商")
+        raise RuntimeError(f"{label} 的 TTS 不是 OpenAI /v1/audio/speech 兼容接口，当前版本未启用。建议使用 OpenAI 或小米 MiMo 并先测试通过。")
+
+    client_kwargs = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    client = OpenAI(**client_kwargs)
+    for candidate_voice in tts_voice_candidates(provider, voice or "coral"):
+        attempted.append(candidate_voice)
+        try:
+            response = client.audio.speech.create(
+                model=model,
+                voice=candidate_voice,
+                input=text,
+                instructions="Speak like a calm IELTS examiner. Clear, natural, and easy to follow.",
+                response_format="mp3",
+            )
+            audio_bytes = response.read() if hasattr(response, "read") else bytes(response)
+            if not audio_bytes:
+                raise RuntimeError("接口未返回音频内容")
+            return audio_bytes, "audio/mpeg", candidate_voice, attempted
+        except TypeError:
+            try:
+                response = client.audio.speech.create(
+                    model=model,
+                    voice=candidate_voice,
+                    input=text,
+                    response_format="mp3",
+                )
+                audio_bytes = response.read() if hasattr(response, "read") else bytes(response)
+                if not audio_bytes:
+                    raise RuntimeError("接口未返回音频内容")
+                return audio_bytes, "audio/mpeg", candidate_voice, attempted
+            except Exception as exc:
+                last_error = exc
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f"OpenAI TTS 调用失败：{last_error}")
+
+
+def test_provider_connection(provider, api_key, model, base_url=""):
+    if not api_key:
+        return False, "请先填写 API Key。"
+    try:
+        assistant = TongyiIELTSAssistant(
+            api_key,
+            provider=provider,
+            model=model or AI_PROVIDERS.get(provider, AI_PROVIDERS["custom"]).get("model", ""),
+            base_url=base_url or AI_PROVIDERS.get(provider, {}).get("base_url", ""),
+        )
+        response = assistant.llm.invoke("Reply with OK only.")
+        text = getattr(response, "content", str(response))
+        return True, f"连接成功：{text[:80]}"
+    except Exception as exc:
+        return False, f"连接失败：{exc}"
 
 
 def is_admin_user(user_id=None):
@@ -1514,9 +1867,260 @@ def latest_saved_study_plan(records):
     plan = data.get("plan") or data.get("study_plan") or data.get("result_data")
     if isinstance(plan, str):
         plan = parse_model_output(plan)
-    if isinstance(plan, dict):
+    if isinstance(plan, dict) and not study_plan_is_placeholder(plan):
         return plan
-    return data.get("plan_text") or data.get("result") or ""
+    text_plan = data.get("plan_text") or data.get("result") or ""
+    return "" if study_plan_is_placeholder(text_plan) else text_plan
+
+
+def progress_timestamp(record):
+    if not isinstance(record, dict):
+        return ""
+    return record.get("timestamp") or ""
+
+
+def is_guidance_activity(activity):
+    return activity in {IMPROVEMENT_SUGGESTIONS_ACTIVITY, STUDY_PLAN_ACTIVITY}
+
+
+def is_training_record_for_guidance(record):
+    if not isinstance(record, dict) or is_guidance_activity(record.get("activity", "")):
+        return False
+    score = score_from_progress_record(record)
+    if score is not None:
+        return True
+    data = record.get("data", {})
+    if not isinstance(data, dict):
+        return False
+    mode = data.get("mode", "")
+    activity = record.get("activity", "")
+    return mode in {"speaking_feedback", "speaking_recording", "task1", "task2"} or "批改" in activity or "反馈" in activity
+
+
+def latest_training_record(records):
+    candidates = [record for record in records if is_training_record_for_guidance(record)]
+    if not candidates:
+        return None
+    return max(candidates, key=progress_timestamp)
+
+
+def guidance_needs_refresh(records, activity):
+    latest_training = latest_training_record(records)
+    if not latest_training:
+        return False
+    latest_guidance = latest_activity_record(records, activity)
+    if not latest_guidance:
+        return True
+    return progress_timestamp(latest_training) > progress_timestamp(latest_guidance)
+
+
+def save_ai_suggestions(user_id, profile, progress, silent=False):
+    assistant, _ = current_assistant()
+    if assistant is None:
+        if not silent:
+            flash("请先保存可用的 AI API Key。", "error")
+        return None
+    weak_areas = profile_weak_areas(profile)
+    target_score = round_ielts_band(profile.get("target_score", 6.5))
+    current_level = round_ielts_band(profile.get("current_level", 5.0))
+    raw_suggestions = assistant.generate_improvement_suggestions(
+        progress,
+        weak_areas,
+        target_score,
+        current_level,
+    )
+    suggestions = parse_model_output(raw_suggestions)
+    if not isinstance(suggestions, dict):
+        suggestions = {"formatted_text": raw_suggestions}
+    save_progress(
+        user_id,
+        IMPROVEMENT_SUGGESTIONS_ACTIVITY,
+        {"suggestions": suggestions, "raw": raw_suggestions},
+    )
+    return suggestions
+
+
+def save_ai_study_plan(user_id, profile, progress, silent=False):
+    assistant, _ = current_assistant()
+    current_level, study_weeks, weak_areas = calculate_study_plan_inputs(profile, progress)
+    target_score = round_ielts_band(profile.get("target_score", 6.5))
+    exam_date = profile.get("exam_date") or ""
+    countdown = exam_countdown(profile)
+    days_until_exam = countdown.get("days") if countdown else None
+    raw_study_plan = ""
+    if assistant is not None:
+        raw_study_plan = assistant.generate_study_plan(
+            current_level=round_ielts_band(current_level),
+            target_score=target_score,
+            weak_areas=weak_areas,
+            weeks=study_weeks,
+            progress_records=progress,
+            exam_date=exam_date,
+            days_until_exam=days_until_exam,
+        )
+        study_plan = parse_model_output(raw_study_plan)
+    else:
+        if not silent:
+            flash("请先保存可用的 AI API Key。", "error")
+        study_plan = None
+
+    fallback_plan = build_personalized_study_plan(
+        current_level=round_ielts_band(current_level),
+        target_score=target_score,
+        weak_areas=weak_areas,
+        weeks=study_weeks,
+        history_count=len([r for r in progress if is_training_record_for_guidance(r)]),
+        exam_date=exam_date,
+    )
+    if not isinstance(study_plan, dict) or "formatted_text" in study_plan or study_plan_is_placeholder(study_plan):
+        study_plan = fallback_plan
+    else:
+        if exam_date and not study_plan.get("daily_schedule"):
+            study_plan["daily_schedule"] = fallback_plan.get("daily_schedule", [])
+        if not study_plan.get("skill_diagnosis"):
+            study_plan["skill_diagnosis"] = fallback_plan.get("skill_diagnosis", [])
+    save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan": study_plan, "raw": raw_study_plan})
+    return study_plan
+
+
+def maybe_auto_refresh_learning_guidance(user_id, profile, progress):
+    refreshed = {"suggestions": False, "study_plan": False, "skipped": False}
+    latest_training = latest_training_record(progress)
+    if not latest_training:
+        return refreshed
+    latest_training_ts = progress_timestamp(latest_training)
+    session_key = f"auto_guidance_refreshed_ts_{user_id}"
+    if session.get(session_key) == latest_training_ts:
+        return refreshed
+    needs_suggestions = guidance_needs_refresh(progress, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
+    needs_plan = guidance_needs_refresh(progress, STUDY_PLAN_ACTIVITY)
+    if not (needs_suggestions or needs_plan):
+        session[session_key] = latest_training_ts
+        return refreshed
+
+    prepared = prepare_progress(progress)
+    try:
+        if needs_suggestions:
+            refreshed["suggestions"] = save_ai_suggestions(user_id, profile, prepared, silent=True) is not None
+        if needs_plan:
+            refreshed["study_plan"] = save_ai_study_plan(user_id, profile, prepared, silent=True) is not None
+    except Exception as exc:
+        print(f"自动更新学习方案失败: {exc}")
+        refreshed["skipped"] = True
+    session[session_key] = latest_training_ts
+    return refreshed
+
+
+DIMENSION_LABELS = {
+    "fluency_coherence": "口语流利度",
+    "speaking_lexical_resource": "口语词汇",
+    "speaking_grammatical_range_accuracy": "口语语法",
+    "pronunciation": "发音表现",
+    "task_achievement": "任务完成",
+    "task_response": "任务回应",
+    "coherence_cohesion": "连贯衔接",
+    "writing_lexical_resource": "写作词汇",
+    "writing_grammatical_range_accuracy": "写作语法",
+}
+
+
+def guidance_dimension_overview(records, profile):
+    target = round_ielts_band(profile_band(profile, "target_score", 6.5))
+    buckets = {}
+    for record in records:
+        if not is_training_record_for_guidance(record):
+            continue
+        data = record.get("data", {}) if isinstance(record, dict) else {}
+        result_data = data.get("result_data", {}) if isinstance(data, dict) else {}
+        if not isinstance(result_data, dict):
+            continue
+        record_skill = progress_skill(record)
+        breakdown = result_data.get("breakdown")
+        if isinstance(breakdown, dict):
+            for key, value in breakdown.items():
+                if isinstance(value, dict) and value.get("score") not in (None, ""):
+                    bucket_key = f"{record_skill}_{key}" if key in {"lexical_resource", "grammatical_range_accuracy"} and record_skill else key
+                    try:
+                        buckets.setdefault(bucket_key, []).append(float(value.get("score")))
+                    except (TypeError, ValueError):
+                        continue
+        for key in [
+            "task_achievement",
+            "task_response",
+            "coherence_cohesion",
+            "lexical_resource",
+            "grammatical_range_accuracy",
+        ]:
+            value = result_data.get(key)
+            if isinstance(value, dict) and value.get("score") not in (None, ""):
+                bucket_key = f"{record_skill}_{key}" if key in {"lexical_resource", "grammatical_range_accuracy"} and record_skill else key
+                try:
+                    buckets.setdefault(bucket_key, []).append(float(value.get("score")))
+                except (TypeError, ValueError):
+                    continue
+
+    dimensions = []
+    for key, scores in buckets.items():
+        if not scores:
+            continue
+        score = round_ielts_band(sum(scores[-5:]) / len(scores[-5:]))
+        dimensions.append({
+            "key": key,
+            "label": DIMENSION_LABELS.get(key, key.replace("_", " ")),
+            "score": score,
+            "count": len(scores),
+            "gap": round_ielts_band(max(0.0, target - score)),
+            "percent": max(0, min(100, int((score / max(target, 0.5)) * 100))),
+            "type": "speaking" if key.startswith("speaking_") or key in {"fluency_coherence", "pronunciation"} else "writing" if key.startswith("writing_") or key in {"task_achievement", "task_response", "coherence_cohesion"} else "shared",
+        })
+    dimensions.sort(key=lambda item: (-item["gap"], item["score"]))
+    return dimensions[:8]
+
+
+def learning_guidance_overview(profile, records, suggestions=None, study_plan=None):
+    target = round_ielts_band(profile_band(profile, "target_score", 6.5))
+    skill_items = skill_score_overview(profile)
+    weak_items = sorted(skill_items, key=lambda item: item["gap"], reverse=True)
+    training_records = [record for record in records if is_training_record_for_guidance(record)]
+    scored_records = [record for record in training_records if score_from_progress_record(record) is not None]
+    latest_scored = max(scored_records, key=progress_timestamp) if scored_records else None
+    latest_score = score_from_progress_record(latest_scored) if latest_scored else None
+    best_score = max((score_from_progress_record(record) or 0 for record in scored_records), default=None)
+    latest_record = latest_training_record(records)
+    latest_guidance = latest_activity_record(records, STUDY_PLAN_ACTIVITY) or latest_activity_record(records, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
+    return {
+        "target": target,
+        "weakest": weak_items[:2],
+        "training_count": len(training_records),
+        "scored_count": len(scored_records),
+        "latest_score": round_ielts_band(latest_score) if latest_score is not None else None,
+        "best_score": round_ielts_band(best_score) if best_score is not None else None,
+        "latest_training_date": (progress_timestamp(latest_record)[:10] if latest_record else ""),
+        "latest_guidance_date": (progress_timestamp(latest_guidance)[:10] if latest_guidance else ""),
+        "has_suggestions": bool(suggestions),
+        "has_study_plan": bool(study_plan),
+        "dimensions": guidance_dimension_overview(records, profile),
+    }
+
+
+def ensure_exam_daily_schedule(profile, study_plan, progress):
+    exam_date = profile.get("exam_date") or ""
+    if not exam_date or not isinstance(study_plan, dict) or study_plan.get("daily_schedule"):
+        return study_plan
+    current_level, study_weeks, weak_areas = calculate_study_plan_inputs(profile, progress)
+    fallback_plan = build_personalized_study_plan(
+        current_level=round_ielts_band(current_level),
+        target_score=round_ielts_band(profile.get("target_score", 6.5)),
+        weak_areas=weak_areas,
+        weeks=study_weeks,
+        history_count=len([r for r in progress if is_training_record_for_guidance(r)]),
+        exam_date=exam_date,
+    )
+    merged = dict(study_plan)
+    merged["daily_schedule"] = fallback_plan.get("daily_schedule", [])
+    if not merged.get("skill_diagnosis"):
+        merged["skill_diagnosis"] = fallback_plan.get("skill_diagnosis", [])
+    return merged
 
 
 def profile_weak_areas(profile):
@@ -2213,12 +2817,13 @@ def transcribe_audio_file_with_api(ai_config, audio_path):
     api_key = ""
     base_url = ""
 
-    if api_keys.get("openai"):
+    speech_providers = {"openai", "custom", "mimo", "volcengine", "xunfei"}
+    if provider in speech_providers and (api_keys.get(provider) or ai_config.get("api_key")):
+        api_key = api_keys.get(provider) or ai_config.get("api_key")
+        base_url = ai_config.get("base_url") or AI_PROVIDERS.get(provider, {}).get("base_url", "")
+    elif api_keys.get("openai"):
         api_key = api_keys["openai"]
         base_url = ""
-    elif provider in {"openai", "custom"} and ai_config.get("api_key"):
-        api_key = ai_config.get("api_key")
-        base_url = ai_config.get("base_url") or ""
 
     if not api_key:
         return "", "没有可用的语音识别 API。"
@@ -2229,7 +2834,7 @@ def transcribe_audio_file_with_api(ai_config, audio_path):
         if base_url:
             client_kwargs["base_url"] = base_url
         client = OpenAI(**client_kwargs)
-        model = os.getenv("OPENAI_TRANSCRIBE_MODEL", "whisper-1")
+        model = os.getenv(f"{provider.upper()}_TRANSCRIBE_MODEL", os.getenv("OPENAI_TRANSCRIBE_MODEL", "whisper-1"))
         with open(audio_path, "rb") as audio:
             result = client.audio.transcriptions.create(model=model, file=audio)
         text = getattr(result, "text", "") or ""
@@ -2470,11 +3075,15 @@ def dashboard():
     user_id = session["user_id"]
     tracked_profile = refresh_user_level_tracking(user_id)
     all_progress = list(reversed(get_progress(user_id, limit=180)))
+    auto_guidance = maybe_auto_refresh_learning_guidance(user_id, tracked_profile, all_progress)
+    if auto_guidance.get("suggestions") or auto_guidance.get("study_plan"):
+        all_progress = list(reversed(get_progress(user_id, limit=180)))
     suggestion_record = get_latest_progress_by_activity(user_id, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
     study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
     suggestions = latest_saved_suggestions([suggestion_record] if suggestion_record else [])
     study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
     prepared_progress = prepare_progress(all_progress)
+    study_plan = ensure_exam_daily_schedule(tracked_profile, study_plan, prepared_progress)
     prepared_progress.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
     total_records = len(prepared_progress)
     progress = prepared_progress[:4]
@@ -2485,6 +3094,8 @@ def dashboard():
     context["goal_progress"] = dashboard_goal_progress(prepared_progress)
     context["exam_countdown"] = exam_countdown(tracked_profile)
     context["ability_trend_chart"] = ability_trend_chart(all_progress, tracked_profile)
+    context["guidance_overview"] = learning_guidance_overview(tracked_profile, prepared_progress, suggestions, study_plan)
+    context["auto_guidance"] = auto_guidance
     return render_template(
         "dashboard.html",
         progress=progress,
@@ -2506,29 +3117,13 @@ def generate_suggestions():
     user_id = session["user_id"]
     profile = load_user_profile(user_id) or default_profile(user_id)
     progress = prepare_progress(list(reversed(get_progress(user_id, limit=100))))
-    assistant, _ = current_assistant()
-    if assistant is None:
-        flash("请先保存可用的 AI API Key。", "error")
-        return redirect(url_for("dashboard"))
-    weak_areas = profile_weak_areas(profile)
-    target_score = profile.get("target_score", 6.5)
-    current_level = profile.get("current_level", 5.0)
     try:
-        raw_suggestions = assistant.generate_improvement_suggestions(
-            progress, weak_areas, float(target_score), float(current_level)
-        )
+        suggestions = save_ai_suggestions(user_id, profile, progress)
     except Exception as exc:
         flash(f"AI 调用失败：{exc}", "error")
         return redirect(url_for("dashboard"))
-    suggestions = parse_model_output(raw_suggestions)
-    if not isinstance(suggestions, dict):
-        suggestions = {"formatted_text": raw_suggestions}
-    save_progress(
-        user_id,
-        IMPROVEMENT_SUGGESTIONS_ACTIVITY,
-        {"suggestions": suggestions, "raw": raw_suggestions},
-    )
-    flash("重点提升建议已生成。", "success")
+    if suggestions is not None:
+        flash("重点提升建议已生成。", "success")
     return redirect(url_for("dashboard"))
 
 
@@ -2538,29 +3133,13 @@ def generate_study_plan():
     user_id = session["user_id"]
     profile = load_user_profile(user_id) or default_profile(user_id)
     progress = prepare_progress(list(reversed(get_progress(user_id, limit=100))))
-    assistant, _ = current_assistant()
-    if assistant is None:
-        flash("请先保存可用的 AI API Key。", "error")
-        return redirect(url_for("dashboard"))
-
-    current_level, study_weeks, weak_areas = calculate_study_plan_inputs(profile, progress)
     try:
-        raw_study_plan = assistant.generate_study_plan(
-            current_level=current_level,
-            target_score=float(profile.get("target_score", 6.5)),
-            weak_areas=weak_areas,
-            weeks=study_weeks,
-            progress_records=progress,
-        )
+        study_plan = save_ai_study_plan(user_id, profile, progress)
     except Exception as exc:
         flash(f"AI 调用失败：{exc}", "error")
         return redirect(request.referrer or url_for("dashboard"))
-    study_plan = parse_model_output(raw_study_plan)
-    if isinstance(study_plan, dict) and "formatted_text" not in study_plan:
-        save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan": study_plan, "raw": raw_study_plan})
-    else:
-        save_progress(user_id, STUDY_PLAN_ACTIVITY, {"plan_text": raw_study_plan})
-    flash("个性化学习计划已生成。", "success")
+    if study_plan is not None:
+        flash("个性化学习计划已生成。", "success")
     return redirect(request.referrer or url_for("dashboard"))
 
 
@@ -2580,6 +3159,7 @@ def update_profile():
         "learning_goal": request.form.get("learning_goal", "").strip(),
         "weak_areas": request.form.getlist("weak_areas"),
         "study_time": int_field("study_time", 10),
+        "daily_vocab_goal": clamp_int(request.form.get("daily_vocab_goal"), 30, 5, 300),
         "exam_date": request.form.get("exam_date", ""),
     }
     save_user_profile(user_id, profile)
@@ -2593,16 +3173,82 @@ def update_ai_config():
     user_id = session["user_id"]
     provider = request.form.get("provider", "tongyi")
     defaults = AI_PROVIDERS.get(provider, AI_PROVIDERS["tongyi"])
+    existing = load_user_ai_config(user_id)
+    api_keys = dict(existing.get("api_keys", {}))
+    touched_marker_present = "api_key_touched" in request.form
+    touched_keys = {
+        item.strip()
+        for item in request.form.get("api_key_touched", "").split(",")
+        if item.strip()
+    }
     api_key = request.form.get("api_key", "").strip()
+    if api_key and ((not touched_marker_present) or provider in touched_keys):
+        api_keys[provider] = api_key
+    for key in AI_PROVIDERS:
+        value = request.form.get(f"api_key_{key}", "").strip()
+        if value and ((not touched_marker_present) or key in touched_keys):
+            api_keys[key] = value
     model = request.form.get("model", "").strip() or defaults["model"]
     base_url = request.form.get("base_url", "").strip() or defaults["base_url"]
+    model_usage = classify_model_usage(model)
+    if model_usage["recommended_for"] != "text":
+        fallback_model = defaults["model"]
+        flash(f"{model} 是{model_usage['label']}，不适合生成题目/批改，已自动改用 {fallback_model}。朗读请在下方 TTS 模块配置。", "error")
+        model = fallback_model
 
-    if not api_key:
+    if not api_keys.get(provider):
         flash("请输入该模型供应商的 API Key。", "error")
         return redirect(url_for("settings_page"))
 
-    save_user_ai_config(user_id, provider, api_key, model, base_url)
+    save_user_ai_config_map(user_id, provider, api_keys, model, base_url)
     flash("AI 模型配置已保存。", "success")
+    return redirect(url_for("settings_page"))
+
+
+@app.post("/tts-config")
+@login_required
+def update_tts_config():
+    provider = request.form.get("tts_provider", "").strip()
+    if not provider:
+        save_user_tts_config(session["user_id"], "", "", "", "", False)
+        flash("已关闭云端 TTS，将使用浏览器朗读作为兜底。", "success")
+        return redirect(url_for("settings_page"))
+
+    defaults = AI_PROVIDERS.get(provider, {})
+    ai_config = load_user_ai_config(session["user_id"])
+    api_key = ai_config.get("api_keys", {}).get(provider, "")
+    if not api_key:
+        flash("请先在上方保存该 TTS 供应商的 API Key，再验证语音朗读。", "error")
+        return redirect(url_for("settings_page"))
+
+    model = request.form.get("tts_model", "").strip() or ("mimo-v2.5-tts" if provider == "mimo" else "gpt-4o-mini-tts")
+    base_url = request.form.get("tts_base_url", "").strip() or defaults.get("base_url", "")
+    voice = request.form.get("tts_voice", "").strip() or ("Chloe" if provider == "mimo" else "coral")
+    try:
+        audio_bytes, _, used_voice, _ = synthesize_tts_audio(
+            provider,
+            api_key,
+            model,
+            base_url,
+            voice,
+            "This is a TTS validation for Xindaya IELTS practice.",
+        )
+        if len(audio_bytes) < 256:
+            raise RuntimeError("测试音频过短，可能不是有效音频")
+    except Exception as exc:
+        save_user_tts_config(session["user_id"], "", "", "", "", False)
+        flash(f"语音朗读验证失败，已禁用云端 TTS：{exc}", "error")
+        return redirect(url_for("settings_page"))
+
+    save_user_tts_config(
+        session["user_id"],
+        provider,
+        model,
+        base_url,
+        used_voice,
+        True,
+    )
+    flash(f"语音朗读验证通过，已启用 {AI_PROVIDERS.get(provider, {}).get('label', provider)} · {model} · {used_voice}。", "success")
     return redirect(url_for("settings_page"))
 
 
@@ -2629,6 +3275,118 @@ def update_active_ai_provider():
     return redirect(request.referrer or url_for("dashboard"))
 
 
+@app.post("/api/ai-models")
+@login_required
+def api_ai_models():
+    payload = request.get_json(silent=True) or request.form
+    provider = (payload.get("provider") or "custom").strip()
+    api_key = (payload.get("api_key") or "").strip()
+    base_url = (payload.get("base_url") or "").strip()
+    if not api_key:
+        api_key = load_user_ai_config(session["user_id"]).get("api_keys", {}).get(provider, "")
+    models, error = fetch_provider_models(provider, api_key, base_url)
+    return jsonify({"ok": not bool(error), "models": models, "model_options": describe_models(models), "error": error})
+
+
+@app.post("/api/tts-models")
+@login_required
+def api_tts_models():
+    payload = request.get_json(silent=True) or request.form
+    provider = (payload.get("provider") or "").strip()
+    api_key = (payload.get("api_key") or "").strip()
+    base_url = (payload.get("base_url") or "").strip()
+    if not provider:
+        return jsonify({"ok": False, "models": [], "voices": [], "error": "请选择 TTS 供应商。"})
+    if not api_key:
+        api_key = load_user_ai_config(session["user_id"]).get("api_keys", {}).get(provider, "")
+    models, error = fetch_provider_models(provider, api_key, base_url)
+    options = [item for item in describe_models(models) if item["recommended_for"] == "tts"]
+    if not options and provider == "mimo":
+        options = [{"id": "mimo-v2.5-tts", **classify_model_usage("mimo-v2.5-tts")}]
+    elif not options and provider == "openai":
+        options = [{"id": "gpt-4o-mini-tts", **classify_model_usage("gpt-4o-mini-tts")}]
+    return jsonify({
+        "ok": not bool(error) or bool(options),
+        "models": [item["id"] for item in options],
+        "model_options": options,
+        "voices": default_tts_voices(provider),
+        "error": "" if options else error,
+    })
+
+
+@app.post("/api/ai-test")
+@login_required
+def api_ai_test():
+    payload = request.get_json(silent=True) or request.form
+    provider = (payload.get("provider") or "custom").strip()
+    api_key = (payload.get("api_key") or "").strip()
+    model = (payload.get("model") or "").strip()
+    base_url = (payload.get("base_url") or "").strip()
+    if not api_key:
+        api_key = load_user_ai_config(session["user_id"]).get("api_keys", {}).get(provider, "")
+    ok, message = test_provider_connection(provider, api_key, model, base_url)
+    return jsonify({"ok": ok, "message": message})
+
+
+@app.get("/api/tts-status")
+@login_required
+def api_tts_status():
+    ai_config = load_user_ai_config(session["user_id"])
+    provider = (ai_config.get("tts_provider") or "").lower()
+    model = ai_config.get("tts_model") or ""
+    voice = ai_config.get("tts_voice") or ""
+    api_key = ai_config.get("api_keys", {}).get(provider, "") if provider else ""
+    enabled = bool(provider and api_key and ai_config.get("tts_validated"))
+    return jsonify({
+        "enabled": enabled,
+        "provider": provider,
+        "provider_label": AI_PROVIDERS.get(provider, {}).get("label", provider),
+        "model": model,
+        "voice": voice,
+    })
+
+
+@app.post("/api/tts")
+@login_required
+def api_tts():
+    payload = request.get_json(silent=True) or {}
+    text = (payload.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "没有可朗读的文本。"}), 400
+    if len(text) > 4000:
+        text = text[:4000]
+    ai_config = load_user_ai_config(session["user_id"])
+    provider = (ai_config.get("tts_provider") or "").lower()
+    if not provider:
+        return jsonify({"ok": False, "error": "未配置 TTS 模型。"}), 400
+    if not ai_config.get("tts_validated"):
+        return jsonify({"ok": False, "error": "当前 TTS 配置尚未通过后台验证，请先到用户中心测试并保存。"}), 400
+    api_key = ai_config.get("api_keys", {}).get(provider, "")
+    if not api_key:
+        return jsonify({"ok": False, "error": "未保存该 TTS 供应商的 API Key。"}), 400
+    model = ai_config.get("tts_model") or ("mimo-v2.5-tts" if provider == "mimo" else "gpt-4o-mini-tts")
+    base_url = ai_config.get("tts_base_url") or AI_PROVIDERS.get(provider, {}).get("base_url", "")
+    voice = ai_config.get("tts_voice") or "alloy"
+    try:
+        audio_bytes, mimetype, used_voice, attempted = synthesize_tts_audio(provider, api_key, model, base_url, voice, text)
+        flask_response = app.response_class(audio_bytes, mimetype=mimetype)
+        flask_response.headers["X-TTS-Provider"] = provider
+        flask_response.headers["X-TTS-Model"] = model
+        flask_response.headers["X-TTS-Voice"] = used_voice
+        flask_response.headers["X-TTS-Voices-Tried"] = ",".join(attempted)
+        return flask_response
+    except Exception as exc:
+        provider_label = AI_PROVIDERS.get(provider, {}).get("label", provider)
+        save_user_tts_config(session["user_id"], "", "", "", "", False)
+        return jsonify({
+            "ok": False,
+            "error": f"云端 TTS 调用失败，已自动禁用该配置：{exc}",
+            "provider": provider_label,
+            "model": model,
+            "base_url": base_url,
+        }), 502
+
+
 @app.route("/admin")
 @admin_required
 def admin_panel():
@@ -2643,6 +3401,8 @@ def admin_panel():
     selected_ai_config = load_user_ai_config(selected_user) if selected_user else None
     selected_is_admin = is_admin_user(selected_user) if selected_user else False
     records = prepare_progress(get_all_progress(limit=500, user_id=selected_user))
+    for item in records:
+        item["admin_score"] = item.get("display_score") or score_from_progress_record(item)
     records.sort(key=lambda item: str(item.get("timestamp", "")), reverse=True)
     return render_template(
         "admin.html",
@@ -2660,6 +3420,128 @@ def admin_panel():
     )
 
 
+@app.route("/admin/vocabulary")
+@admin_required
+def admin_vocabulary():
+    query = request.args.get("q", "").strip().lower()
+    topic = request.args.get("topic", "")
+    status = request.args.get("status", "needs")
+    page = int_query("page", 1)
+    per_page = 40
+    words = [dict(item) for item in IELTS_WORDS]
+    for item in words:
+        item["has_chinese_meaning"] = _has_chinese_meaning(item)
+        item["needs_enrichment"] = _needs_vocab_enrichment(item)
+    if query:
+        words = [
+            item for item in words
+            if query in item.get("word", "").lower()
+            or query in item.get("meaning", "").lower()
+            or query in item.get("topic", "").lower()
+        ]
+    if topic:
+        words = [item for item in words if item.get("topic") == topic]
+    if status == "needs":
+        words = [item for item in words if item.get("needs_enrichment")]
+    elif status == "complete":
+        words = [item for item in words if not item.get("needs_enrichment")]
+    total_words = len(IELTS_WORDS)
+    needs_count = sum(1 for item in IELTS_WORDS if _needs_vocab_enrichment(item))
+    phonetic_count = sum(1 for item in IELTS_WORDS if item.get("phonetic"))
+    chinese_count = sum(1 for item in IELTS_WORDS if _has_chinese_meaning(item))
+    topics = sorted({item.get("topic", "通用学术词") for item in IELTS_WORDS})
+    total_pages = max(1, math.ceil(len(words) / per_page))
+    page = max(1, min(page, total_pages))
+    page_words = words[(page - 1) * per_page:page * per_page]
+    selected_word = request.args.get("word", "").strip().lower()
+    selected_item = next((item for item in IELTS_WORDS if item.get("word", "").lower() == selected_word), None)
+    return render_template(
+        "admin_vocabulary.html",
+        words=page_words,
+        selected_item=selected_item,
+        query=query,
+        topic=topic,
+        status=status,
+        topics=topics,
+        page=page,
+        total_pages=total_pages,
+        page_items=pagination_window(page, total_pages),
+        total_words=total_words,
+        needs_count=needs_count,
+        phonetic_count=phonetic_count,
+        chinese_count=chinese_count,
+        **common_context(),
+    )
+
+
+@app.post("/admin/vocabulary/bulk-enrich")
+@admin_required
+def admin_bulk_enrich_vocabulary():
+    assistant, _ = current_assistant()
+    if assistant is None:
+        flash("请先在管理员账号的用户中心保存可用 API Key。", "error")
+        return redirect(url_for("admin_vocabulary"))
+    limit = clamp_int(request.form.get("limit"), 10, 1, 80)
+    candidates = [item for item in IELTS_WORDS if _needs_vocab_enrichment(item)][:limit]
+    success = 0
+    failed = []
+    for item in candidates:
+        try:
+            _enrich_vocab_item(assistant, item)
+            success += 1
+        except Exception as exc:
+            failed.append(f"{item.get('word')}: {exc}")
+    if success:
+        flash(f"已补全 {success} 个词条。", "success")
+    if failed:
+        flash("部分词条补全失败：" + "；".join(failed[:3]), "error")
+    if not candidates:
+        flash("当前没有待补全词条。", "success")
+    return redirect(url_for("admin_vocabulary"))
+
+
+@app.post("/admin/vocabulary/<word>/save")
+@admin_required
+def admin_save_vocabulary_word(word):
+    phrases = [
+        item.strip()
+        for item in request.form.get("phrases", "").replace("\n", ",").split(",")
+        if item.strip()
+    ]
+    enrichment = {
+        "meaning": request.form.get("meaning", "").strip(),
+        "phonetic": request.form.get("phonetic", "").strip(),
+        "topic": request.form.get("topic", "").strip() or "通用学术词",
+        "phrases": phrases[:8],
+        "essay_use": request.form.get("essay_use", "").strip(),
+    }
+    if not enrichment["meaning"]:
+        flash("中文释义不能为空。", "error")
+    else:
+        _save_vocab_ai_override(word, enrichment)
+        flash(f"{word} 词条已保存。", "success")
+    return redirect(url_for("admin_vocabulary", word=word, status=request.form.get("status", "needs")))
+
+
+@app.post("/admin/vocabulary/<word>/enrich")
+@admin_required
+def admin_enrich_vocabulary_word(word):
+    assistant, _ = current_assistant()
+    if assistant is None:
+        flash("请先在管理员账号的用户中心保存可用 API Key。", "error")
+        return redirect(url_for("admin_vocabulary", word=word, status=request.form.get("status", "needs")))
+    target = next((item for item in IELTS_WORDS if item.get("word", "").lower() == word.lower()), None)
+    if not target:
+        flash("词库中未找到这个单词。", "error")
+    else:
+        try:
+            _enrich_vocab_item(assistant, target)
+            flash(f"{target.get('word')} 已用 AI 补全。", "success")
+        except Exception as exc:
+            flash(f"AI 补全失败：{exc}", "error")
+    return redirect(url_for("admin_vocabulary", word=word, status=request.form.get("status", "needs")))
+
+
 @app.post("/admin/users/<target_user>/profile")
 @admin_required
 def admin_update_user_profile(target_user):
@@ -2675,6 +3557,7 @@ def admin_update_user_profile(target_user):
         "learning_goal": request.form.get("learning_goal", "").strip(),
         "weak_areas": request.form.getlist("weak_areas"),
         "study_time": int_field("study_time", 10),
+        "daily_vocab_goal": clamp_int(request.form.get("daily_vocab_goal"), 30, 5, 300),
         "exam_date": request.form.get("exam_date", ""),
     }
     save_user_profile(target_user, profile)
@@ -2763,17 +3646,27 @@ def assistant_center():
         if assistant is None:
             flash("请先在用户中心保存可用的 AI API Key。", "error")
             return redirect(url_for("dashboard"))
+        if ai_config.get("used_model_fallback"):
+            flash(f"当前选择的 {ai_config.get('requested_model')} 不适合文本生成，已自动改用 {ai_config.get('effective_model')}。", "success")
 
         if mode == "writing_ideas":
             topic = request.form.get("topic", "").strip()
             question = request.form.get("question", "").strip()
-            result = assistant.generate_writing_ideas(topic, question)
+            try:
+                result = assistant.generate_writing_ideas(topic, question)
+            except Exception as exc:
+                flash(f"AI 调用失败：{exc}", "error")
+                return redirect(url_for("assistant_center"))
             save_progress(session["user_id"], "作文思路互动", {"topic": topic, "question": question})
 
         elif mode == "speaking_part2":
             topic = request.form.get("speaking_topic", "人物描述")
             cue_type = request.form.get("cue_type", "描述类")
-            result = assistant.practice_speaking_part2(topic, cue_type)
+            try:
+                result = assistant.practice_speaking_part2(topic, cue_type)
+            except Exception as exc:
+                flash(f"AI 调用失败：{exc}", "error")
+                return redirect(url_for("assistant_center"))
             save_progress(session["user_id"], "口语Part 2题目生成", {"topic": topic, "cue_type": cue_type})
 
     return render_template(
@@ -2798,13 +3691,19 @@ def speaking():
         if assistant is None:
             flash("请先在用户中心保存可用的 AI API Key。", "error")
             return redirect(url_for("dashboard"))
+        if ai_config.get("used_model_fallback"):
+            flash(f"当前选择的 {ai_config.get('requested_model')} 不适合文本生成，已自动改用 {ai_config.get('effective_model')}。", "success")
         if mode == "part1":
             topic = request.form.get("topic", "工作/学习")
             difficulty = request.form.get("difficulty", "中等")
-            result = assistant.practice_speaking_part1(
-                topic,
-                difficulty,
-            )
+            try:
+                result = assistant.practice_speaking_part1(
+                    topic,
+                    difficulty,
+                )
+            except Exception as exc:
+                flash(f"AI 生成题目失败：{exc}", "error")
+                return redirect(url_for("speaking", mode=mode))
             result_data = parse_model_output(result)
             result_data = sanitize_speaking_result(mode, result_data)
             save_progress(session["user_id"], "口语Part 1题目生成", {
@@ -2817,10 +3716,14 @@ def speaking():
         elif mode == "part2":
             topic = request.form.get("topic", "人物描述")
             cue_type = request.form.get("cue_type", "描述类")
-            result = assistant.practice_speaking_part2(
-                topic,
-                cue_type,
-            )
+            try:
+                result = assistant.practice_speaking_part2(
+                    topic,
+                    cue_type,
+                )
+            except Exception as exc:
+                flash(f"AI 生成题目失败：{exc}", "error")
+                return redirect(url_for("speaking", mode=mode))
             result_data = parse_model_output(result)
             result_data = sanitize_speaking_result(mode, result_data)
             save_progress(session["user_id"], "口语Part 2题目生成", {
@@ -2833,10 +3736,14 @@ def speaking():
         elif mode == "part3":
             part2_topic = request.form.get("part2_topic", "")
             discussion_type = request.form.get("discussion_type", "社会影响")
-            result = assistant.practice_speaking_part3(
-                part2_topic,
-                discussion_type,
-            )
+            try:
+                result = assistant.practice_speaking_part3(
+                    part2_topic,
+                    discussion_type,
+                )
+            except Exception as exc:
+                flash(f"AI 生成题目失败：{exc}", "error")
+                return redirect(url_for("speaking", mode=mode))
             result_data = parse_model_output(result)
             result_data = sanitize_speaking_result(mode, result_data)
             save_progress(session["user_id"], "口语Part 3题目生成", {
@@ -3096,11 +4003,17 @@ def writing():
         if assistant is None:
             flash("请先在用户中心保存可用的 AI API Key。", "error")
             return redirect(url_for("dashboard"))
+        if ai_config.get("used_model_fallback"):
+            flash(f"当前选择的 {ai_config.get('requested_model')} 不适合文本生成，已自动改用 {ai_config.get('effective_model')}。", "success")
         if mode == "generate_topic":
             task_type = request.form.get("task_type", "Task 2")
             chart_type = request.form.get("chart_type", "柱状图")
             topic = request.form.get("topic", "教育")
-            result = assistant.generate_writing_topic(task_type, chart_type=chart_type, topic=topic)
+            try:
+                result = assistant.generate_writing_topic(task_type, chart_type=chart_type, topic=topic)
+            except Exception as exc:
+                flash(f"AI 生成作文题目失败：{exc}", "error")
+                return redirect(url_for("writing", mode="task1" if task_type == "Task 1" else "task2"))
             result_data = parse_generated_topic_md(result, task_type)
             result_data = build_task1_chart_assets(result_data, raw_text=result)
             session["generated_topic_text"] = result_data.get("question", "")
@@ -3360,9 +4273,16 @@ def analysis():
     page = int_query("page", 1)
     type_filter = request.args.get("type", "").strip()
     all_progress = list(reversed(get_progress(user_id, limit=180)))
+    auto_guidance = maybe_auto_refresh_learning_guidance(user_id, tracked_profile, all_progress)
+    if auto_guidance.get("suggestions") or auto_guidance.get("study_plan"):
+        all_progress = list(reversed(get_progress(user_id, limit=180)))
     study_plan_record = get_latest_progress_by_activity(user_id, STUDY_PLAN_ACTIVITY)
+    suggestion_record = get_latest_progress_by_activity(user_id, IMPROVEMENT_SUGGESTIONS_ACTIVITY)
     study_plan = latest_saved_study_plan([study_plan_record] if study_plan_record else [])
+    suggestions = latest_saved_suggestions([suggestion_record] if suggestion_record else [])
     progress = prepare_progress(all_progress)
+    study_plan = ensure_exam_daily_schedule(tracked_profile, study_plan, progress)
+    guidance_overview = learning_guidance_overview(tracked_profile, progress, suggestions, study_plan)
     if type_filter:
         progress = [p for p in progress if _matches_type_filter(p, type_filter)]
     progress, page, total_pages, total_records = paginate_records(progress, page, 10)
@@ -3371,6 +4291,8 @@ def analysis():
     context["profile"] = tracked_profile
     context["skill_scores"] = skill_score_overview(context["profile"])
     context["exam_countdown"] = exam_countdown(tracked_profile)
+    context["guidance_overview"] = guidance_overview
+    context["auto_guidance"] = auto_guidance
     return render_template(
         "analysis.html",
         progress=progress,
@@ -3378,6 +4300,7 @@ def analysis():
         total_pages=total_pages,
         total_records=total_records,
         study_plan=study_plan,
+        suggestions=suggestions,
         user_words=user_words,
         type_filter=type_filter,
         **context,
@@ -3387,8 +4310,11 @@ def analysis():
 @app.route("/vocabulary")
 @login_required
 def vocabulary():
+    context = common_context()
     query = request.args.get("q", "").strip().lower()
     topic = request.args.get("topic", "")
+    page = int_query("page", 1)
+    per_page = 60
     progress = get_vocab_progress(session["user_id"])
     user_words = get_user_words(session["user_id"])
     words = IELTS_WORDS
@@ -3401,18 +4327,217 @@ def vocabulary():
         words = [item for item in words if item["topic"] == topic]
     topics = sorted({item["topic"] for item in IELTS_WORDS})
     learned_count = sum(1 for item in IELTS_WORDS if progress.get(item["word"], {}).get("status") == "learned")
+    filtered_count = len(words)
+    daily_goal = clamp_int(context.get("profile", {}).get("daily_vocab_goal"), 30, 5, 300)
+    remaining_count = max(0, len(IELTS_WORDS) - learned_count)
+    days_to_finish = math.ceil(remaining_count / daily_goal) if remaining_count else 0
+    finish_date = (date.today() + timedelta(days=max(days_to_finish - 1, 0))).strftime("%Y-%m-%d") if days_to_finish else "已完成"
+    total_pages = max(1, math.ceil(filtered_count / per_page))
+    page = max(1, min(page, total_pages))
+    def has_chinese_meaning(item):
+        return bool(re.search(r"[\u4e00-\u9fff]", str(item.get("meaning", ""))))
+
+    def needs_vocab_enrichment(item):
+        phrases = item.get("phrases") or []
+        generic_phrase = any(" in context" in str(phrase) or "IELTS writing" in str(phrase) for phrase in phrases)
+        return (
+            not has_chinese_meaning(item)
+            or not item.get("phonetic")
+            or item.get("topic") in {"雅思核心词", "通用学术词", "雅思中文词表"}
+            or generic_phrase
+        )
+
+    page_words = []
+    for item in words[(page - 1) * per_page:page * per_page]:
+        display_item = dict(item)
+        display_item["has_chinese_meaning"] = has_chinese_meaning(item)
+        display_item["needs_enrichment"] = needs_vocab_enrichment(item)
+        page_words.append(display_item)
     return render_template(
         "vocabulary.html",
-        words=words,
+        words=page_words,
         topics=topics,
         progress=progress,
         learned_count=learned_count,
         total_count=len(IELTS_WORDS),
+        filtered_count=filtered_count,
+        daily_goal=daily_goal,
+        remaining_count=remaining_count,
+        days_to_finish=days_to_finish,
+        finish_date=finish_date,
+        page=page,
+        total_pages=total_pages,
+        page_items=pagination_window(page, total_pages),
         user_words=user_words,
         selected_topic=topic,
         query=query,
-        **common_context(),
+        **context,
     )
+
+
+@app.route("/vocabulary/review")
+@login_required
+def vocabulary_review():
+    context = common_context()
+    query = request.args.get("q", "").strip().lower()
+    topic = request.args.get("topic", "")
+    start = max(0, int_query("start", 0))
+    deck_size = clamp_int(request.args.get("count"), context.get("profile", {}).get("daily_vocab_goal", 30), 5, 300)
+    progress = get_vocab_progress(session["user_id"])
+    words = IELTS_WORDS
+    if query:
+        words = [
+            item for item in words
+            if query in item["word"].lower() or query in item["meaning"].lower()
+        ]
+    if topic:
+        words = [item for item in words if item["topic"] == topic]
+    def has_chinese_meaning(item):
+        return bool(re.search(r"[\u4e00-\u9fff]", str(item.get("meaning", ""))))
+
+    def needs_vocab_enrichment(item):
+        phrases = item.get("phrases") or []
+        generic_phrase = any(" in context" in str(phrase) or "IELTS writing" in str(phrase) for phrase in phrases)
+        return (
+            not has_chinese_meaning(item)
+            or not item.get("phonetic")
+            or item.get("topic") in {"雅思核心词", "通用学术词", "雅思中文词表"}
+            or generic_phrase
+        )
+
+    learning_words = [item for item in words if progress.get(item["word"], {}).get("status") != "learned"]
+    learned_words = [item for item in words if progress.get(item["word"], {}).get("status") == "learned"]
+    random.shuffle(learning_words)
+    random.shuffle(learned_words)
+    ordered_words = sorted(learning_words + learned_words, key=lambda item: not has_chinese_meaning(item))
+    if start >= len(ordered_words):
+        start = 0
+    deck_words = ordered_words[start:start + deck_size]
+    if not deck_words and ordered_words:
+        deck_words = ordered_words[:deck_size]
+        start = 0
+    next_start = start + deck_size if start + deck_size < len(ordered_words) else 0
+    prev_start = max(0, start - deck_size)
+    learned_total = sum(1 for item in words if progress.get(item["word"], {}).get("status") == "learned")
+    remaining_total = max(0, len(words) - learned_total)
+    days_to_finish = math.ceil(remaining_total / deck_size) if remaining_total else 0
+    finish_date = (date.today() + timedelta(days=max(days_to_finish - 1, 0))).strftime("%Y-%m-%d") if days_to_finish else "已完成"
+    deck = [
+        {
+            "word": item.get("word", ""),
+            "phonetic": item.get("phonetic", ""),
+            "meaning": item.get("meaning", ""),
+            "phrases": item.get("phrases", []),
+            "essay_use": item.get("essay_use", ""),
+            "topic": item.get("topic", ""),
+            "learned": progress.get(item["word"], {}).get("status") == "learned",
+            "needs_enrichment": needs_vocab_enrichment(item),
+        }
+        for item in deck_words
+    ]
+    return render_template(
+        "vocabulary_review.html",
+        deck=deck,
+        query=query,
+        selected_topic=topic,
+        total_count=len(words),
+        learned_count=learned_total,
+        daily_goal=deck_size,
+        start=start,
+        next_start=next_start,
+        prev_start=prev_start,
+        remaining_count=remaining_total,
+        days_to_finish=days_to_finish,
+        finish_date=finish_date,
+        **context,
+    )
+
+
+def _vocab_override_path():
+    return os.path.join(os.path.dirname(__file__), "data", "vocab_ai_overrides.json")
+
+
+def _save_vocab_ai_override(word, enrichment):
+    os.makedirs(os.path.dirname(_vocab_override_path()), exist_ok=True)
+    try:
+        with open(_vocab_override_path(), "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    data[word.lower()] = enrichment
+    with open(_vocab_override_path(), "w", encoding="utf-8") as handle:
+        json.dump(data, handle, ensure_ascii=False, indent=2)
+    for item in IELTS_WORDS:
+        if item.get("word", "").lower() == word.lower():
+            item.update({key: value for key, value in enrichment.items() if value not in (None, "", [])})
+            item["ai_enriched"] = True
+            break
+
+
+def _has_chinese_meaning(item):
+    return bool(re.search(r"[\u4e00-\u9fff]", str(item.get("meaning", ""))))
+
+
+def _needs_vocab_enrichment(item):
+    phrases = item.get("phrases") or []
+    generic_phrase = any(
+        " in context" in str(phrase) or "IELTS writing" in str(phrase)
+        for phrase in phrases
+    )
+    return (
+        not _has_chinese_meaning(item)
+        or not item.get("phonetic")
+        or item.get("topic") in {"雅思核心词", "通用学术词", "雅思中文词表"}
+        or generic_phrase
+    )
+
+
+def _parse_vocab_enrichment(raw_data):
+    if not isinstance(raw_data, dict):
+        raise ValueError("AI 返回格式无法解析。")
+    meaning = raw_data.get("translation") or raw_data.get("meaning") or raw_data.get("中文释义") or ""
+    phonetic = raw_data.get("phonetic") or raw_data.get("音标") or ""
+    topic = raw_data.get("topic") or raw_data.get("话题") or ""
+    phrases = raw_data.get("phrases") or raw_data.get("搭配") or []
+    essay_use = raw_data.get("usage") or raw_data.get("essay_use") or raw_data.get("作文例句") or ""
+    if isinstance(phrases, str):
+        phrases = [phrases]
+    enrichment = {
+        "meaning": str(meaning).strip(),
+        "phonetic": str(phonetic).strip(),
+        "topic": str(topic).strip(),
+        "phrases": [str(item).strip() for item in phrases if str(item).strip()][:6],
+        "essay_use": str(essay_use).strip(),
+    }
+    if not enrichment["meaning"]:
+        raise ValueError("AI 没有返回中文释义，请稍后重试。")
+    return enrichment
+
+
+def _enrich_vocab_item(assistant, target):
+    raw = assistant.explain_word(target.get("word", ""))
+    data = parse_model_output(raw)
+    enrichment = _parse_vocab_enrichment(data)
+    _save_vocab_ai_override(target.get("word", ""), enrichment)
+    return enrichment
+
+
+@app.post("/vocabulary/<word>/enrich")
+@login_required
+def vocabulary_enrich(word):
+    assistant, _ = current_assistant()
+    if assistant is None:
+        return jsonify({"ok": False, "error": "请先在用户中心保存可用的 AI API Key。"}), 400
+    target = next((item for item in IELTS_WORDS if item.get("word", "").lower() == word.lower()), None)
+    if not target:
+        return jsonify({"ok": False, "error": "词库中未找到这个单词。"}), 404
+    try:
+        enrichment = _enrich_vocab_item(assistant, target)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"AI 查词失败：{exc}"}), 500
+    return jsonify({"ok": True, "word": target.get("word", word), **enrichment})
 
 
 @app.post("/vocabulary/<word>/progress")
@@ -3420,8 +4545,10 @@ def vocabulary():
 def vocabulary_progress(word):
     status = request.form.get("status", "learned")
     save_vocab_progress(session["user_id"], word, status)
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify({"ok": True, "word": word, "status": status})
     flash(f"{word} 已标记为{ '已掌握' if status == 'learned' else '学习中' }。", "success")
-    return redirect(url_for("vocabulary"))
+    return redirect(request.form.get("next") or url_for("vocabulary"))
 
 
 @app.post("/api/word-lookup")

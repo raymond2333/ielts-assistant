@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>闪卡复习 · 信达雅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="brand-line"><div class="brand-icon">雅</div><div><strong>信达雅</strong><span>闪卡复习</span></div></div>
+        <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="折叠侧边栏">☰</button>
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard') }}" title="首页"><span class="svg-icon icon-home nav-svg" aria-hidden="true"></span><span class="nav-text">学习总览</span></a>
+        <a href="{{ url_for('speaking') }}" title="口语练习"><span class="svg-icon icon-speaking nav-svg" aria-hidden="true"></span><span class="nav-text">口语练习</span></a>
+        <a href="{{ url_for('theme_linking') }}" title="口语串题"><span class="svg-icon icon-theme nav-svg" aria-hidden="true"></span><span class="nav-text">口语串题</span></a>
+        <a href="{{ url_for('writing') }}" title="作文批改"><span class="svg-icon icon-writing nav-svg" aria-hidden="true"></span><span class="nav-text">作文批改</span></a>
+        <a href="{{ url_for('analysis') }}" title="学习分析"><span class="svg-icon icon-analysis nav-svg" aria-hidden="true"></span><span class="nav-text">学习分析</span></a>
+        <a href="{{ url_for('vocabulary') }}" title="背单词"><span class="svg-icon icon-vocabulary nav-svg" aria-hidden="true"></span><span class="nav-text">背单词</span></a>
+        <a href="{{ url_for('admin_panel') }}" title="管理员"><span class="svg-icon icon-admin nav-svg" aria-hidden="true"></span><span class="nav-text">管理员</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Flashcards</p>
+          <h1>闪卡复习</h1>
+        </div>
+        <div class="user-menu">
+          <a class="ghost-btn small" href="{{ url_for('vocabulary', q=query, topic=selected_topic) }}">返回词库</a>
+          <a class="ghost-btn small" href="{{ url_for('vocabulary_review', q=query, topic=selected_topic, count=daily_goal, start=prev_start) }}">上一组</a>
+          <a class="primary-btn small" href="{{ url_for('vocabulary_review', q=query, topic=selected_topic, count=daily_goal, start=next_start) }}">下一组</a>
+          <div class="db-pill">已掌握 {{ learned_count }} / {{ total_count }}</div>
+        </div>
+      </header>
+
+      <section class="panel vocab-review-plan">
+        <div>
+          <p class="eyebrow">Today</p>
+          <h2>本组 {{ deck|length }} 个词 · 目标每天 {{ daily_goal }} 个</h2>
+          <p class="record-meta">当前从第 {{ start + 1 }} 个未掌握词附近开始；剩余 {{ remaining_count }} 个，预计 {{ finish_date }} 背完。</p>
+        </div>
+        <form method="get" class="vocab-start-form">
+          <input type="hidden" name="q" value="{{ query }}">
+          <input type="hidden" name="topic" value="{{ selected_topic }}">
+          <label><span>每组数量</span><input name="count" type="number" min="5" max="300" value="{{ daily_goal }}"></label>
+          <label><span>起始序号</span><input name="start" type="number" min="0" max="{{ total_count }}" value="{{ start }}"></label>
+          <button class="ghost-btn small" type="submit">跳到这组</button>
+        </form>
+      </section>
+
+      <section class="flashcard-stage" data-deck='{{ deck | tojson | forceescape }}'>
+        {% if deck %}
+        <div class="flashcard-progress">
+          <span id="flashcardCounter">1 / {{ deck|length }}</span>
+          <div><i id="flashcardBar" style="width:1%"></i></div>
+        </div>
+        <button class="flashcard" id="flashcard" type="button" aria-label="点击翻面">
+          <div class="flashcard-face flashcard-front">
+            <span id="cardTopic"></span>
+            <strong id="cardWord"></strong>
+            <em id="cardPhonetic"></em>
+            <small>点击卡片查看释义和用法</small>
+          </div>
+          <div class="flashcard-face flashcard-back">
+            <div class="flashcard-section">
+              <span id="meaningLabel">中文释义</span>
+              <strong id="cardMeaning"></strong>
+              <button class="ghost-btn small icon-btn flashcard-enrich-btn" type="button" id="enrichMeaning"><span class="svg-icon icon-sparkle" aria-hidden="true"></span>AI 补全词条</button>
+            </div>
+            <div class="flashcard-section">
+              <span>常用短语</span>
+              <div class="phrase-list" id="cardPhrases"></div>
+            </div>
+            <div class="flashcard-section">
+              <span>作文例句</span>
+              <p id="cardEssay"></p>
+            </div>
+          </div>
+        </button>
+        <div class="flashcard-actions">
+          <button class="ghost-btn" type="button" id="prevCard">上一张</button>
+          <button class="primary-btn" type="button" id="markKnown">标记掌握</button>
+          <button class="ghost-btn" type="button" id="nextCard">下一张</button>
+        </div>
+        {% else %}
+        <section class="panel">
+          <p class="empty-text">当前筛选下没有可复习的单词。</p>
+          <a class="primary-btn small" href="{{ url_for('vocabulary') }}">返回词库</a>
+        </section>
+        {% endif %}
+      </section>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js', v='20260703tts5') }}"></script>
+  <script>
+    const stage = document.querySelector(".flashcard-stage");
+    const deck = stage ? JSON.parse(stage.dataset.deck || "[]") : [];
+    let index = 0;
+    let flipped = false;
+    const card = document.getElementById("flashcard");
+    const counter = document.getElementById("flashcardCounter");
+    const bar = document.getElementById("flashcardBar");
+    const topic = document.getElementById("cardTopic");
+    const word = document.getElementById("cardWord");
+    const phonetic = document.getElementById("cardPhonetic");
+    const meaningLabel = document.getElementById("meaningLabel");
+    const meaning = document.getElementById("cardMeaning");
+    const phrases = document.getElementById("cardPhrases");
+    const essay = document.getElementById("cardEssay");
+    const enrichMeaning = document.getElementById("enrichMeaning");
+
+    function hasChinese(text) {
+      return /[\u4e00-\u9fff]/.test(text || "");
+    }
+
+    function renderCard() {
+      if (!deck.length || !card) return;
+      const item = deck[index];
+      flipped = false;
+      card.classList.remove("flipped", "learned");
+      if (item.learned) card.classList.add("learned");
+      counter.textContent = `${index + 1} / ${deck.length}`;
+      bar.style.width = `${Math.round(((index + 1) / deck.length) * 100)}%`;
+      topic.textContent = item.topic || "IELTS";
+      word.textContent = item.word || "";
+      phonetic.textContent = item.phonetic || "";
+      phonetic.hidden = !item.phonetic;
+      const chineseReady = hasChinese(item.meaning);
+      const needsEnrichment = item.needs_enrichment || !chineseReady || !item.phonetic || ["雅思核心词", "通用学术词", "雅思中文词表"].includes(item.topic || "");
+      meaningLabel.textContent = chineseReady ? "中文释义" : "英文释义";
+      meaning.textContent = item.meaning || "暂无释义";
+      enrichMeaning.hidden = !needsEnrichment;
+      enrichMeaning.disabled = false;
+      enrichMeaning.innerHTML = '<span class="svg-icon icon-sparkle" aria-hidden="true"></span>AI 补全词条';
+      phrases.replaceChildren(...(item.phrases || []).slice(0, 4).map((phrase) => {
+        const span = document.createElement("span");
+        span.textContent = phrase;
+        return span;
+      }));
+      essay.textContent = item.essay_use || "";
+    }
+
+    function move(step) {
+      if (!deck.length) return;
+      index = (index + step + deck.length) % deck.length;
+      renderCard();
+    }
+
+    if (card) {
+      card.addEventListener("click", () => {
+        flipped = !flipped;
+        card.classList.toggle("flipped", flipped);
+      });
+    }
+    document.getElementById("prevCard")?.addEventListener("click", () => move(-1));
+    document.getElementById("nextCard")?.addEventListener("click", () => move(1));
+    enrichMeaning?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const item = deck[index];
+      if (!item) return;
+      enrichMeaning.disabled = true;
+      enrichMeaning.textContent = "正在补全...";
+      try {
+        const response = await fetch(`/vocabulary/${encodeURIComponent(item.word)}/enrich`, {method: "POST"});
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "AI 查词失败");
+        item.meaning = data.meaning || item.meaning;
+        item.phonetic = data.phonetic || item.phonetic;
+        item.topic = data.topic || item.topic;
+        item.phrases = data.phrases || item.phrases;
+        item.essay_use = data.essay_use || item.essay_use;
+        item.needs_enrichment = false;
+        renderCard();
+        flipped = true;
+        card.classList.add("flipped");
+      } catch (error) {
+        enrichMeaning.disabled = false;
+        enrichMeaning.textContent = error.message || "查词失败";
+      }
+    });
+    document.getElementById("markKnown")?.addEventListener("click", async () => {
+      const item = deck[index];
+      if (!item) return;
+      item.learned = true;
+      card.classList.add("learned");
+      await fetch(`/vocabulary/${encodeURIComponent(item.word)}/progress`, {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "fetch"},
+        body: new URLSearchParams({status: "learned"})
+      });
+      setTimeout(() => move(1), 220);
+    });
+    renderCard();
+  </script>
+</body>
+</html>

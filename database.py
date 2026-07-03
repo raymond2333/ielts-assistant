@@ -93,6 +93,11 @@ def initialize_database() -> bool:
                 ai_model VARCHAR(128) NULL,
                 ai_base_url VARCHAR(255) NULL,
                 ai_api_keys JSON NULL,
+                ai_tts_provider VARCHAR(32) NULL,
+                ai_tts_model VARCHAR(128) NULL,
+                ai_tts_base_url VARCHAR(255) NULL,
+                ai_tts_voice VARCHAR(64) NULL,
+                ai_tts_validated TINYINT(1) NOT NULL DEFAULT 0,
                 is_admin TINYINT(1) NOT NULL DEFAULT 0,
                 current_level DECIMAL(3,1) NOT NULL DEFAULT 5.0,
                 listening_level DECIMAL(3,1) NOT NULL DEFAULT 5.0,
@@ -103,6 +108,7 @@ def initialize_database() -> bool:
                 learning_goal TEXT NULL,
                 weak_areas JSON NULL,
                 study_time INT NOT NULL DEFAULT 10,
+                daily_vocab_goal INT NOT NULL DEFAULT 30,
                 exam_date DATE NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -117,12 +123,18 @@ def initialize_database() -> bool:
         _ensure_column(cursor, database_name, "users", "ai_model", "VARCHAR(128) NULL")
         _ensure_column(cursor, database_name, "users", "ai_base_url", "VARCHAR(255) NULL")
         _ensure_column(cursor, database_name, "users", "ai_api_keys", "JSON NULL")
+        _ensure_column(cursor, database_name, "users", "ai_tts_provider", "VARCHAR(32) NULL")
+        _ensure_column(cursor, database_name, "users", "ai_tts_model", "VARCHAR(128) NULL")
+        _ensure_column(cursor, database_name, "users", "ai_tts_base_url", "VARCHAR(255) NULL")
+        _ensure_column(cursor, database_name, "users", "ai_tts_voice", "VARCHAR(64) NULL")
+        _ensure_column(cursor, database_name, "users", "ai_tts_validated", "TINYINT(1) NOT NULL DEFAULT 0")
         _ensure_column(cursor, database_name, "users", "is_admin", "TINYINT(1) NOT NULL DEFAULT 0")
         _ensure_column(cursor, database_name, "users", "listening_level", "DECIMAL(3,1) NOT NULL DEFAULT 5.0")
         _ensure_column(cursor, database_name, "users", "speaking_level", "DECIMAL(3,1) NOT NULL DEFAULT 5.0")
         _ensure_column(cursor, database_name, "users", "reading_level", "DECIMAL(3,1) NOT NULL DEFAULT 5.0")
         _ensure_column(cursor, database_name, "users", "writing_level", "DECIMAL(3,1) NOT NULL DEFAULT 5.0")
         _ensure_column(cursor, database_name, "users", "learning_goal", "TEXT NULL")
+        _ensure_column(cursor, database_name, "users", "daily_vocab_goal", "INT NOT NULL DEFAULT 30")
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS study_progress (
@@ -220,9 +232,9 @@ def ensure_user(user_id: str, profile: Optional[Dict[str, Any]] = None) -> None:
             """
             INSERT INTO users (
                 user_id, current_level, listening_level, speaking_level, reading_level,
-                writing_level, target_score, weak_areas, study_time, exam_date
+                writing_level, target_score, weak_areas, study_time, daily_vocab_goal, exam_date
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 user_id = VALUES(user_id)
             """,
@@ -236,6 +248,7 @@ def ensure_user(user_id: str, profile: Optional[Dict[str, Any]] = None) -> None:
                 _round_to_ielts_band(profile.get("target_score", 6.5)),
                 json.dumps(weak_areas, ensure_ascii=False),
                 int(profile.get("study_time", 10)),
+                int(profile.get("daily_vocab_goal", 30)),
                 exam_date,
             ),
         )
@@ -334,9 +347,9 @@ def register_user(user_id: str, password: str, profile: Optional[Dict[str, Any]]
             """
             INSERT INTO users (
                 user_id, password_hash, current_level, listening_level, speaking_level,
-                reading_level, writing_level, target_score, weak_areas, study_time, exam_date
+                reading_level, writing_level, target_score, weak_areas, study_time, daily_vocab_goal, exam_date
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 user_id,
@@ -349,6 +362,7 @@ def register_user(user_id: str, password: str, profile: Optional[Dict[str, Any]]
                 _round_to_ielts_band(profile.get("target_score", 6.5)),
                 json.dumps(weak_areas, ensure_ascii=False),
                 int(profile.get("study_time", 10)),
+                int(profile.get("daily_vocab_goal", 30)),
                 profile.get("exam_date") or None,
             ),
         )
@@ -416,7 +430,8 @@ def load_user_ai_config(user_id: str) -> Dict[str, Any]:
         cursor = connection.cursor(dictionary=True)
         cursor.execute(
             """
-            SELECT dashscope_api_key, ai_provider, ai_model, ai_base_url, ai_api_keys
+            SELECT dashscope_api_key, ai_provider, ai_model, ai_base_url, ai_api_keys,
+                   ai_tts_provider, ai_tts_model, ai_tts_base_url, ai_tts_voice, ai_tts_validated
             FROM users
             WHERE user_id = %s
             """,
@@ -432,6 +447,11 @@ def load_user_ai_config(user_id: str) -> Dict[str, Any]:
             "model": "qwen-turbo",
             "base_url": "",
             "api_keys": {},
+            "tts_provider": "",
+            "tts_model": "",
+            "tts_base_url": "",
+            "tts_voice": "alloy",
+            "tts_validated": False,
         }
 
     api_keys = row.get("ai_api_keys") or {}
@@ -455,7 +475,46 @@ def load_user_ai_config(user_id: str) -> Dict[str, Any]:
         "model": model,
         "base_url": base_url,
         "api_keys": api_keys,
+        "tts_provider": row.get("ai_tts_provider") or "",
+        "tts_model": row.get("ai_tts_model") or "",
+        "tts_base_url": row.get("ai_tts_base_url") or "",
+        "tts_voice": row.get("ai_tts_voice") or "alloy",
+        "tts_validated": bool(row.get("ai_tts_validated")),
     }
+
+
+def save_user_tts_config(
+    user_id: str,
+    provider: str,
+    model: str = "",
+    base_url: str = "",
+    voice: str = "alloy",
+    validated: bool = False,
+) -> None:
+    ensure_user(user_id)
+    with mysql_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            UPDATE users
+            SET ai_tts_provider = %s,
+                ai_tts_model = %s,
+                ai_tts_base_url = %s,
+                ai_tts_voice = %s,
+                ai_tts_validated = %s
+            WHERE user_id = %s
+            """,
+            (
+                (provider or "").lower(),
+                model or "",
+                base_url or "",
+                voice or "alloy",
+                1 if validated else 0,
+                user_id,
+            ),
+        )
+        connection.commit()
+        cursor.close()
 
 
 def save_user_ai_config_map(
@@ -535,6 +594,12 @@ def _default_model(provider: str) -> str:
         "tongyi": "qwen-turbo",
         "deepseek": "deepseek-chat",
         "openai": "gpt-4o-mini",
+        "siliconflow": "Qwen/Qwen2.5-72B-Instruct",
+        "moonshot": "moonshot-v1-8k",
+        "zhipu": "glm-4-flash",
+        "volcengine": "doubao-1-5-lite-32k-250115",
+        "xunfei": "generalv3.5",
+        "mimo": "mimo-v2.5-pro",
         "custom": "gpt-4o-mini",
     }
     return defaults.get((provider or "tongyi").lower(), "qwen-turbo")
@@ -543,6 +608,12 @@ def _default_model(provider: str) -> str:
 def _default_base_url(provider: str) -> str:
     defaults = {
         "deepseek": "https://api.deepseek.com",
+        "siliconflow": "https://api.siliconflow.cn/v1",
+        "moonshot": "https://api.moonshot.cn/v1",
+        "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+        "volcengine": "https://ark.cn-beijing.volces.com/api/v3",
+        "xunfei": "https://spark-api-open.xf-yun.com/v1",
+        "mimo": "https://api.xiaomimimo.com/v1",
     }
     return defaults.get((provider or "").lower(), "")
 
@@ -567,6 +638,7 @@ def save_user_profile(user_id: str, profile: Dict[str, Any]) -> None:
                 learning_goal = %s,
                 weak_areas = %s,
                 study_time = %s,
+                daily_vocab_goal = %s,
                 exam_date = %s
             WHERE user_id = %s
             """,
@@ -582,6 +654,7 @@ def save_user_profile(user_id: str, profile: Dict[str, Any]) -> None:
                 profile.get("learning_goal", ""),
                 json.dumps(profile.get("weak_areas", []), ensure_ascii=False),
                 int(profile.get("study_time", 10)),
+                int(profile.get("daily_vocab_goal", 30)),
                 profile.get("exam_date") or None,
                 user_id,
             ),
@@ -621,6 +694,7 @@ def load_user_profile(user_id: str) -> Optional[Dict[str, Any]]:
         "learning_goal": row.get("learning_goal") or "",
         "weak_areas": weak_areas or [],
         "study_time": int(row["study_time"]),
+        "daily_vocab_goal": int(row.get("daily_vocab_goal") or 30),
         "exam_date": exam_date or "",
     }
 

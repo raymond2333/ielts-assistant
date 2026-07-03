@@ -68,8 +68,9 @@
         {% endif %}
       {% endwith %}
 
-      <section id="profile" class="panel">
+      <section id="profile" class="panel settings-module">
         <div class="panel-heading">
+          <span class="module-icon"><span class="svg-icon icon-target" aria-hidden="true"></span></span>
           <div>
             <p class="eyebrow">Profile</p>
             <h2>个人信息与学习目标</h2>
@@ -87,6 +88,8 @@
             </label>
           </div>
 
+          <div class="settings-submodule">
+            <div class="settings-submodule-title"><span class="svg-icon icon-analysis" aria-hidden="true"></span><strong>四项水平</strong></div>
           <div class="form-row four">
             {% for key, label in [('listening_level','听力'),('speaking_level','口语'),('reading_level','阅读'),('writing_level','写作')] %}
             <label>
@@ -99,7 +102,10 @@
             </label>
             {% endfor %}
           </div>
+          </div>
 
+          <div class="settings-submodule">
+            <div class="settings-submodule-title"><span class="svg-icon icon-calendar" aria-hidden="true"></span><strong>考试与背词计划</strong></div>
           <div class="form-row">
             <label>
               <span>目标总分</span>
@@ -117,16 +123,25 @@
               <span>每周学习小时</span>
               <input name="study_time" type="number" min="1" max="80" value="{{ profile.study_time }}">
             </label>
+            <label>
+              <span>每日背词目标</span>
+              <input name="daily_vocab_goal" type="number" min="5" max="300" value="{{ profile.daily_vocab_goal or 30 }}">
+            </label>
+          </div>
           </div>
 
-          <div class="check-row">
-            <span>重点弱项</span>
-            {% for area in ['听力','口语','阅读','写作'] %}
-              <label class="check-pill">
-                <input type="checkbox" name="weak_areas" value="{{ area }}" {% if area in profile.weak_areas %}checked{% endif %}>
-                {{ area }}
-              </label>
-            {% endfor %}
+          <div class="settings-submodule">
+            <div class="settings-submodule-title"><span class="svg-icon icon-target" aria-hidden="true"></span><strong>重点弱项</strong></div>
+            <div class="weak-area-grid">
+              {% for area, icon in [('听力','icon-listening'),('口语','icon-speaking'),('阅读','icon-reading'),('写作','icon-writing')] %}
+                <label class="weak-area-card">
+                  <input type="checkbox" name="weak_areas" value="{{ area }}" {% if area in profile.weak_areas %}checked{% endif %}>
+                  <span class="svg-icon {{ icon }}" aria-hidden="true"></span>
+                  <strong>{{ area }}</strong>
+                  <em>{{ '重点突破' if area in profile.weak_areas else '加入重点' }}</em>
+                </label>
+              {% endfor %}
+            </div>
           </div>
 
           <label>
@@ -138,8 +153,9 @@
         </form>
       </section>
 
-      <section id="apis" class="panel">
+      <section id="apis" class="panel settings-module">
         <div class="panel-heading">
+          <span class="module-icon"><span class="svg-icon icon-brain" aria-hidden="true"></span></span>
           <div>
             <p class="eyebrow">Model Keys</p>
             <h2>各模型 API 配置</h2>
@@ -151,11 +167,14 @@
           </div>
         </div>
 
-        <form method="post" action="{{ url_for('update_ai_config') }}" class="settings-form">
+        <form method="post" action="{{ url_for('update_ai_config') }}" class="settings-form" id="aiConfigForm" autocomplete="off">
+          <input type="text" name="fake_username" autocomplete="username" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <input type="password" name="fake_password" autocomplete="new-password" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <input type="hidden" name="api_key_touched" id="apiKeyTouched" value="">
           <div class="form-row">
             <label>
               <span>模型供应商</span>
-              <select name="provider" id="providerSelect">
+              <select name="provider" id="providerSelect" autocomplete="off">
                 {% for key, provider in providers.items() %}
                   <option value="{{ key }}" data-model="{{ provider.model }}" data-base="{{ provider.base_url }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}</option>
                 {% endfor %}
@@ -163,34 +182,317 @@
             </label>
             <label>
               <span>模型名称</span>
-              <input id="modelInput" name="model" value="{{ ai_config.model }}">
+              <input id="modelInput" name="model" value="{{ ai_config.model }}" data-initial-value="{{ ai_config.model }}" autocomplete="off" autocapitalize="off" spellcheck="false">
             </label>
           </div>
           <div class="form-row">
             <label>
               <span>Base URL</span>
-              <input id="baseInput" name="base_url" value="{{ ai_config.base_url }}" placeholder="OpenAI官方可留空">
+              <input id="baseInput" name="base_url" value="{{ ai_config.base_url }}" data-initial-value="{{ ai_config.base_url }}" placeholder="OpenAI官方可留空" autocomplete="off" autocapitalize="off" spellcheck="false">
             </label>
-            <label>
-              <span>API Key</span>
-              <input name="api_key" type="password" placeholder="保存后会绑定到当前用户">
-            </label>
+          </div>
+          <div class="ai-action-row">
+            <button class="ghost-btn small icon-btn" type="button" id="fetchModelsBtn"><span class="svg-icon icon-sparkle" aria-hidden="true"></span>拉取模型列表</button>
+            <button class="ghost-btn small icon-btn" type="button" id="testAiBtn"><span class="svg-icon icon-check" aria-hidden="true"></span>测试连接</button>
+            <select id="modelListSelect" hidden></select>
+            <span id="aiConfigStatus" class="record-meta"></span>
+          </div>
+          <div id="modelCatalog" class="model-catalog" hidden></div>
+          <div class="provider-card-grid">
+            {% for key, provider in providers.items() %}
+              <label class="provider-card {{ 'ready' if provider_status[key] else '' }}">
+                <span class="provider-card-head">
+                  <strong>{{ provider.label }}</strong>
+                  <em>{{ '已配置' if provider_status[key] else '未配置' }}</em>
+                </span>
+                <small>{{ provider.hint }}</small>
+                <span class="provider-capabilities">
+                  {% for cap in provider.capabilities %}
+                    <b>{{ cap }}</b>
+                  {% endfor %}
+                </span>
+                <input name="api_key_{{ key }}" data-provider-key="{{ key }}" data-api-secret="1" type="password" placeholder="{{ provider.label }} API Key" autocomplete="new-password" autocapitalize="off" spellcheck="false" inputmode="text">
+              </label>
+            {% endfor %}
           </div>
           <button class="primary-btn" type="submit">保存模型配置</button>
         </form>
       </section>
+
+      <section id="tts" class="panel settings-module">
+        <div class="panel-heading">
+          <span class="module-icon"><span class="svg-icon icon-speaking" aria-hidden="true"></span></span>
+          <div>
+            <p class="eyebrow">Voice</p>
+            <h2>语音朗读 / TTS 配置</h2>
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('update_tts_config') }}" class="settings-form" id="ttsConfigForm" autocomplete="off">
+          <input type="text" name="fake_tts_username" autocomplete="username" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <input type="password" name="fake_tts_password" autocomplete="new-password" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <div class="form-row">
+            <label>
+              <span>TTS 供应商</span>
+              <select name="tts_provider" id="ttsProviderSelect" autocomplete="off">
+                <option value="">不使用云端 TTS，回退浏览器朗读</option>
+                {% for key, provider in providers.items() %}
+                  {% if 'TTS' in provider.capabilities %}
+                    <option value="{{ key }}" data-model="{{ 'mimo-v2.5-tts' if key == 'mimo' else 'gpt-4o-mini-tts' }}" data-base="{{ provider.base_url }}" {% if ai_config.tts_provider == key %}selected{% endif %}>{{ provider.label }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              <span>TTS 模型名称</span>
+              <input id="ttsModelInput" name="tts_model" value="{{ ai_config.tts_model }}" data-initial-value="{{ ai_config.tts_model }}" placeholder="例如 mimo-v2.5-tts" autocomplete="off" autocapitalize="off" spellcheck="false">
+            </label>
+          </div>
+          <div class="form-row">
+            <label>
+              <span>TTS Base URL</span>
+              <input id="ttsBaseInput" name="tts_base_url" value="{{ ai_config.tts_base_url }}" data-initial-value="{{ ai_config.tts_base_url }}" placeholder="例如 https://api.xiaomimimo.com/v1" autocomplete="off" autocapitalize="off" spellcheck="false">
+            </label>
+            <label>
+              <span>声音 / Voice</span>
+              <input id="ttsVoiceInput" name="tts_voice" value="{{ ai_config.tts_voice or 'coral' }}" data-initial-value="{{ ai_config.tts_voice or 'coral' }}" placeholder="例如 coral / Chloe / Mia" autocomplete="off" autocapitalize="off" spellcheck="false">
+            </label>
+          </div>
+          <div class="ai-action-row">
+            <button class="ghost-btn small icon-btn" type="button" id="fetchTtsModelsBtn"><span class="svg-icon icon-sparkle" aria-hidden="true"></span>获取朗读模型和声音</button>
+            <span id="ttsConfigStatus" class="record-meta"></span>
+          </div>
+          <div id="ttsModelCatalog" class="model-catalog" hidden></div>
+          <div id="ttsVoiceCatalog" class="voice-catalog" hidden></div>
+          <p class="record-meta">保存时会先真实合成一段测试音频，验证通过才会启用云端 TTS；未通过时会自动使用浏览器朗读兜底。</p>
+          {% if ai_config.tts_validated %}
+            <p class="record-meta success-inline">当前云端 TTS 已验证：{{ ai_config.tts_provider }} · {{ ai_config.tts_model }} · {{ ai_config.tts_voice }}</p>
+          {% else %}
+            <p class="record-meta">当前未启用已验证的云端 TTS。</p>
+          {% endif %}
+          <button class="primary-btn" type="submit">测试并保存语音朗读配置</button>
+        </form>
+      </section>
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260703tts5') }}"></script>
   <script>
     const providerSelect = document.getElementById('providerSelect');
+    const aiConfigForm = document.getElementById('aiConfigForm');
+    const ttsConfigForm = document.getElementById('ttsConfigForm');
+    const apiKeyTouched = document.getElementById('apiKeyTouched');
     const modelInput = document.getElementById('modelInput');
     const baseInput = document.getElementById('baseInput');
+    const fetchModelsBtn = document.getElementById('fetchModelsBtn');
+    const testAiBtn = document.getElementById('testAiBtn');
+    const modelListSelect = document.getElementById('modelListSelect');
+    const aiConfigStatus = document.getElementById('aiConfigStatus');
+    const modelCatalog = document.getElementById('modelCatalog');
+    const ttsProviderSelect = document.getElementById('ttsProviderSelect');
+    const ttsModelInput = document.getElementById('ttsModelInput');
+    const ttsBaseInput = document.getElementById('ttsBaseInput');
+    const ttsVoiceInput = document.getElementById('ttsVoiceInput');
+    const fetchTtsModelsBtn = document.getElementById('fetchTtsModelsBtn');
+    const ttsConfigStatus = document.getElementById('ttsConfigStatus');
+    const ttsModelCatalog = document.getElementById('ttsModelCatalog');
+    const ttsVoiceCatalog = document.getElementById('ttsVoiceCatalog');
+    const touchedApiProviders = new Set();
+    document.querySelectorAll('[data-api-secret]').forEach((input) => {
+      input.dataset.userEdited = '0';
+      input.addEventListener('input', () => {
+        input.dataset.userEdited = '1';
+        if (input.dataset.providerKey) touchedApiProviders.add(input.dataset.providerKey);
+        if (apiKeyTouched) apiKeyTouched.value = Array.from(touchedApiProviders).join(',');
+      });
+      input.addEventListener('change', () => {
+        if (input.value && input.dataset.userEdited !== '1') input.value = '';
+      });
+    });
+    [modelInput, baseInput, ttsModelInput, ttsBaseInput, ttsVoiceInput].forEach((input) => {
+      if (!input) return;
+      input.dataset.userEdited = '0';
+      input.addEventListener('input', () => { input.dataset.userEdited = '1'; });
+    });
+    function selectedProviderKey() {
+      return providerSelect?.value || 'custom';
+    }
+    function selectedApiKey() {
+      const input = document.querySelector(`[data-provider-key="${CSS.escape(selectedProviderKey())}"]`);
+      return input && input.dataset.userEdited === '1' ? input.value : '';
+    }
+    function restoredValue(input) {
+      if (!input) return '';
+      return input.dataset.userEdited === '1' ? input.value : (input.dataset.initialValue || '');
+    }
+    function sanitizeAutofillBeforeSubmit(form) {
+      form?.querySelectorAll('[data-api-secret]').forEach((input) => {
+        if (input.dataset.userEdited !== '1') input.value = '';
+      });
+      [baseInput, modelInput, ttsBaseInput, ttsModelInput, ttsVoiceInput].forEach((input) => {
+        if (input && input.dataset.userEdited !== '1') input.value = input.dataset.initialValue || input.value || '';
+      });
+    }
+    function setStatus(text, ok = true) {
+      if (!aiConfigStatus) return;
+      aiConfigStatus.textContent = text;
+      aiConfigStatus.style.color = ok ? 'var(--accent)' : 'var(--danger)';
+    }
+    function setTtsStatus(text, ok = true) {
+      if (!ttsConfigStatus) return;
+      ttsConfigStatus.textContent = text;
+      ttsConfigStatus.style.color = ok ? 'var(--accent)' : 'var(--danger)';
+    }
+    function renderModelCatalog(container, options, targetInput, preferred = 'text') {
+      if (!container) return;
+      const groups = [
+        ['text', '适合生成题目 / 批改'],
+        ['tts', '适合朗读 / TTS'],
+        ['asr', '适合语音识别 / ASR'],
+        ['ocr', 'OCR / 图片识别'],
+        ['other', '其他工具模型']
+      ];
+      container.replaceChildren();
+      groups.forEach(([kind, title]) => {
+        const items = (options || []).filter((item) => item.kind === kind);
+        if (!items.length) return;
+        const section = document.createElement('section');
+        section.className = `model-group model-group-${kind}`;
+        const heading = document.createElement('h4');
+        heading.textContent = title;
+        section.appendChild(heading);
+        const list = document.createElement('div');
+        list.className = 'model-chip-list';
+        items.forEach((item) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `model-chip ${kind === preferred ? 'recommended' : ''}`;
+          button.innerHTML = `<strong></strong><em></em>`;
+          button.querySelector('strong').textContent = item.id;
+          button.querySelector('em').textContent = item.label;
+          button.addEventListener('click', () => {
+            targetInput.value = item.id;
+            targetInput.dataset.userEdited = '1';
+          });
+          list.appendChild(button);
+        });
+        section.appendChild(list);
+        container.appendChild(section);
+      });
+      container.hidden = !container.children.length;
+    }
+    function renderVoiceCatalog(voices) {
+      if (!ttsVoiceCatalog) return;
+      ttsVoiceCatalog.replaceChildren(...(voices || []).map((voice) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'voice-chip';
+        button.textContent = voice;
+        button.addEventListener('click', () => {
+          ttsVoiceInput.value = voice;
+          ttsVoiceInput.dataset.userEdited = '1';
+        });
+        return button;
+      }));
+      ttsVoiceCatalog.hidden = !(voices || []).length;
+    }
     providerSelect?.addEventListener('change', () => {
       const selected = providerSelect.options[providerSelect.selectedIndex];
       modelInput.value = selected.dataset.model || '';
       baseInput.value = selected.dataset.base || '';
+      modelInput.dataset.userEdited = '1';
+      baseInput.dataset.userEdited = '1';
+      if (modelListSelect) modelListSelect.hidden = true;
+      if (modelCatalog) modelCatalog.hidden = true;
+      setStatus('');
     });
+    fetchModelsBtn?.addEventListener('click', async () => {
+      setStatus('正在拉取模型列表...');
+      const response = await fetch('{{ url_for("api_ai_models") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({provider: selectedProviderKey(), api_key: selectedApiKey(), base_url: restoredValue(baseInput)})
+      });
+      const data = await response.json();
+      if (!data.ok) {
+        setStatus(data.error || '模型列表拉取失败，可手动填写模型名称。', false);
+        return;
+      }
+      modelListSelect.replaceChildren(...data.models.map((name) => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        return option;
+      }));
+      modelListSelect.hidden = true;
+      renderModelCatalog(modelCatalog, data.model_options || [], modelInput, 'text');
+      const firstText = (data.model_options || []).find((item) => item.recommended_for === 'text');
+      if (firstText) {
+        modelInput.value = firstText.id;
+        modelInput.dataset.userEdited = '1';
+      }
+      setStatus(data.models.length ? `已拉取 ${data.models.length} 个模型，已按用途分类。` : '该接口没有返回模型列表，可手动填写。', true);
+    });
+    modelListSelect?.addEventListener('change', () => {
+      modelInput.value = modelListSelect.value;
+    });
+    testAiBtn?.addEventListener('click', async () => {
+      setStatus('正在测试连接...');
+      const response = await fetch('{{ url_for("api_ai_test") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({provider: selectedProviderKey(), api_key: selectedApiKey(), model: restoredValue(modelInput), base_url: restoredValue(baseInput)})
+      });
+      const data = await response.json();
+      setStatus(data.message || (data.ok ? '连接成功' : '连接失败'), data.ok);
+    });
+    ttsProviderSelect?.addEventListener('change', () => {
+      const selected = ttsProviderSelect.options[ttsProviderSelect.selectedIndex];
+      if (ttsModelInput && !ttsModelInput.value) {
+        ttsModelInput.value = selected.dataset.model || '';
+        ttsModelInput.dataset.userEdited = '1';
+      }
+      if (ttsBaseInput) {
+        ttsBaseInput.value = selected.dataset.base || '';
+        ttsBaseInput.dataset.userEdited = '1';
+      }
+      if (ttsVoiceInput) {
+        ttsVoiceInput.value = ttsProviderSelect.value === 'mimo' ? 'Chloe' : 'coral';
+        ttsVoiceInput.dataset.userEdited = '1';
+      }
+    });
+    fetchTtsModelsBtn?.addEventListener('click', async () => {
+      setTtsStatus('正在获取朗读模型和声音...');
+      const provider = ttsProviderSelect?.value || '';
+      const response = await fetch('{{ url_for("api_tts_models") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          provider,
+          api_key: (() => {
+            const input = document.querySelector(`[data-provider-key="${CSS.escape(provider)}"]`);
+            return input && input.dataset.userEdited === '1' ? input.value : '';
+          })(),
+          base_url: restoredValue(ttsBaseInput)
+        })
+      });
+      const data = await response.json();
+      if (!data.ok) {
+        setTtsStatus(data.error || '获取失败，可手动填写 TTS 模型。', false);
+        return;
+      }
+      renderModelCatalog(ttsModelCatalog, data.model_options || [], ttsModelInput, 'tts');
+      renderVoiceCatalog(data.voices || []);
+      if (data.models && data.models[0]) {
+        ttsModelInput.value = data.models[0];
+        ttsModelInput.dataset.userEdited = '1';
+      }
+      if (data.voices && data.voices[0] && !ttsVoiceInput.value) {
+        ttsVoiceInput.value = data.voices[0];
+        ttsVoiceInput.dataset.userEdited = '1';
+      }
+      setTtsStatus('已获取朗读模型和可选声音。', true);
+    });
+    aiConfigForm?.addEventListener('submit', () => sanitizeAutofillBeforeSubmit(aiConfigForm));
+    ttsConfigForm?.addEventListener('submit', () => sanitizeAutofillBeforeSubmit(ttsConfigForm));
   </script>
 </body>
 </html>

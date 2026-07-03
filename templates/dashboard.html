@@ -208,87 +208,104 @@
         {% endif %}
       </div>
 
-      <section class="panel">
+      <section class="panel guidance-panel">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Suggestions</p>
-            <h2>重点提升建议</h2>
+            <p class="eyebrow">AI Study Scheme</p>
+            <h2>AI 学习方案</h2>
+            <p class="record-meta">合并“重点提升”和“学习计划”：先看真实训练数据，再给出短板、行动建议和周计划。</p>
           </div>
-          {% if not suggestions %}
-          <form method="post" action="{{ url_for('generate_suggestions') }}" style="margin:0">
-            <button class="primary-btn" type="submit">生成提升建议</button>
-          </form>
-          {% endif %}
+          <div class="guidance-actions">
+            <form method="post" action="{{ url_for('generate_suggestions') }}"><button class="ghost-btn small" type="submit">刷新诊断</button></form>
+            <form method="post" action="{{ url_for('generate_study_plan') }}"><button class="primary-btn small" type="submit">刷新方案</button></form>
+          </div>
         </div>
-        {% if suggestions %}
-          <details class="result-accordion">
-            <summary>查看已生成的重点提升建议</summary>
-            <div class="result-body">
-          {% if suggestions.get('formatted_text') %}
-            {{ suggestions.formatted_text | simple_md }}
-          {% else %}
-          {% if suggestions.get('summary') %}<details class="result-accordion" open><summary>总体建议</summary><div class="result-body"><p><strong>{{ suggestions.get('summary', '') }}</strong></p></div></details>{% endif %}
-          {% if suggestions.get('priority_areas') %}
-          <details class="result-accordion"><summary>优先提升领域</summary><div class="result-body"><p class="tag-row">
-            {% for area in suggestions.priority_areas %}<span class="tag tag-accent">{{ area }}</span>{% endfor %}
-          </p></div></details>
-          {% endif %}
-          {% if suggestions.get('suggestions') %}
-          <details class="result-accordion" open><summary>分项提升建议</summary><div class="result-body">
-          {% for s in suggestions.suggestions %}
-          <details class="result-accordion nested-answer">
-            <summary>{{ s.get('area', '') }}</summary>
-            <div class="result-body">
-            <p class="record-meta"><strong>当前问题：</strong>{{ s.get('current_issue', '') }}</p>
-            <p class="record-meta"><strong>行动建议：</strong>{{ s.get('action', '') }}</p>
-            <p class="record-meta"><strong>每周目标：</strong>{{ s.get('weekly_goal', '') }}</p>
-            <p class="record-meta"><strong>预计提升：</strong>{{ s.get('estimated_improvement', '') }}</p>
-            </div>
-          </details>
-          {% endfor %}
-          </div></details>
-          {% endif %}
-          {% if suggestions.get('study_tips') %}
-          <details class="result-accordion"><summary>学习技巧</summary><div class="result-body"><p class="tag-row">
-            {% for tip in suggestions.study_tips %}<span class="tag">{{ tip }}</span>{% endfor %}
-          </p></div></details>
-          {% endif %}
-          {% if suggestions.get('motivation') %}
-          <p class="record-meta" style="color:var(--accent);font-weight:800;text-align:center;font-size:1.05rem">{{ suggestions.motivation }}</p>
-          {% endif %}
-          {% endif %}
-            </div>
-          </details>
-          <form method="post" action="{{ url_for('generate_suggestions') }}" style="margin-top:12px">
-            <button class="ghost-btn" type="submit">重新生成</button>
-          </form>
-        {% else %}
-          <p class="empty-text">点击上方按钮，AI 会根据你的训练记录和弱项生成个性化提升建议。</p>
+        {% if auto_guidance.suggestions or auto_guidance.study_plan %}
+          <div class="guidance-auto-note">已根据最新有分数练习自动更新。</div>
         {% endif %}
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow">Study Plan</p>
-            <h2>个性化学习计划</h2>
+        <div class="guidance-visual-grid">
+          <div class="guidance-stat-card">
+            <span>已追踪训练</span>
+            <strong>{{ guidance_overview.training_count }}</strong>
+            <small>{{ guidance_overview.scored_count }} 条含评分</small>
           </div>
-          {% if not study_plan %}
-          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin:0">
-            <button class="primary-btn" type="submit">生成详细学习计划</button>
-          </form>
+          <div class="guidance-stat-card">
+            <span>最近得分</span>
+            <strong>{% if guidance_overview.latest_score is not none %}{{ '%.1f'|format(guidance_overview.latest_score) }}{% else %}--{% endif %}</strong>
+            <small>目标 {{ '%.1f'|format(guidance_overview.target) }}</small>
+          </div>
+          <div class="guidance-stat-card">
+            <span>最佳得分</span>
+            <strong>{% if guidance_overview.best_score is not none %}{{ '%.1f'|format(guidance_overview.best_score) }}{% else %}--{% endif %}</strong>
+            <small>{% if guidance_overview.latest_guidance_date %}方案更新 {{ guidance_overview.latest_guidance_date }}{% else %}等待生成{% endif %}</small>
+          </div>
+        </div>
+        <div class="guidance-gap-list">
+          {% for skill in guidance_overview.weakest %}
+          <div class="guidance-gap-item skill-card-{{ skill.icon }}">
+            <span class="skill-score-icon small"><span class="svg-icon icon-{{ skill.icon }}" aria-hidden="true"></span></span>
+            <div>
+              <strong>{{ skill.label }}</strong>
+              <p>{{ '%.1f'|format(skill.score) }} / 目标 {{ '%.1f'|format(skill.target) }}{% if skill.gap > 0 %}，还差 {{ '%.1f'|format(skill.gap) }}{% else %}，已达标{% endif %}</p>
+            </div>
+            <div class="score-mini-bar"><span style="width: {{ skill.percent }}%"></span></div>
+          </div>
+          {% endfor %}
+        </div>
+        {% if guidance_overview.dimensions %}
+        <div class="guidance-dimension-chart">
+          <div class="guidance-chart-head">
+            <strong>薄弱维度追踪</strong>
+            <span>按最近评分维度计算</span>
+          </div>
+          {% for dim in guidance_overview.dimensions %}
+          <div class="dimension-row dimension-{{ dim.type }}">
+            <div class="dimension-label">
+              <strong>{{ dim.label }}</strong>
+              <span>{{ dim.count }} 次记录</span>
+            </div>
+            <div class="dimension-track"><span style="width: {{ dim.percent }}%"></span></div>
+            <div class="dimension-score">{{ '%.1f'|format(dim.score) }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if suggestions or study_plan %}
+        <div class="guidance-detail-grid">
+          {% if suggestions %}
+          <div class="guidance-detail-card">
+            <h3>重点诊断</h3>
+            {% if suggestions.get('formatted_text') %}
+              {{ suggestions.formatted_text | simple_md }}
+            {% else %}
+              {% if suggestions.get('summary') %}<p class="guidance-summary-text">{{ suggestions.get('summary', '') }}</p>{% endif %}
+              {% if suggestions.get('priority_areas') %}<p class="tag-row">{% for area in suggestions.priority_areas %}<span class="tag tag-accent">{{ area }}</span>{% endfor %}</p>{% endif %}
+              {% if suggestions.get('suggestions') %}
+                <div class="guidance-suggestion-grid">
+                {% for s in suggestions.suggestions %}
+                <div class="guidance-suggestion-card">
+                  <strong>{{ s.get('area', '') }}</strong>
+                    <p><strong>当前问题：</strong>{{ s.get('current_issue', '') }}</p>
+                    <p><strong>行动建议：</strong>{{ s.get('action', '') }}</p>
+                    <p><strong>每周目标：</strong>{{ s.get('weekly_goal', '') }}</p>
+                    <p><strong>预计提升：</strong>{{ s.get('estimated_improvement', '') }}</p>
+                </div>
+                {% endfor %}
+                </div>
+              {% endif %}
+              {% if suggestions.get('motivation') %}<p class="guidance-motivation">{{ suggestions.motivation }}</p>{% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if study_plan %}
+          <div class="guidance-detail-card">
+            <h3>阶段计划</h3>
+            {{ study_plan | study_plan_result }}
+          </div>
           {% endif %}
         </div>
-        {% if study_plan %}
-          <details class="result-accordion">
-            <summary>查看已生成的学习计划</summary>
-            <div class="result-body">{{ study_plan | study_plan_result }}</div>
-          </details>
-          <form method="post" action="{{ url_for('generate_study_plan') }}" style="margin-top:12px">
-            <button class="ghost-btn" type="submit">重新生成</button>
-          </form>
         {% else %}
-          <p class="empty-text">生成后会自动保存；之后每次打开页面都会显示最新一次计划，直到你重新生成。</p>
+          <p class="empty-text">完成一次口语或写作评分后，这里会自动生成基于训练记录的学习方案。也可以点击右上角手动刷新。</p>
         {% endif %}
       </section>
 
@@ -346,7 +363,7 @@
       </section>
     </main>
   </div>
-  <script src="{{ url_for('static', filename='app.js', v='20260702b') }}"></script>
+  <script src="{{ url_for('static', filename='app.js', v='20260703tts5') }}"></script>
   <script>
     function filterDashHistory(group) {
       document.querySelectorAll('.history-compact-item').forEach(function(el) {
