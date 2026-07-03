@@ -34,7 +34,7 @@
           <a class="ghost-btn small" href="{{ url_for('vocabulary', q=query, topic=selected_topic) }}">返回词库</a>
           <a class="ghost-btn small" href="{{ url_for('vocabulary_review', q=query, topic=selected_topic, count=daily_goal, start=prev_start) }}">上一组</a>
           <a class="primary-btn small" href="{{ url_for('vocabulary_review', q=query, topic=selected_topic, count=daily_goal, start=next_start) }}">下一组</a>
-          <div class="db-pill">已掌握 {{ learned_count }} / {{ total_count }}</div>
+          <div class="db-pill" id="reviewLearnedPill" data-learned="{{ learned_count }}" data-total="{{ total_count }}">已掌握 {{ learned_count }} / {{ total_count }}</div>
         </div>
       </header>
 
@@ -70,7 +70,6 @@
             <div class="flashcard-section">
               <span id="meaningLabel">中文释义</span>
               <strong id="cardMeaning"></strong>
-              <button class="ghost-btn small icon-btn flashcard-enrich-btn" type="button" id="enrichMeaning"><span class="svg-icon icon-sparkle" aria-hidden="true"></span>AI 补全词条</button>
             </div>
             <div class="flashcard-section">
               <span>常用短语</span>
@@ -112,13 +111,37 @@
     const meaning = document.getElementById("cardMeaning");
     const phrases = document.getElementById("cardPhrases");
     const essay = document.getElementById("cardEssay");
-    const enrichMeaning = document.getElementById("enrichMeaning");
 
     function hasChinese(text) {
       return /[\u4e00-\u9fff]/.test(text || "");
     }
 
-    function renderCard() {
+    async function autoEnrichCurrentCard(item) {
+      if (!item || !item.needs_enrichment || item.enriching || item.enriched_attempted) return;
+      item.enriching = true;
+      item.enriched_attempted = true;
+      const oldTopic = topic.textContent;
+      topic.textContent = `${oldTopic || "IELTS"} · 补全中`;
+      try {
+        const response = await fetch(`/vocabulary/${encodeURIComponent(item.word)}/enrich`, {method: "POST"});
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "AI 查词失败");
+        item.meaning = data.meaning || item.meaning;
+        item.phonetic = data.phonetic || item.phonetic;
+        item.topic = data.topic || item.topic;
+        item.phrases = data.phrases || item.phrases;
+        item.essay_use = data.essay_use || item.essay_use;
+        item.needs_enrichment = false;
+        if (deck[index] && deck[index].word === item.word) renderCard(false);
+      } catch (error) {
+        item.enrich_error = error.message || "补全失败";
+        if (deck[index] && deck[index].word === item.word) topic.textContent = oldTopic || item.topic || "IELTS";
+      } finally {
+        item.enriching = false;
+      }
+    }
+
+    function renderCard(allowAutoEnrich = true) {
       if (!deck.length || !card) return;
       const item = deck[index];
       flipped = false;
@@ -131,18 +154,15 @@
       phonetic.textContent = item.phonetic || "";
       phonetic.hidden = !item.phonetic;
       const chineseReady = hasChinese(item.meaning);
-      const needsEnrichment = item.needs_enrichment || !chineseReady || !item.phonetic || ["雅思核心词", "通用学术词", "雅思中文词表"].includes(item.topic || "");
       meaningLabel.textContent = chineseReady ? "中文释义" : "英文释义";
       meaning.textContent = item.meaning || "暂无释义";
-      enrichMeaning.hidden = !needsEnrichment;
-      enrichMeaning.disabled = false;
-      enrichMeaning.innerHTML = '<span class="svg-icon icon-sparkle" aria-hidden="true"></span>AI 补全词条';
       phrases.replaceChildren(...(item.phrases || []).slice(0, 4).map((phrase) => {
         const span = document.createElement("span");
         span.textContent = phrase;
         return span;
       }));
       essay.textContent = item.essay_use || "";
+      if (allowAutoEnrich) autoEnrichCurrentCard(item);
     }
 
     function move(step) {
@@ -159,40 +179,24 @@
     }
     document.getElementById("prevCard")?.addEventListener("click", () => move(-1));
     document.getElementById("nextCard")?.addEventListener("click", () => move(1));
-    enrichMeaning?.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const item = deck[index];
-      if (!item) return;
-      enrichMeaning.disabled = true;
-      enrichMeaning.textContent = "正在补全...";
-      try {
-        const response = await fetch(`/vocabulary/${encodeURIComponent(item.word)}/enrich`, {method: "POST"});
-        const data = await response.json();
-        if (!response.ok || !data.ok) throw new Error(data.error || "AI 查词失败");
-        item.meaning = data.meaning || item.meaning;
-        item.phonetic = data.phonetic || item.phonetic;
-        item.topic = data.topic || item.topic;
-        item.phrases = data.phrases || item.phrases;
-        item.essay_use = data.essay_use || item.essay_use;
-        item.needs_enrichment = false;
-        renderCard();
-        flipped = true;
-        card.classList.add("flipped");
-      } catch (error) {
-        enrichMeaning.disabled = false;
-        enrichMeaning.textContent = error.message || "查词失败";
-      }
-    });
     document.getElementById("markKnown")?.addEventListener("click", async () => {
       const item = deck[index];
       if (!item) return;
       item.learned = true;
       card.classList.add("learned");
-      await fetch(`/vocabulary/${encodeURIComponent(item.word)}/progress`, {
+      const response = await fetch(`/vocabulary/${encodeURIComponent(item.word)}/progress`, {
         method: "POST",
         headers: {"Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "fetch"},
         body: new URLSearchParams({status: "learned"})
       });
+      const data = await response.json().catch(() => ({}));
+      const pill = document.getElementById("reviewLearnedPill");
+      if (pill) {
+        const total = Number(pill.dataset.total || {{ total_count }});
+        const learned = Number(data.learned_count || 0) || Math.min(total, Number(pill.dataset.learned || {{ learned_count }}) + 1);
+        pill.dataset.learned = String(learned);
+        pill.textContent = `已掌握 ${learned} / ${total}`;
+      }
       setTimeout(() => move(1), 220);
     });
     renderCard();

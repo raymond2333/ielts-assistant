@@ -105,6 +105,30 @@
           <a class="ghost-btn filter-btn icon-btn" href="{{ url_for('vocabulary_review', q=query, topic=selected_topic) }}"><span class="svg-icon icon-flashcard" aria-hidden="true"></span>闪卡复习</a>
         </form>
         <p class="record-meta" style="margin-top:10px">共 {{ filtered_count }} 个匹配词，当前第 {{ page }} / {{ total_pages }} 页。</p>
+        {% if lookup_result %}
+          <article class="word-card vocab-lookup-card">
+            <div class="word-top">
+              <div>
+                <h2>{{ lookup_result.word }}</h2>
+                <span>{% if lookup_result.phonetic %}{{ lookup_result.phonetic }} · {% endif %}{{ lookup_result.topic or 'AI 临时查词' }}</span>
+              </div>
+              <button class="primary-btn small" type="button"
+                data-add-wordbook="{{ lookup_result.word }}"
+                data-translation="{{ lookup_result.translation }}"
+                data-usage="{{ lookup_result.usage }}"
+                data-source="{{ lookup_result.source or 'AI 查询' }}">加入生词本</button>
+            </div>
+            <p class="meaning">{{ lookup_result.translation }}</p>
+            {% if lookup_result.phrases %}
+              <div class="phrase-list">
+                {% for phrase in lookup_result.phrases %}
+                  <span>{{ phrase }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="essay-use"><strong>作文例句</strong><p>{{ lookup_result.usage }}</p></div>
+          </article>
+        {% endif %}
       </section>
 
       <section class="panel">
@@ -227,6 +251,32 @@
           alert(error.message || "补全失败，请稍后再试。");
           button.disabled = false;
           button.innerHTML = original;
+        }
+      });
+    });
+    document.querySelectorAll("[data-add-wordbook]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const original = button.textContent;
+        button.disabled = true;
+        button.textContent = "加入中...";
+        try {
+          const response = await fetch("/api/wordbook", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+              word: button.dataset.addWordbook,
+              translation: button.dataset.translation || "",
+              usage: button.dataset.usage || "",
+              source: button.dataset.source || "AI 查询"
+            })
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) throw new Error(data.error || "加入失败");
+          button.textContent = "已加入生词本";
+        } catch (error) {
+          button.disabled = false;
+          button.textContent = original;
+          alert(error.message || "加入失败，请稍后再试。");
         }
       });
     });

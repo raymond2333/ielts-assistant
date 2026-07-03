@@ -1510,7 +1510,7 @@ def inline_speaking_feedback_html(inline):
             "<div class='result-body'><p class='empty-text'>暂未识别到转写文本。</p></div></details>"
         )
     if inline.get("transcript_source"):
-        source_label = {"local": "本地转写", "api": "语音 API 转写", "text": "文本提交"}.get(
+        source_label = {"local": "本地转写", "api": "音频转写", "text": "文本提交"}.get(
             inline.get("transcript_source"),
             inline.get("transcript_source"),
         )
@@ -2811,53 +2811,37 @@ def transcribe_audio_file_locally(audio_path):
         return "", f"本地语音转写失败：{e}"
 
 
+def clean_transcribe_error(error):
+    message = str(error or "").strip()
+    if not message:
+        return "语音识别服务暂时不可用。"
+    lowered = message.lower()
+    if "<html" in lowered or "<!doctype" in lowered:
+        status_match = re.search(r"\b(4\d\d|5\d\d)\b", message)
+        if status_match:
+            status = status_match.group(1)
+            if status == "404":
+                return "语音识别接口地址不支持当前转写请求。"
+            return f"语音识别接口返回 HTTP {status}。"
+        return "语音识别接口返回了错误页面。"
+    message = re.sub(r"<[^>]+>", " ", message)
+    message = re.sub(r"\s+", " ", message).strip()
+    message = message.replace("Not Found", "接口不存在")
+    message = message.replace("Unauthorized", "API Key 无效或权限不足")
+    message = message.replace("Forbidden", "API Key 没有语音识别权限")
+    return message[:160] + ("..." if len(message) > 160 else "")
+
+
 def transcribe_audio_file_with_api(ai_config, audio_path):
-    api_keys = ai_config.get("api_keys", {}) if isinstance(ai_config, dict) else {}
-    provider = (ai_config.get("provider", "") if isinstance(ai_config, dict) else "").lower()
-    api_key = ""
-    base_url = ""
-
-    speech_providers = {"openai", "custom", "mimo", "volcengine", "xunfei"}
-    if provider in speech_providers and (api_keys.get(provider) or ai_config.get("api_key")):
-        api_key = api_keys.get(provider) or ai_config.get("api_key")
-        base_url = ai_config.get("base_url") or AI_PROVIDERS.get(provider, {}).get("base_url", "")
-    elif api_keys.get("openai"):
-        api_key = api_keys["openai"]
-        base_url = ""
-
-    if not api_key:
-        return "", "没有可用的语音识别 API。"
-
-    try:
-        from openai import OpenAI
-        client_kwargs = {"api_key": api_key}
-        if base_url:
-            client_kwargs["base_url"] = base_url
-        client = OpenAI(**client_kwargs)
-        model = os.getenv(f"{provider.upper()}_TRANSCRIBE_MODEL", os.getenv("OPENAI_TRANSCRIBE_MODEL", "whisper-1"))
-        with open(audio_path, "rb") as audio:
-            result = client.audio.transcriptions.create(model=model, file=audio)
-        text = getattr(result, "text", "") or ""
-        if not text and isinstance(result, dict):
-            text = result.get("text", "")
-        return text.strip(), ""
-    except Exception as e:
-        return "", f"语音识别 API 转写失败：{e}"
+    return "", ""
 
 
 def transcribe_audio_file(ai_config, audio_path):
     local_text, local_error = transcribe_audio_file_locally(audio_path)
     if local_text:
         return local_text, "", "local"
-
-    api_text, api_error = transcribe_audio_file_with_api(ai_config, audio_path)
-    if api_text:
-        return api_text, "", "api"
-
-    return "", (
-        f"{local_error} {api_error} "
-        "如果当前模型不支持语音识别，请先在本地完成语音转文字，再上传文字给模型评分。"
-    ).strip(), ""
+    guidance = "请检查录音音量、麦克风权限，或直接在文本框输入回答后获取评分。"
+    return "", " ".join([item for item in [local_error, guidance] if item]).strip(), ""
 
 
 
@@ -2969,6 +2953,7 @@ def lookup_word_locally(word: str) -> dict:
                 "phrases": item["phrases"],
                 "usage": item["essay_use"],
                 "source": "雅思词库",
+                "found": True,
             }
     return {
         "word": word,
@@ -2976,6 +2961,7 @@ def lookup_word_locally(word: str) -> dict:
         "phrases": [],
         "usage": "建议结合上下文判断词性和含义，再用 AI 查询更完整的作文用法。",
         "source": "临时查询",
+        "found": False,
     }
 
 
@@ -4353,6 +4339,25 @@ def vocabulary():
         display_item["has_chinese_meaning"] = has_chinese_meaning(item)
         display_item["needs_enrichment"] = needs_vocab_enrichment(item)
         page_words.append(display_item)
+    lookup_result = None
+    if query and filtered_count == 0 and re.fullmatch(r"[A-Za-z][A-Za-z\-']{1,39}", query):
+        lookup_result = lookup_word_locally(query)
+        assistant, _ = current_assistant()
+        if assistant is not None:
+            try:
+                raw = assistant.explain_word(query)
+                parsed = parse_model_output(raw)
+                enrichment = _parse_vocab_enrichment(parsed)
+                lookup_result.update({
+                    "translation": enrichment.get("meaning") or lookup_result["translation"],
+                    "phrases": enrichment.get("phrases") or lookup_result["phrases"],
+                    "usage": enrichment.get("essay_use") or lookup_result["usage"],
+                    "phonetic": enrichment.get("phonetic", ""),
+                    "topic": enrichment.get("topic", ""),
+                    "source": "AI 查询",
+                })
+            except Exception:
+                lookup_result["source"] = "临时查询"
     return render_template(
         "vocabulary.html",
         words=page_words,
@@ -4371,6 +4376,7 @@ def vocabulary():
         user_words=user_words,
         selected_topic=topic,
         query=query,
+        lookup_result=lookup_result,
         **context,
     )
 
@@ -4546,7 +4552,9 @@ def vocabulary_progress(word):
     status = request.form.get("status", "learned")
     save_vocab_progress(session["user_id"], word, status)
     if request.headers.get("X-Requested-With") == "fetch":
-        return jsonify({"ok": True, "word": word, "status": status})
+        progress = get_vocab_progress(session["user_id"])
+        learned_count = sum(1 for item in IELTS_WORDS if progress.get(item["word"], {}).get("status") == "learned")
+        return jsonify({"ok": True, "word": word, "status": status, "learned_count": learned_count, "total_count": len(IELTS_WORDS)})
     flash(f"{word} 已标记为{ '已掌握' if status == 'learned' else '学习中' }。", "success")
     return redirect(request.form.get("next") or url_for("vocabulary"))
 
@@ -4564,11 +4572,14 @@ def word_lookup():
     if assistant is not None:
         try:
             raw = assistant.explain_word(word)
-            parsed = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
+            parsed = parse_model_output(raw)
+            enrichment = _parse_vocab_enrichment(parsed)
             local.update({
-                "translation": parsed.get("translation", local["translation"]),
-                "phrases": parsed.get("phrases", local["phrases"]),
-                "usage": parsed.get("usage", local["usage"]),
+                "translation": enrichment.get("meaning", local["translation"]),
+                "phrases": enrichment.get("phrases", local["phrases"]),
+                "usage": enrichment.get("essay_use", local["usage"]),
+                "phonetic": enrichment.get("phonetic", ""),
+                "topic": enrichment.get("topic", ""),
                 "source": "AI 查询",
             })
         except Exception:

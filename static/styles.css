@@ -2141,6 +2141,9 @@ nav a:hover {
   display: grid;
   gap: 18px;
   justify-items: center;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
 }
 
 .vocab-plan-hero,
@@ -2294,14 +2297,17 @@ button.page-pill {
 }
 
 .flashcard {
-  width: min(720px, 100%);
-  min-height: 420px;
+  width: min(760px, 100%);
+  height: clamp(430px, 58vh, 560px);
+  min-height: 430px;
   border: 0;
   padding: 0;
   background: transparent;
   perspective: 1200px;
   cursor: pointer;
   position: relative;
+  display: block;
+  overflow: visible;
 }
 
 .flashcard-face {
@@ -2311,7 +2317,7 @@ button.page-pill {
   align-content: center;
   justify-items: center;
   gap: 18px;
-  padding: 42px;
+  padding: clamp(24px, 4vw, 42px);
   border-radius: 28px;
   border: 1px solid rgba(15, 123, 99, 0.18);
   background:
@@ -2320,13 +2326,17 @@ button.page-pill {
   box-shadow: 0 24px 70px rgba(21, 45, 38, 0.12);
   backface-visibility: hidden;
   transition: transform 0.35s ease;
+  overflow: hidden;
 }
 
 .flashcard-back {
   transform: rotateY(180deg);
   justify-items: stretch;
   text-align: left;
-  align-content: center;
+  align-content: start;
+  grid-auto-rows: max-content;
+  gap: 12px;
+  overflow-y: auto;
 }
 
 .flashcard.flipped .flashcard-front {
@@ -2385,8 +2395,9 @@ button.page-pill {
 
 .flashcard-section > strong {
   color: var(--ink);
-  font-size: 1.35rem;
-  line-height: 1.55;
+  font-size: clamp(1.05rem, 2vw, 1.28rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .flashcard-enrich-btn {
@@ -2407,7 +2418,7 @@ button.page-pill {
 }
 
 .flashcard-back .phrase-list {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .flashcard-section p {
@@ -2421,6 +2432,16 @@ button.page-pill {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
+  width: min(760px, 100%);
+  position: relative;
+  z-index: 2;
+  padding: 4px 0 0;
+}
+
+.flashcard-actions .ghost-btn,
+.flashcard-actions .primary-btn {
+  min-width: 128px;
   justify-content: center;
 }
 

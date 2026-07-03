@@ -1691,5 +1691,226 @@
       "alienate customers"
     ],
     "essay_use": "The government's decision to cut funding for public services has alienated many citizens who feel neglected and unheard."
+  },
+  "sophisticated": {
+    "meaning": "复杂的；精致的",
+    "phonetic": "/səˈfɪstɪkeɪtɪd/",
+    "topic": "科技",
+    "phrases": [
+      "sophisticated technology",
+      "sophisticated system",
+      "sophisticated equipment",
+      "sophisticated analysis",
+      "sophisticated design"
+    ],
+    "essay_use": "Modern technology has become increasingly sophisticated, enabling more efficient and accurate data processing."
+  },
+  "gloss": {
+    "meaning": "概述，简要说明",
+    "phonetic": "/ɡlɒs/",
+    "topic": "写作",
+    "phrases": [
+      "a gloss on",
+      "gloss over",
+      "glossary of terms",
+      "brief gloss",
+      "cultural gloss"
+    ],
+    "essay_use": "In the essay, the author provides a brief gloss on the key concepts to help readers understand the complex arguments."
+  },
+  "bolster": {
+    "meaning": "加强，支持",
+    "phonetic": "/ˈbɒlstə(r)/",
+    "topic": "教育",
+    "phrases": [
+      "bolster confidence",
+      "bolster argument",
+      "bolster evidence",
+      "bolster reputation",
+      "bolster economy"
+    ],
+    "essay_use": "Proper training can bolster students' confidence and improve their performance in exams."
+  },
+  "layout": {
+    "meaning": "布局；安排；设计",
+    "phonetic": "/ˈlæɪəʊt/",
+    "topic": "写作",
+    "phrases": [
+      "layout of a report",
+      "website layout",
+      "room layout",
+      "article layout",
+      "design layout"
+    ],
+    "essay_use": "The layout of the essay should be clear and logical to ensure the reader can follow the argument easily."
+  },
+  "alcohol": {
+    "meaning": "酒精",
+    "phonetic": "/ˈælkəˌhɒl/",
+    "topic": "健康",
+    "phrases": [
+      "alcohol consumption",
+      "alcohol abuse",
+      "alcohol-related problems",
+      "alcohol dependence",
+      "alcohol policy"
+    ],
+    "essay_use": "The government has introduced stricter regulations on alcohol consumption to reduce the number of alcohol-related accidents."
+  },
+  "blade": {
+    "meaning": "刀片；叶片；（剑等的）刃",
+    "phonetic": "/bleɪd/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "a sharp blade",
+      "blade of grass",
+      "blade of a knife",
+      "cutting blade",
+      "ice blade"
+    ],
+    "essay_use": "In traditional culture, the blade of a sword symbolizes honor and courage."
+  },
+  "mammal": {
+    "meaning": "哺乳动物",
+    "phonetic": "/ˈmæməl/",
+    "topic": "环境",
+    "phrases": [
+      "mammal species",
+      "marine mammal",
+      "warm-blooded mammal",
+      "endangered mammal",
+      "mammal population"
+    ],
+    "essay_use": "Conservation efforts are crucial to protect endangered mammal species from extinction."
+  },
+  "decorate": {
+    "meaning": "装饰",
+    "phonetic": "/ˈdekəreɪt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "decorate a room",
+      "decorate the house",
+      "decorate with lights",
+      "decorate for a festival",
+      "decorate the classroom"
+    ],
+    "essay_use": "Many traditional festivals involve decorating homes with colorful decorations to celebrate the occasion."
+  },
+  "scandal": {
+    "meaning": "丑闻",
+    "phonetic": "/ˈskændəl/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "political scandal",
+      "corruption scandal",
+      "scandalous behavior",
+      "media scandal",
+      "public scandal"
+    ],
+    "essay_use": "The government was involved in a major political scandal that damaged its reputation and led to public protests."
+  },
+  "decade": {
+    "meaning": "十年",
+    "phonetic": "/ˈdekəd/",
+    "topic": "时间 / 历史",
+    "phrases": [
+      "a decade ago",
+      "over the past decade",
+      "each decade",
+      "decade of change",
+      "decade-long"
+    ],
+    "essay_use": "Over the past decade, there has been significant progress in renewable energy technologies."
+  },
+  "construct": {
+    "meaning": "构造；建立；（思想等）形成",
+    "phonetic": "/ˈkɒnstrʌkt/",
+    "topic": "教育",
+    "phrases": [
+      "construct a theory",
+      "construct an argument",
+      "construct knowledge",
+      "construct a sentence",
+      "construct a model"
+    ],
+    "essay_use": "Students need to learn how to construct clear and logical arguments in their writing."
+  },
+  "withstand": {
+    "meaning": "经受住，承受",
+    "phonetic": "/ˈwɪðs'tænd/",
+    "topic": "环境",
+    "phrases": [
+      "withstand pressure",
+      "withstand damage",
+      "withstand criticism",
+      "withstand the test of time",
+      "withstand extreme weather"
+    ],
+    "essay_use": "The building was designed to withstand strong winds and heavy rain, making it suitable for areas prone to severe weather."
+  },
+  "redevelopment": {
+    "meaning": "再开发，重建",
+    "phonetic": "/ˌriːdɪˈvɛləp.mənt/",
+    "topic": "城市 / 交通",
+    "phrases": [
+      "urban redevelopment",
+      "redevelopment project",
+      "city centre redevelopment",
+      "housing redevelopment",
+      "redevelopment plan"
+    ],
+    "essay_use": "The government has launched a major redevelopment plan to modernize the old industrial area and improve the quality of life for residents."
+  },
+  "thereby": {
+    "meaning": "从而，因此",
+    "phonetic": "/ðɪəˈbaɪ/",
+    "topic": "写作",
+    "phrases": [
+      "thereby leading to",
+      "thereby increasing",
+      "thereby causing",
+      "thereby improving",
+      "thereby resulting in"
+    ],
+    "essay_use": "The policy was introduced to reduce pollution, thereby improving the quality of life for residents."
+  },
+  "foresee": {
+    "meaning": "预见",
+    "phonetic": "/ˈfɔːrˌsiː/",
+    "topic": "科技",
+    "phrases": [
+      "foresee the future",
+      "foresee problems",
+      "foresee the consequences",
+      "foresee a trend",
+      "foresee success"
+    ],
+    "essay_use": "Advances in technology have enabled scientists to foresee potential environmental disasters before they occur."
+  },
+  "uneasy": {
+    "meaning": "不安的；不舒服的",
+    "phonetic": "/ˈʌnzi/",
+    "topic": "家庭 / 个人",
+    "phrases": [
+      "feel uneasy",
+      "uneasy feeling",
+      "uneasy about something",
+      "an uneasy silence",
+      "uneasy relationship"
+    ],
+    "essay_use": "Many people feel uneasy when they are forced to speak in public, as it challenges their confidence and comfort zone."
+  },
+  "license": {
+    "meaning": "许可证",
+    "phonetic": "/ˈlaɪsns/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "driver's license",
+      "license to operate",
+      "apply for a license",
+      "commercial license",
+      "software license"
+    ],
+    "essay_use": "In many countries, individuals must obtain a driver's license before they are allowed to operate a vehicle on public roads."
   }
 }

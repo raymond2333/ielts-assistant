@@ -29,7 +29,7 @@
             </details>
           {% endif %}
           {% if feedback.transcript_source %}
-            <p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'语音 API 转写','text':'文本提交'}.get(feedback.transcript_source, feedback.transcript_source) }}</p>
+            <p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'音频转写','text':'文本提交'}.get(feedback.transcript_source, feedback.transcript_source) }}</p>
           {% endif %}
           {% if feedback.result_data %}
             {{ feedback.result_data | record_result('口语反馈') }}
