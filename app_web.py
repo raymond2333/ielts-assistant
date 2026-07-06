@@ -15,7 +15,7 @@ from importlib.util import find_spec
 from urllib.parse import urlsplit, urlunsplit
 import ipaddress
 
-from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, flash, jsonify, has_request_context, redirect, render_template, request, send_from_directory, session, url_for
 from markupsafe import Markup, escape
 
 from database import (
@@ -203,6 +203,77 @@ def _html_list(items):
     if isinstance(items, str):
         return f"<p>{escape(items)}</p>"
     return "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
+
+
+def _essay_sentences(text):
+    text = str(text or "").strip()
+    if not text:
+        return []
+    chunks = re.split(r"(?<=[.!?。！？])\s+|\n+", text)
+    return [chunk.strip() for chunk in chunks if chunk.strip()]
+
+
+def _diff_tokens_html(left, right):
+    token_pattern = r"\s+|[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*|[^\w\s]"
+    left_tokens = re.findall(token_pattern, str(left or ""))
+    right_tokens = re.findall(token_pattern, str(right or ""))
+    matcher = SequenceMatcher(None, left_tokens, right_tokens)
+    left_html = []
+    right_html = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        left_text = "".join(left_tokens[i1:i2])
+        right_text = "".join(right_tokens[j1:j2])
+        if tag == "equal":
+            left_html.append(escape(left_text))
+            right_html.append(escape(right_text))
+        elif tag == "delete":
+            left_html.append(f"<mark class='diff-del'>{escape(left_text)}</mark>")
+        elif tag == "insert":
+            right_html.append(f"<mark class='diff-add'>{escape(right_text)}</mark>")
+        else:
+            if left_text:
+                left_html.append(f"<mark class='diff-del'>{escape(left_text)}</mark>")
+            if right_text:
+                right_html.append(f"<mark class='diff-add'>{escape(right_text)}</mark>")
+    return "".join(left_html), "".join(right_html)
+
+
+def writing_revision_compare_html(original, corrected):
+    original_sentences = _essay_sentences(original)
+    corrected_sentences = _essay_sentences(corrected)
+    if not original_sentences or not corrected_sentences:
+        return ""
+    matcher = SequenceMatcher(None, original_sentences, corrected_sentences)
+    rows = []
+    row_index = 1
+    empty_added = "<span class='empty-text'>新增句子</span>"
+    empty_deleted = "<span class='empty-text'>删除句子</span>"
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        left_group = original_sentences[i1:i2]
+        right_group = corrected_sentences[j1:j2]
+        pairs = max(len(left_group), len(right_group))
+        for offset in range(pairs):
+            left = left_group[offset] if offset < len(left_group) else ""
+            right = right_group[offset] if offset < len(right_group) else ""
+            if tag == "equal":
+                left_html = escape(left)
+                right_html = escape(right)
+            else:
+                left_html, right_html = _diff_tokens_html(left, right)
+            rows.append(
+                "<div class='essay-compare-row'>"
+                f"<div class='essay-compare-index'>{row_index}</div>"
+                f"<div class='essay-compare-cell original'>{left_html or empty_added}</div>"
+                f"<div class='essay-compare-cell revised'>{right_html or empty_deleted}</div>"
+                "</div>"
+            )
+            row_index += 1
+    return (
+        "<div class='essay-compare'>"
+        "<div class='essay-compare-head'><span></span><strong>原文</strong><strong>修正版</strong></div>"
+        f"{''.join(rows)}"
+        "</div>"
+    )
 
 
 def _chunk_items(items, size):
@@ -451,6 +522,12 @@ def record_result_filter(result_data, activity=""):
                 "<details class='result-accordion'><summary>我的作文原文</summary>"
                 f"<div class='result-body essay-original'><div>{escape(essay_content)}</div></div></details>"
             )
+            revision_compare = writing_revision_compare_html(essay_content, result_data.get("corrected_essay"))
+            if revision_compare:
+                sections.append(
+                    "<details class='result-accordion' open><summary>原文与修正后作文对比</summary>"
+                    f"<div class='result-body'>{revision_compare}</div></details>"
+                )
 
     if result_data.get("overall_score") is not None and isinstance(result_data.get("breakdown"), dict):
         sections.append(score_encouragement_html(result_data.get("overall_score")))
@@ -1783,6 +1860,7 @@ def _record_progress_summary(record):
         "generated": generated,
         "practiced": practiced,
         "score": score,
+        "best_score": score,
         "percent": max(0, min(100, percent)),
         "question_label": f"{practiced}/{generated}" if generated else "0/0",
     }
@@ -2523,6 +2601,58 @@ def speaking_record_replay_payload(record):
     return "part1", {"questions": [{"question": question}]}
 
 
+def inline_result_from_record_data(data):
+    data = data if isinstance(data, dict) else {}
+    result_data = data.get("result_data")
+    score = data.get("score")
+    if isinstance(result_data, dict):
+        score = result_data.get("overall_score") or score
+    return {
+        "mode": data.get("mode", ""),
+        "result": data.get("result", ""),
+        "result_data": result_data if isinstance(result_data, dict) else None,
+        "user_response": data.get("user_response", "") or data.get("transcript", ""),
+        "transcript": data.get("transcript", ""),
+        "audio_file": data.get("audio_file", ""),
+        "recorded_at": data.get("recorded_at", ""),
+        "transcript_source": data.get("transcript_source", ""),
+        "score": score,
+        "chinese_answer": data.get("chinese_answer", ""),
+        "keywords": data.get("keywords", ""),
+    }
+
+
+def attach_replay_inline_result(parent_data, source_mode, question, inline):
+    if not isinstance(parent_data, dict) or not isinstance(inline, dict):
+        return parent_data
+    source_mode = source_mode if source_mode in {"part1", "part2", "part3"} else infer_record_mode({"data": parent_data})
+    question_key = _normalized_question(question)
+    if source_mode == "part2":
+        parent_data["_inline_result"] = inline
+    elif source_mode == "part3" and isinstance(parent_data.get("discussion_questions"), list):
+        target = None
+        for item in parent_data["discussion_questions"]:
+            if isinstance(item, dict) and _normalized_question(item.get("question", "")) == question_key:
+                target = item
+                break
+        if target is None and parent_data["discussion_questions"]:
+            target = parent_data["discussion_questions"][0]
+        if isinstance(target, dict):
+            target["_inline_result"] = inline
+    elif isinstance(parent_data.get("questions"), list):
+        target = None
+        for item in parent_data["questions"]:
+            if isinstance(item, dict) and _normalized_question(item.get("question", "")) == question_key:
+                target = item
+                break
+        if target is None and parent_data["questions"]:
+            target = parent_data["questions"][0]
+        if isinstance(target, dict):
+            target["_inline_result"] = inline
+    mark_speaking_focus(parent_data, source_mode)
+    return parent_data
+
+
 def form_json_object(name):
     raw = request.form.get(name, "").strip()
     if not raw:
@@ -2563,6 +2693,33 @@ def speaking_source_mode_from_form(default_mode):
     return default_mode
 
 
+def compact_speaking_context(value):
+    if isinstance(value, dict):
+        compact = {}
+        for key, item in value.items():
+            if key.startswith("_") or key in {"_feedbacks", "_related_records"}:
+                continue
+            compact[key] = compact_speaking_context(item)
+        return compact
+    if isinstance(value, list):
+        return [compact_speaking_context(item) for item in value]
+    return value
+
+
+@app.template_filter("speaking_source_context")
+def speaking_source_context_filter(value):
+    return compact_speaking_context(value)
+
+
+def fallback_speaking_parent_data(source_mode, question):
+    question = (question or "").strip() or "Please answer this IELTS speaking question."
+    if source_mode == "part2":
+        return {"cue_card": question}
+    if source_mode == "part3":
+        return {"discussion_questions": [{"question": question}]}
+    return {"questions": [{"question": question}]}
+
+
 def speaking_part_label(source_mode):
     return {
         "part1": "Part 1",
@@ -2577,7 +2734,7 @@ def mark_speaking_focus(parent_data, source_mode):
     if source_mode == "part2":
         parent_data["_focus_feedback"] = "part2"
     else:
-        question_index = request.form.get("question_index", "").strip()
+        question_index = request.form.get("question_index", "").strip() if has_request_context() else ""
         if question_index:
             parent_data["_focus_question_index"] = question_index
     return parent_data
@@ -2661,6 +2818,82 @@ def normalize_ielts_score(value):
         return None
     score = max(0.0, min(9.0, round(score * 2) / 2))
     return score
+
+
+def _criterion_score(value):
+    if isinstance(value, dict):
+        for key in ("score", "band_score", "overall_score", "分数"):
+            score = normalize_ielts_score(value.get(key))
+            if score is not None:
+                return score
+    return normalize_ielts_score(value)
+
+
+@app.template_filter("speaking_score_preview")
+def speaking_score_preview_filter(result_data):
+    criteria_config = [
+        (
+            "fluency",
+            "流利度与连贯性",
+            ["fluency_coherence", "fluency_and_coherence", "fluency", "流利度与连贯性"],
+        ),
+        (
+            "lexical",
+            "词汇资源",
+            ["lexical_resource", "vocabulary", "lexical", "词汇资源"],
+        ),
+        (
+            "grammar",
+            "语法多样性与准确性",
+            ["grammatical_range_accuracy", "grammar_range_accuracy", "grammar", "语法"],
+        ),
+        (
+            "pronunciation",
+            "发音表现",
+            ["pronunciation", "pronunciation_score", "发音", "发音表现"],
+        ),
+    ]
+    preview = {
+        "overall": None,
+        "criteria": [{"key": key, "label": label, "score": None} for key, label, _ in criteria_config],
+    }
+    if not isinstance(result_data, dict):
+        return preview
+
+    for key in ("overall_score", "score", "band_score", "overall_band", "总分"):
+        score = normalize_ielts_score(result_data.get(key))
+        if score is not None:
+            preview["overall"] = score
+            break
+
+    breakdown = result_data.get("breakdown")
+    for item in preview["criteria"]:
+        _, _, aliases = next(cfg for cfg in criteria_config if cfg[0] == item["key"])
+        score = None
+        if isinstance(breakdown, dict):
+            for alias in aliases:
+                score = _criterion_score(breakdown.get(alias))
+                if score is not None:
+                    break
+        elif isinstance(breakdown, list):
+            for entry in breakdown:
+                if not isinstance(entry, dict):
+                    continue
+                name = str(entry.get("criterion") or entry.get("name") or entry.get("title") or "")
+                if any(alias.lower() in name.lower() for alias in aliases):
+                    score = _criterion_score(entry)
+                    break
+        if score is None:
+            for alias in aliases:
+                score = _criterion_score(result_data.get(alias))
+                if score is not None:
+                    break
+        item["score"] = score
+
+    scores = [item["score"] for item in preview["criteria"] if item["score"] is not None]
+    if preview["overall"] is None and scores:
+        preview["overall"] = round((sum(scores) / len(scores)) * 2) / 2
+    return preview
 
 
 def normalize_speaking_scores(feedback_data):
@@ -3388,7 +3621,13 @@ def admin_panel():
     selected_is_admin = is_admin_user(selected_user) if selected_user else False
     records = prepare_progress(get_all_progress(limit=500, user_id=selected_user))
     for item in records:
-        item["admin_score"] = item.get("display_score") or score_from_progress_record(item)
+        summary = item.get("progress_summary") if isinstance(item.get("progress_summary"), dict) else {}
+        score = item.get("display_score")
+        if score is None:
+            score = score_from_progress_record(item)
+        if score is None:
+            score = summary.get("score")
+        item["admin_score"] = score
     records.sort(key=lambda item: str(item.get("timestamp", "")), reverse=True)
     return render_template(
         "admin.html",
@@ -3757,18 +3996,9 @@ def speaking():
             result_data, _score_warning = normalize_speaking_scores(result_data if isinstance(result_data, dict) else None)
             result_data = calibrate_reference_answer_scores(result_data, reference_note)
             score_value = result_data.get("overall_score") if isinstance(result_data, dict) else None
-            # Look for a pending audio file from the most recent voice recording
+            # Text-only feedback must not attach any historical recording.
+            # Recordings are bound to a question only through /api/speech-score.
             audio_file = ""
-            try:
-                recent = get_progress(session["user_id"], limit=20)
-                for r in recent:
-                    rd = (r.get("data") or {}) if isinstance(r, dict) else {}
-                    af = rd.get("audio_file", "")
-                    if af and (rd.get("mode") == "speaking_recording" or rd.get("audio_file")):
-                        audio_file = af
-                        break
-            except Exception:
-                pass
             save_progress(session["user_id"], "口语反馈", {
                 "mode": mode,
                 "question": question,
@@ -3777,10 +4007,12 @@ def speaking():
                 "result": result,
                 "result_data": result_data,
                 "audio_file": audio_file,
+                "source_mode": source_mode,
+                "source_result_data": parent_data,
             })
             refresh_user_level_tracking(session["user_id"])
             parent_with_inline = attach_inline_speaking_result(
-                parent_data,
+                parent_data or fallback_speaking_parent_data(source_mode, question),
                 source_mode,
                 mode,
                 question,
@@ -3799,6 +4031,8 @@ def speaking():
             question = request.form.get("question", "").strip()
             keywords = request.form.get("keywords", "").strip()
             part = request.form.get("part", "Part 2")
+            source_mode = speaking_source_mode_from_form(mode)
+            parent_data = speaking_parent_data_from_form()
             result = assistant.generate_answer_from_keywords(
                 question,
                 keywords,
@@ -3811,11 +4045,11 @@ def speaking():
                 "keywords": keywords,
                 "result": result,
                 "result_data": result_data,
+                "source_mode": source_mode,
+                "source_result_data": parent_data,
             })
-            source_mode = speaking_source_mode_from_form(mode)
-            parent_data = speaking_parent_data_from_form()
             parent_with_inline = attach_inline_speaking_result(
-                parent_data,
+                parent_data or fallback_speaking_parent_data(source_mode, question),
                 source_mode,
                 mode,
                 question,
@@ -3829,17 +4063,19 @@ def speaking():
         elif mode == "answer_from_cn":
             question = request.form.get("question", "").strip()
             chinese_answer = request.form.get("chinese_answer", "").strip()
+            source_mode = speaking_source_mode_from_form(mode)
+            parent_data = speaking_parent_data_from_form()
             result = assistant.generate_answer_from_cn(question, chinese_answer)
             save_progress(session["user_id"], "中文思路生成英文口语答案", {
                 "mode": mode,
                 "question": question,
                 "chinese_answer": chinese_answer,
                 "result": result,
+                "source_mode": source_mode,
+                "source_result_data": parent_data,
             })
-            source_mode = speaking_source_mode_from_form(mode)
-            parent_data = speaking_parent_data_from_form()
             parent_with_inline = attach_inline_speaking_result(
-                parent_data,
+                parent_data or fallback_speaking_parent_data(source_mode, question),
                 source_mode,
                 mode,
                 question,
@@ -3853,17 +4089,24 @@ def speaking():
         if result is not None:
             if render_result is not None:
                 # Inline-result action (feedback / keyword / cn-answer).
-                # Keep the current question set plus the inline result for the
-                # redirect target; otherwise GET may load an unrelated old
-                # feedback record and the visible questions disappear.
+                # Render the current question set directly. Putting the full
+                # question payload plus feedback into Flask's client-side
+                # session can exceed cookie limits, especially for replayed
+                # Part 2 records, which makes the GET fallback show a blank
+                # initial Part 2 page.
                 session.pop("_speaking_replay_id", None)
-                session["speaking_result"] = render_result
-                session["speaking_result_data"] = (
-                    json.dumps(render_result_data, ensure_ascii=False)
-                    if render_result_data is not None else None
+                current_mode = render_mode or mode
+                if isinstance(render_result_data, dict) and current_mode in {"part1", "part2", "part3"}:
+                    render_result_data = sanitize_speaking_result(current_mode, render_result_data)
+                    render_result_data = decorate_current_speaking_result(session["user_id"], render_result_data)
+                    render_result = json.dumps(render_result_data, ensure_ascii=False)
+                return render_template(
+                    "speaking.html",
+                    result=render_result,
+                    result_data=render_result_data,
+                    mode=current_mode,
+                    **common_context(),
                 )
-                session["speaking_mode"] = render_mode or mode
-                return redirect(url_for("speaking", mode=render_mode or mode))
             session["speaking_result"] = result
             session["speaking_result_data"] = (
                 json.dumps(result_data, ensure_ascii=False)
@@ -3888,30 +4131,25 @@ def speaking():
             if replay_mode == "speaking_recording":
                 mode, result_data = speaking_record_replay_payload(replay_record)
                 result = json.dumps(result_data, ensure_ascii=False)
-            elif replay_mode == "speaking_feedback":
-                # Load the parent question generation record instead, so the
-                # page shows questions + inline feedback (not just feedback alone).
+            elif replay_mode in {"speaking_feedback", "keyword_answer", "answer_from_cn"}:
+                # Inline action records may be replayed directly from history.
+                # Prefer their saved parent question payload; for older records
+                # that lack it, rebuild a minimal current-question page.
                 feedback_data = replay_record.get("data") or {}
                 source_mode = feedback_data.get("source_mode") or ""
                 question = feedback_data.get("question") or ""
-                activity_map = {
-                    "part1": "口语Part 1题目生成",
-                    "part2": "口语Part 2题目生成",
-                    "part3": "口语Part 3题目生成",
-                }
-                # Try to find the matching parent question record
-                parent_activity = activity_map.get(source_mode)
-                parent_record = None
-                if parent_activity:
-                    parent_record = get_latest_progress_by_activity(
-                        session["user_id"], parent_activity
-                    )
-                if parent_record:
-                    mode = infer_record_mode(parent_record) or source_mode or "part1"
-                    result, result_data = result_from_record(parent_record)
-                else:
-                    mode = source_mode or "part1"
-                    result, result_data = None, None
+                mode, result_data = speaking_record_replay_payload(replay_record)
+                if source_mode in {"part1", "part2", "part3"}:
+                    mode = source_mode
+                if not isinstance(result_data, dict) or not question:
+                    result_data = fallback_speaking_parent_data(mode, question)
+                result_data = attach_replay_inline_result(
+                    result_data,
+                    mode,
+                    question,
+                    inline_result_from_record_data(feedback_data),
+                )
+                result = json.dumps(result_data, ensure_ascii=False)
             else:
                 mode = replay_mode
                 result, result_data = result_from_record(replay_record)
@@ -3984,6 +4222,12 @@ def writing():
     result = None
     result_data = None
     mode = request.form.get("mode") or request.args.get("mode", "task1")
+    writing_form_task = ""
+    writing_form_topic = ""
+    writing_form_essay = ""
+    writing_form_topic_category = ""
+    writing_form_essay_type = ""
+    writing_form_task_type = ""
     assistant, ai_config = current_assistant()
     if request.method == "POST":
         if assistant is None:
@@ -4060,6 +4304,10 @@ def writing():
             task_type = request.form.get("task_type", "图表描述")
             essay_content = request.form.get("essay_content", "")
             topic = request.form.get("topic", "").strip()
+            writing_form_task = "Task 1"
+            writing_form_topic = topic
+            writing_form_essay = essay_content
+            writing_form_task_type = task_type
             target_score = float_field("target_score", 6.5)
             reference_note = reference_essay_note_for_submission(essay_content)
             result = assistant.correct_writing_task1(
@@ -4090,6 +4338,11 @@ def writing():
             topic = request.form.get("topic", "").strip()
             essay_type = request.form.get("essay_type", "议论文")
             essay_content = request.form.get("essay_content", "")
+            writing_form_task = "Task 2"
+            writing_form_topic = topic
+            writing_form_essay = essay_content
+            writing_form_topic_category = topic_category
+            writing_form_essay_type = essay_type
             target_score = float_field("target_score", 6.5)
             reference_note = reference_essay_note_for_submission(essay_content)
             result = assistant.correct_writing_task2(
@@ -4168,6 +4421,14 @@ def writing():
         if replay_record:
             mode = infer_record_mode(replay_record) or mode
             result, result_data = result_from_record(replay_record)
+            data = replay_record.get("data") or {}
+            if mode in {"task1", "task2"}:
+                writing_form_task = "Task 1" if mode == "task1" else "Task 2"
+                writing_form_topic = (data.get("question") or data.get("topic") or "").strip()
+                writing_form_essay = data.get("essay_content", "")
+                writing_form_topic_category = data.get("topic_category", "")
+                writing_form_essay_type = data.get("essay_type", "")
+                writing_form_task_type = data.get("task_type", "")
         else:
             cached = session.pop("writing_result", None)
             cached_data = session.pop("writing_result_data", None)
@@ -4227,6 +4488,12 @@ def writing():
         generated_topic_task=gen_topic_task,
         generated_topic_data=generated_topic_data,
         inline_model_answer=inline_model_answer,
+        writing_form_task=writing_form_task,
+        writing_form_topic=writing_form_topic,
+        writing_form_essay=writing_form_essay,
+        writing_form_topic_category=writing_form_topic_category,
+        writing_form_essay_type=writing_form_essay_type,
+        writing_form_task_type=writing_form_task_type,
         **common_context())
 
 

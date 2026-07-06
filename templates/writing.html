@@ -121,14 +121,14 @@
           </details>
 
           {% set _generated_task1 = generated_topic_data if generated_topic_data and generated_topic_data.task_type == 'Task 1' else {} %}
-          {% set _t1_topic = (generated_topic_text if generated_topic_text and generated_topic_task == 'Task 1' else (import_question if import_topic and import_task == 'Task 1' else (_generated_task1.question if _generated_task1 else ''))) %}
+          {% set _t1_topic = (writing_form_topic if writing_form_task == 'Task 1' and writing_form_topic else (generated_topic_text if generated_topic_text and generated_topic_task == 'Task 1' else (import_question if import_topic and import_task == 'Task 1' else (_generated_task1.question if _generated_task1 else '')))) %}
           {% set _active_task1 = result_data if mode == 'generate_topic' and result_data and (result_data.task_type if result_data.task_type else 'Task 2') == 'Task 1' else _generated_task1 %}
           {% set _task1_model_answer = _active_task1.model_answer if _active_task1 else '' %}
           <form method="post" class="settings-form">
             <input type="hidden" name="mode" value="task1">
             {% if _t1_topic %}<input type="hidden" name="topic" value="{{ _t1_topic }}">{% endif %}
             <div class="form-row">
-              <label><span>图表类型</span><select name="task_type"><option>线形图</option><option>柱状图</option><option>饼图</option><option>表格</option><option>流程图</option><option>地图</option></select></label>
+              <label><span>图表类型</span><select name="task_type"><option {% if writing_form_task_type == '线形图' %}selected{% endif %}>线形图</option><option {% if writing_form_task_type == '柱状图' %}selected{% endif %}>柱状图</option><option {% if writing_form_task_type == '饼图' %}selected{% endif %}>饼图</option><option {% if writing_form_task_type == '表格' %}selected{% endif %}>表格</option><option {% if writing_form_task_type == '流程图' %}selected{% endif %}>流程图</option><option {% if writing_form_task_type == '地图' %}selected{% endif %}>地图</option></select></label>
             </div>
             {% if _t1_topic %}
               <div class="record-question generated-topic-card ai-output">
@@ -182,7 +182,7 @@
                 {% endif %}
               </div>
             {% endif %}
-            <label><span>小作文内容</span><textarea name="essay_content" rows="12" placeholder="在此粘贴或输入你的 Task 1 作文" class="no-voice"></textarea></label>
+            <label><span>小作文内容</span><textarea name="essay_content" rows="12" placeholder="在此粘贴或输入你的 Task 1 作文" class="no-voice">{{ writing_form_essay if writing_form_task == 'Task 1' else '' }}</textarea></label>
             <button class="primary-btn" type="submit">批改小作文</button>
           </form>
         </div>
@@ -226,15 +226,15 @@
           </details>
 
           {% set _generated_task2 = generated_topic_data if generated_topic_data and generated_topic_data.task_type == 'Task 2' else {} %}
-          {% set _t2_topic = (generated_topic_text if generated_topic_text and generated_topic_task == 'Task 2' else (import_question if import_topic and import_task == 'Task 2' else (_generated_task2.question if _generated_task2 else ''))) %}
+          {% set _t2_topic = (writing_form_topic if writing_form_task == 'Task 2' and writing_form_topic else (generated_topic_text if generated_topic_text and generated_topic_task == 'Task 2' else (import_question if import_topic and import_task == 'Task 2' else (_generated_task2.question if _generated_task2 else '')))) %}
           {% set _active_task2 = result_data if mode == 'generate_topic' and result_data and (result_data.task_type if result_data.task_type else 'Task 2') == 'Task 2' else _generated_task2 %}
           {% set _task2_model_answer = _active_task2.model_answer if _active_task2 else '' %}
           <form method="post" class="settings-form">
             <input type="hidden" name="mode" value="task2">
             {% if _t2_topic %}<input type="hidden" name="topic" value="{{ _t2_topic }}">{% endif %}
             <div class="form-row">
-              <label><span>话题类别</span><select name="topic_category"><option>教育</option><option>科技</option><option>环境</option><option>社会</option><option>文化</option><option>工作</option><option>政府</option><option>全球化</option></select></label>
-              <label><span>作文类型</span><select name="essay_type"><option>同意不同意型</option><option>讨论双方观点型</option><option>利弊分析型</option><option>问题解决型</option></select></label>
+              <label><span>话题类别</span><select name="topic_category"><option {% if writing_form_topic_category == '教育' %}selected{% endif %}>教育</option><option {% if writing_form_topic_category == '科技' %}selected{% endif %}>科技</option><option {% if writing_form_topic_category == '环境' %}selected{% endif %}>环境</option><option {% if writing_form_topic_category == '社会' %}selected{% endif %}>社会</option><option {% if writing_form_topic_category == '文化' %}selected{% endif %}>文化</option><option {% if writing_form_topic_category == '工作' %}selected{% endif %}>工作</option><option {% if writing_form_topic_category == '政府' %}selected{% endif %}>政府</option><option {% if writing_form_topic_category == '全球化' %}selected{% endif %}>全球化</option></select></label>
+              <label><span>作文类型</span><select name="essay_type"><option {% if writing_form_essay_type == '同意不同意型' %}selected{% endif %}>同意不同意型</option><option {% if writing_form_essay_type == '讨论双方观点型' %}selected{% endif %}>讨论双方观点型</option><option {% if writing_form_essay_type == '利弊分析型' %}selected{% endif %}>利弊分析型</option><option {% if writing_form_essay_type == '问题解决型' %}selected{% endif %}>问题解决型</option></select></label>
             </div>
             {% if _t2_topic %}
               <div class="record-question generated-topic-card ai-output">
@@ -259,7 +259,7 @@
                 {% endif %}
               </div>
             {% endif %}
-            <label><span>大作文内容</span><textarea name="essay_content" rows="12" placeholder="在此粘贴或输入你的 Task 2 作文" class="no-voice"></textarea></label>
+            <label><span>大作文内容</span><textarea name="essay_content" rows="12" placeholder="在此粘贴或输入你的 Task 2 作文" class="no-voice">{{ writing_form_essay if writing_form_task == 'Task 2' else '' }}</textarea></label>
             <button class="primary-btn" type="submit">批改大作文</button>
           </form>
         </div>

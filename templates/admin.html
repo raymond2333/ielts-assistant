@@ -185,13 +185,13 @@
                   <span class="record-icon"><span class="svg-icon icon-{{ item.display_icon or 'analysis' }}" aria-hidden="true"></span></span>
                   <strong>{{ item.display_title or (item.activity | record_title) }}</strong>
                   {% if item.display_badge %}<span class="record-badge">{{ item.display_badge }}</span>{% endif %}
-                  {% if item.admin_score %}<span class="record-score-chip">{{ '%.1f'|format(item.admin_score) }}分</span>{% endif %}
+                  {% if item.admin_score is not none %}<span class="record-score-chip">{{ '%.1f'|format(item.admin_score) }}分</span>{% endif %}
                   <time>{{ item.user_id }} · {{ item.timestamp | beijing_time }}</time>
                   {% if item.progress_summary %}
                     <span class="record-overview">
                       <b>{{ item.progress_summary.generated }} 题生成</b>
                       <b>{{ item.progress_summary.practiced }} 题已练</b>
-                      <b>{{ item.progress_summary.best_score if item.progress_summary.best_score is not none else '--' }} 分</b>
+                      <b>{{ '%.1f'|format(item.progress_summary.best_score) if item.progress_summary.best_score is not none else '--' }} 分</b>
                       <i><span style="width: {{ item.progress_summary.percent }}%"></span></i>
                     </span>
                   {% endif %}
@@ -201,7 +201,7 @@
                   <p class="record-meta"><strong>用户：</strong>{{ item.user_id }}</p>
                   {% if item.data.mode %}<p class="record-meta"><strong>模式：</strong>{{ item.data.mode }}</p>{% endif %}
                   {% if item.data.topic %}<p class="record-meta"><strong>题目/话题：</strong>{{ item.data.topic }}</p>{% endif %}
-                  {% if item.data.question %}<p class="record-meta"><strong>练习题：</strong>{{ item.data.question }}</p>{% endif %}
+                  {% if item.data.question %}<div class="record-question record-meta"><strong>练习题：</strong><div>{{ item.data.question | simple_md }}</div></div>{% endif %}
                   {% if item.data.user_response %}<p class="record-meta"><strong>用户回答：</strong>{{ item.data.user_response[:240] }}{% if item.data.user_response|length > 240 %}...{% endif %}</p>{% endif %}
                   {% if item.data.essay_content %}<div class="record-meta"><strong>作文内容：</strong><div style="white-space:pre-wrap;margin-top:6px">{{ item.data.essay_content }}</div></div>{% endif %}
                   <form method="post" action="{{ url_for('delete_record', record_id=item.id) }}" onsubmit="return confirm('确定删除这条记录吗？')" style="margin:10px 0">

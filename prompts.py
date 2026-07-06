@@ -206,7 +206,8 @@ WRITING_TASK1_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 1 考官
 - 严格按照 IELTS Writing Task 1 四项标准评分：Task Achievement、Coherence and Cohesion、Lexical Resource、Grammatical Range and Accuracy。
 - 反馈语言必须是简体中文：band_description、comments、strengths、improvements、suggested_corrections 都必须用中文表达；可以在中文解释中保留必要英文词组或句子示例。
 - 不要在 JSON 中重复输出、改写或转义“考生作文原文”；系统会在前端单独展示用户提交的原文。
-- corrected_essay/model_answer 如需给出英文范文或英文修改示例，可以使用英文，但标题、解释和建议必须是中文。
+- 必须返回 corrected_essay：基于考生原文逐段润色后的英文修改版本，尽量保留原观点和结构，但提升论证、衔接、词汇和语法；不要写成完全无关的新范文。
+- model_answer 如需给出英文范文，可以使用英文，但标题、解释和建议必须是中文。
 - 目标分数只用于建议方向，不能作为评分锚点；请根据作文实际质量独立评分。
 - overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0 ... 9.0。
 - overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
@@ -245,6 +246,7 @@ WRITING_TASK1_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 1 考官
   "strengths": ["中文总体优点1", "中文总体优点2"],
   "improvements": ["中文总体改进建议1", "中文总体改进建议2"],
   "suggested_corrections": "用中文说明语法、词汇和数据描述如何修改；可附英文替换句",
+  "corrected_essay": "基于考生原文逐段润色后的英文修改版本",
   "model_answer": "英文高分 Task 1 范文或空字符串"
 }}"""
 
@@ -262,7 +264,8 @@ WRITING_TASK2_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 2 考官
 - 严格按照 IELTS Writing Task 2 四项标准评分：Task Response、Coherence and Cohesion、Lexical Resource、Grammatical Range and Accuracy。
 - 反馈语言必须是简体中文：band_description、comments、strengths、improvements、suggested_corrections 都必须用中文表达；可以在中文解释中保留必要英文词组或句子示例。
 - 不要在 JSON 中重复输出、改写或转义“考生作文原文”；系统会在前端单独展示用户提交的原文。
-- corrected_essay/model_essay 如需给出英文范文或英文修改示例，可以使用英文，但标题、解释和建议必须是中文。
+- 必须返回 corrected_essay：基于考生原文逐段润色后的英文修改版本，尽量保留考生原有立场、主要论点和段落安排，但提升论证深度、衔接、词汇准确性和语法质量；不要写成完全无关的新范文。
+- model_essay 如需给出英文高分范文，可以使用英文，但标题、解释和建议必须是中文。
 - 目标分数只用于建议方向，不能作为评分锚点；请根据作文实际质量独立评分。
 - overall_score 和各项 score 只能使用雅思半分制：0, 0.5, 1.0 ... 9.0。
 - overall_score 应等于四项分数的平均值，并四舍五入到最近的 0.5。
@@ -301,6 +304,7 @@ WRITING_TASK2_CORRECTION_PROMPT = """你是专业的 IELTS Writing Task 2 考官
   "strengths": ["中文总体优点1", "中文总体优点2"],
   "improvements": ["中文总体改进建议1", "中文总体改进建议2"],
   "suggested_corrections": "用中文说明论证、结构、词汇和语法如何修改；可附英文替换句",
+  "corrected_essay": "基于考生原文逐段润色后的英文修改版本",
   "model_essay": "英文高分 Task 2 范文或空字符串"
 }}"""
 

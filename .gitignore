@@ -10,3 +10,4 @@ data/charts/*.png
 *.doc
 *.pptx
 .gitignore
+outputs

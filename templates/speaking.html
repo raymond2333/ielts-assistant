@@ -125,7 +125,7 @@
             <input type="hidden" name="mode" value="part3">
             <label>
               <span>Part 2 话题</span>
-              <textarea name="part2_topic" rows="4" placeholder="粘贴或输入 Part 2 话题，例如 Describe a person who inspired you"></textarea>
+              <textarea class="no-voice" name="part2_topic" rows="4" placeholder="粘贴或输入 Part 2 话题，例如 Describe a person who inspired you"></textarea>
             </label>
             <label>
               <span>讨论类型</span>
@@ -166,7 +166,7 @@
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="speaking_feedback">
                     <input type="hidden" name="source_mode" value="part1">
-                    <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                    <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
                     <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                     <input type="hidden" name="question" value="{{ item.question }}">
                     <input type="hidden" name="target_score" value="{{ profile.target_score }}">
@@ -181,10 +181,10 @@
                       <form method="post" class="settings-form answer-form">
                         <input type="hidden" name="mode" value="answer_from_cn">
                         <input type="hidden" name="source_mode" value="part1">
-                        <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                        <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
                         <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                         <input type="hidden" name="question" value="{{ item.question }}">
-                        <label><span>输入中文思路</span><textarea name="chinese_answer" rows="3" placeholder="例如：我平时喜欢在周末和朋友去咖啡馆，因为那里让我放松。"></textarea></label>
+                        <label><span>输入中文思路</span><textarea class="no-voice" name="chinese_answer" rows="3" placeholder="例如：我平时喜欢在周末和朋友去咖啡馆，因为那里让我放松。"></textarea></label>
                         <button class="ghost-btn small" type="submit">生成英文答案</button>
                       </form>
                     </div>
@@ -196,11 +196,11 @@
                       <form method="post" class="settings-form answer-form">
                         <input type="hidden" name="mode" value="keyword_answer">
                         <input type="hidden" name="source_mode" value="part1">
-                        <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                        <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
                         <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                         <input type="hidden" name="question" value="{{ item.question }}">
                         <input type="hidden" name="part" value="Part 1">
-                        <label><span>你的关键词</span><textarea name="keywords" rows="3" placeholder="例如：weekends, coffee shop, relax, friends"></textarea></label>
+                        <label><span>你的关键词</span><textarea class="no-voice" name="keywords" rows="3" placeholder="例如：weekends, coffee shop, relax, friends"></textarea></label>
                         <button class="ghost-btn small" type="submit">生成完整答案</button>
                       </form>
                     </div>
@@ -257,6 +257,31 @@
               <summary><span class="svg-icon icon-target" aria-hidden="true"></span> 题目卡 <button class="speak-btn" type="button">朗读题目</button></summary>
               <div class="result-body cue-card-body"><div class="speak-source">{{ result_data.cue_card | simple_md }}</div></div>
             </details>
+            {% set part2_inline = result_data.get('_inline_result') %}
+            {% set part2_preview = (part2_inline.result_data | speaking_score_preview) if part2_inline and part2_inline.result_data else none %}
+
+            <section class="part3-bridge-card">
+              <div>
+                <p class="eyebrow">Part 2 → Part 3</p>
+                <h3><span class="svg-icon icon-brain" aria-hidden="true"></span> 基于当前题卡生成 Part 3 深入讨论</h3>
+                <p>Part 3 会围绕这张 Part 2 题卡继续追问社会影响、趋势、比较和观点表达，更贴近真实雅思口语流程。</p>
+              </div>
+              <form method="post" class="part3-bridge-form">
+                <input type="hidden" name="mode" value="part3">
+                <input type="hidden" name="part2_topic" value="{{ result_data.cue_card }}">
+                <label>
+                  <span>讨论方向</span>
+                  <select name="discussion_type">
+                    <option>社会影响</option>
+                    <option>发展趋势</option>
+                    <option>比较分析</option>
+                    <option>问题解决</option>
+                    <option>个人观点</option>
+                  </select>
+                </label>
+                <button class="primary-btn small" type="submit">生成对应 Part 3</button>
+              </form>
+            </section>
 
             <div class="practice-workbench speaking-studio-grid">
               <!-- 计时器 -->
@@ -283,7 +308,7 @@
               <form method="post" class="settings-form answer-form practice-answer-panel recording-studio-panel">
                 <input type="hidden" name="mode" value="speaking_feedback">
                 <input type="hidden" name="source_mode" value="part2">
-                <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
                 <input type="hidden" name="question" value="{{ result_data.cue_card }}">
                 <input type="hidden" name="target_score" value="{{ profile.target_score }}">
                 <div class="studio-heading">
@@ -293,19 +318,80 @@
                 <label><span>你的 Part 2 回答</span><textarea name="user_response" rows="6" placeholder="点击录音按钮作答，也可以直接输入英文回答。完成后 AI 将给出评分和改进建议。"></textarea></label>
                 <button class="primary-btn small" type="submit">获取 AI 批改反馈</button>
               </form>
-              <div class="speaking-preview-panel">
+              <div class="speaking-preview-panel {% if part2_preview and part2_preview.overall is not none %}has-score{% endif %}">
                 <p class="eyebrow">AI Preview</p>
                 <h3><span class="svg-icon icon-analysis" aria-hidden="true"></span> AI 反馈预览</h3>
-                <p class="empty-text">完成录音或输入回答后，将按以下维度给出评分：</p>
+                {% if part2_preview and part2_preview.overall is not none %}
+                  <p class="empty-text">本题最新批改已同步到这里：</p>
+                {% else %}
+                  <p class="empty-text">完成录音或输入回答后，将按以下维度给出评分：</p>
+                {% endif %}
                 <div class="preview-criteria">
-                  <span><i></i>流利度与连贯性 <b>--</b></span>
-                  <span><i></i>词汇资源 <b>--</b></span>
-                  <span><i></i>语法多样性与准确性 <b>--</b></span>
-                  <span><i></i>发音表现 <b>--</b></span>
+                  {% if part2_preview %}
+                    {% for item in part2_preview.criteria %}
+                      <span><i></i>{{ item.label }} <b>{% if item.score is not none %}{{ '%.1f'|format(item.score) }}{% else %}--{% endif %}</b></span>
+                    {% endfor %}
+                  {% else %}
+                    <span><i></i>流利度与连贯性 <b>--</b></span>
+                    <span><i></i>词汇资源 <b>--</b></span>
+                    <span><i></i>语法多样性与准确性 <b>--</b></span>
+                    <span><i></i>发音表现 <b>--</b></span>
+                  {% endif %}
                 </div>
-                <strong class="preview-score">预计总分 --</strong>
+                <strong class="preview-score">{% if part2_preview and part2_preview.overall is not none %}本次总分 {{ '%.1f'|format(part2_preview.overall) }}{% else %}预计总分 --{% endif %}</strong>
               </div>
             </div>
+
+            {% if part2_inline %}
+            <section class="part2-feedback-strip inline-result" {% if result_data.get('_focus_feedback') == 'part2' %}data-feedback-focus="1"{% endif %}>
+              <div class="part2-feedback-head">
+                <div>
+                  <p class="eyebrow">Feedback</p>
+                  <h3>
+                    {% if part2_inline.mode in ['speaking_feedback', 'speaking_recording'] %}本题 AI 批改反馈
+                    {% elif part2_inline.mode == 'keyword_answer' %}本题关键词生成答案
+                    {% else %}本题中文思路生成答案{% endif %}
+                  </h3>
+                </div>
+                {% if part2_preview and part2_preview.overall is not none %}
+                  <strong>{{ '%.1f'|format(part2_preview.overall) }} / 9.0</strong>
+                {% endif %}
+              </div>
+              <div class="result-body">
+                {% if part2_inline.recorded_at %}<p class="record-meta"><strong>训练时间：</strong>{{ part2_inline.recorded_at | beijing_time }}</p>{% endif %}
+                {% if part2_inline.audio_file %}
+                  <p><strong>录音回放：</strong></p>
+                  <audio controls preload="none" style="width:100%;max-width:520px">
+                    <source src="/{{ part2_inline.audio_file }}" type="{{ 'audio/webm' if part2_inline.audio_file.endswith('.webm') else 'audio/mp4' }}">
+                  </audio>
+                {% endif %}
+                {% if part2_inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本 / 我的回答</summary><div class="result-body"><p>{{ part2_inline.transcript }}</p></div></details>{% elif part2_inline.user_response %}<details class="result-accordion nested-answer" open><summary>我的回答</summary><div class="result-body"><p>{{ part2_inline.user_response }}</p></div></details>{% elif part2_inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% endif %}
+                {% if part2_inline.transcript_source %}<p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'音频转写','text':'文本提交'}.get(part2_inline.transcript_source, part2_inline.transcript_source) }}</p>{% endif %}
+                {% if part2_inline.chinese_answer %}<p><strong>中文思路：</strong>{{ part2_inline.chinese_answer }}</p>{% endif %}
+                {% if part2_inline.keywords %}<p><strong>关键词：</strong>{{ part2_inline.keywords }}</p>{% endif %}
+                {% if part2_inline.result_data %}
+                  {{ part2_inline.result_data | record_result('口语反馈' if part2_inline.mode in ['speaking_feedback', 'speaking_recording'] else '关键词生成答案') }}
+                {% else %}
+                  {{ part2_inline.result | simple_md }}
+                {% endif %}
+              </div>
+            </section>
+            {% endif %}
+
+            <!-- 中文思路生成英文答案 -->
+            <details class="result-accordion">
+              <summary>💡 用中文思路生成英文答案</summary>
+              <div class="result-body">
+                <form method="post" class="settings-form answer-form">
+                  <input type="hidden" name="mode" value="answer_from_cn">
+                  <input type="hidden" name="source_mode" value="part2">
+                  <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
+                  <input type="hidden" name="question" value="{{ result_data.cue_card }}">
+                  <label><span>输入中文思路</span><textarea class="no-voice" name="chinese_answer" rows="3" placeholder="写下你想讲的中文内容"></textarea></label>
+                  <button class="ghost-btn small" type="submit">生成英文答案</button>
+                </form>
+              </div>
+            </details>
 
             <!-- 参考答案（折叠） -->
             {% if result_data.model_answer %}
@@ -315,17 +401,7 @@
                   {% set answer_text = (result_data.model_answer.introduction or '') ~ ' ' ~ (result_data.model_answer.main_points or [])|join(' ') ~ ' ' ~ (result_data.model_answer.details or [])|join(' ') ~ ' ' ~ (result_data.model_answer.conclusion or '') %}
                   <button class="speak-btn" type="button">🔊 朗读参考答案</button>
                   <div class="speak-source" hidden>{{ answer_text }}</div>
-                  
-                  <!-- 中文思路生成英文答案 -->
-                  <form method="post" class="settings-form answer-form">
-                    <input type="hidden" name="mode" value="answer_from_cn">
-                    <input type="hidden" name="source_mode" value="part2">
-                    <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
-                    <input type="hidden" name="question" value="{{ result_data.cue_card }}">
-                    <label><span>输入中文思路，生成英文答案</span><textarea name="chinese_answer" rows="3" placeholder="写下你想讲的中文内容"></textarea></label>
-                    <button class="ghost-btn small" type="submit">生成英文答案</button>
-                  </form>
-                  
+
                   {% if result_data.model_answer.introduction %}
                   <details class="result-accordion nested-answer">
                     <summary>开头</summary>
@@ -363,10 +439,10 @@
                 <form method="post" class="settings-form answer-form">
                   <input type="hidden" name="mode" value="keyword_answer">
                   <input type="hidden" name="source_mode" value="part2">
-                  <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                  <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
                   <input type="hidden" name="question" value="{{ result_data.cue_card }}">
                   <input type="hidden" name="part" value="Part 2">
-                  <label><span>你的关键词</span><textarea name="keywords" rows="4" placeholder="输入你想用的关键词，每行一个或用逗号分隔&#10;例如：&#10;childhood memory, river, fishing, grandfather, patient, life lesson"></textarea></label>
+                  <label><span>你的关键词</span><textarea class="no-voice" name="keywords" rows="4" placeholder="输入你想用的关键词，每行一个或用逗号分隔&#10;例如：&#10;childhood memory, river, fishing, grandfather, patient, life lesson"></textarea></label>
                   <button class="primary-btn" type="submit"><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 生成完整答案</button>
                 </form>
               </div>
@@ -375,34 +451,6 @@
             {% if result_data.vocabulary_highlight %}<details class="result-accordion"><summary>高级词汇</summary><div class="result-body"><div class="phrase-list">{% for word in result_data.vocabulary_highlight %}<span>{{ word }}</span>{% endfor %}</div></div></details>{% endif %}
             {% if result_data.grammar_structures %}<details class="result-accordion"><summary>语法结构</summary><div class="result-body"><ul>{% for item in result_data.grammar_structures %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
             {% if result_data.fluency_tips %}<details class="result-accordion"><summary>流利度建议</summary><div class="result-body"><ul>{% for item in result_data.fluency_tips %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
-            {% if result_data.get('_inline_result') %}
-            {% set inline = result_data.get('_inline_result') %}
-            <details class="result-accordion inline-result" {% if result_data.get('_focus_feedback') == 'part2' %}data-feedback-focus="1"{% endif %} open>
-              <summary>
-                {% if inline.mode in ['speaking_feedback', 'speaking_recording'] %}本题 AI 批改反馈
-                {% elif inline.mode == 'keyword_answer' %}本题关键词生成答案
-                {% else %}本题中文思路生成答案{% endif %}
-              </summary>
-              <div class="result-body">
-                {% if inline.recorded_at %}<p class="record-meta"><strong>训练时间：</strong>{{ inline.recorded_at | beijing_time }}</p>{% endif %}
-                {% if inline.audio_file %}
-                  <p><strong>录音回放：</strong></p>
-                  <audio controls preload="none" style="width:100%;max-width:360px">
-                    <source src="/{{ inline.audio_file }}" type="{{ 'audio/webm' if inline.audio_file.endswith('.webm') else 'audio/mp4' }}">
-                  </audio>
-                {% endif %}
-                {% if inline.transcript %}<details class="result-accordion nested-answer" open><summary>转写文本 / 我的回答</summary><div class="result-body"><p>{{ inline.transcript }}</p></div></details>{% elif inline.user_response %}<details class="result-accordion nested-answer" open><summary>我的回答</summary><div class="result-body"><p>{{ inline.user_response }}</p></div></details>{% elif inline.audio_file %}<details class="result-accordion nested-answer" open><summary>转写文本</summary><div class="result-body"><p class="empty-text">暂未识别到转写文本。</p></div></details>{% endif %}
-                {% if inline.transcript_source %}<p class="record-meta"><strong>转写来源：</strong>{{ {'local':'本地转写','api':'音频转写','text':'文本提交'}.get(inline.transcript_source, inline.transcript_source) }}</p>{% endif %}
-                {% if inline.chinese_answer %}<p><strong>中文思路：</strong>{{ inline.chinese_answer }}</p>{% endif %}
-                {% if inline.keywords %}<p><strong>关键词：</strong>{{ inline.keywords }}</p>{% endif %}
-                {% if inline.result_data %}
-                  {{ inline.result_data | record_result('口语反馈' if inline.mode in ['speaking_feedback', 'speaking_recording'] else '关键词生成答案') }}
-                {% else %}
-                  {{ inline.result | simple_md }}
-                {% endif %}
-              </div>
-            </details>
-            {% endif %}
           
           {% elif result_data and mode == 'part3' and result_data.discussion_questions %}
             {% for item in result_data.discussion_questions %}
@@ -419,7 +467,7 @@
                   <form method="post" class="settings-form answer-form">
                     <input type="hidden" name="mode" value="speaking_feedback">
                     <input type="hidden" name="source_mode" value="part3">
-                    <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                    <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
                     <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                     <input type="hidden" name="question" value="{{ item.question }}">
                     <input type="hidden" name="target_score" value="{{ profile.target_score }}">
@@ -434,10 +482,10 @@
                       <form method="post" class="settings-form answer-form">
                         <input type="hidden" name="mode" value="answer_from_cn">
                         <input type="hidden" name="source_mode" value="part3">
-                        <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                        <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
                         <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                         <input type="hidden" name="question" value="{{ item.question }}">
-                        <label><span>输入中文思路</span><textarea name="chinese_answer" rows="3" placeholder="用中文写下你的观点和例子"></textarea></label>
+                        <label><span>输入中文思路</span><textarea class="no-voice" name="chinese_answer" rows="3" placeholder="用中文写下你的观点和例子"></textarea></label>
                         <button class="ghost-btn small" type="submit">生成英文答案</button>
                       </form>
                     </div>
@@ -449,11 +497,11 @@
                       <form method="post" class="settings-form answer-form">
                         <input type="hidden" name="mode" value="keyword_answer">
                         <input type="hidden" name="source_mode" value="part3">
-                        <input type="hidden" name="source_result_data" value="{{ result_data | tojson | forceescape }}">
+                        <input type="hidden" name="source_result_data" value="{{ result_data | speaking_source_context | tojson | forceescape }}">
                         <input type="hidden" name="question_index" value="{{ loop.index0 }}">
                         <input type="hidden" name="question" value="{{ item.question }}">
                         <input type="hidden" name="part" value="Part 3">
-                        <label><span>你的关键词</span><textarea name="keywords" rows="3" placeholder="例如：technology, communication, efficiency, drawbacks"></textarea></label>
+                        <label><span>你的关键词</span><textarea class="no-voice" name="keywords" rows="3" placeholder="例如：technology, communication, efficiency, drawbacks"></textarea></label>
                         <button class="ghost-btn small" type="submit">生成完整答案</button>
                       </form>
                     </div>
@@ -628,6 +676,6 @@
     }
   </script>
   <script src="{{ url_for('static', filename='word_tools.js') }}"></script>
-  <script src="{{ url_for('static', filename='voice_input.js', v='20260702c') }}"></script>
+  <script src="{{ url_for('static', filename='voice_input.js', v='20260706rec1') }}"></script>
 </body>
 </html>

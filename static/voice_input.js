@@ -20,6 +20,9 @@
   var restartCount = 0;
   var recordTimer = null;
   var recordStartedAt = 0;
+  var recordLimitSeconds = 0;
+  var recordSoftSeconds = 60;
+  var autoStopNotice = false;
   var uploading = false;
   var pendingRecording = null;
 
@@ -40,6 +43,14 @@
     status.className = "voice-status";
     status.setAttribute("aria-live", "polite");
     wrapper.appendChild(status);
+
+    var meter = document.createElement("div");
+    meter.className = "recording-meter";
+    meter.innerHTML =
+      "<div class='recording-meter-head'><strong>录音时长</strong><span data-record-time>00:00</span></div>" +
+      "<div class='recording-meter-track'><i data-record-bar></i></div>" +
+      "<div class='recording-meter-note' data-record-note>准备录音</div>";
+    wrapper.appendChild(meter);
 
     if (hasSR) {
       var speakBtn = document.createElement("button");
@@ -208,6 +219,9 @@
       recording = true;
       audioChunks = [];
       recordStartedAt = Date.now();
+      autoStopNotice = false;
+      recordLimitSeconds = getRecordLimitSeconds(currentTarget);
+      recordSoftSeconds = getRecordSoftSeconds(currentTarget, recordLimitSeconds);
       var mimeType = "";
       if (window.MediaRecorder && MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
         mimeType = "audio/webm;codecs=opus";
@@ -242,11 +256,13 @@
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
     }
-    btn.classList.remove("listening");
-    btn.innerHTML = '<span class="svg-icon icon-mic"></span><small>重录</small>';
-    btn.title = "重新录音";
+    if (btn) {
+      btn.classList.remove("listening");
+      btn.innerHTML = '<span class="svg-icon icon-mic"></span><small>重录</small>';
+      btn.title = "重新录音";
+    }
     setRecordingState("preview");
-    setVoiceStatus("录音已结束。请先试听，满意后再上传评分。");
+    setVoiceStatus(autoStopNotice ? "Part 2 已到 2 分钟，录音自动结束。请先试听，满意后再上传评分。" : "录音已结束。请先试听，满意后再上传评分。");
   }
 
   function showRecordingPreview(blob, btn) {
@@ -416,9 +432,71 @@
     return min + ":" + sec;
   }
 
+  function getRecordSourceMode(textarea) {
+    var form = textarea ? textarea.closest("form") : null;
+    var sourceModeInput = form ? form.querySelector("input[name='source_mode']") : null;
+    if (sourceModeInput && sourceModeInput.value) return sourceModeInput.value;
+    if (form && form.querySelector("input[name='question'][value*='You should say']")) return "part2";
+    return "";
+  }
+
+  function getRecordLimitSeconds(textarea) {
+    return getRecordSourceMode(textarea) === "part2" ? 120 : 0;
+  }
+
+  function getRecordSoftSeconds(textarea, limitSeconds) {
+    if (limitSeconds) return limitSeconds;
+    var mode = getRecordSourceMode(textarea);
+    if (mode === "part1") return 60;
+    if (mode === "part3") return 75;
+    return 90;
+  }
+
+  function updateRecordingMeter(elapsedSeconds, note) {
+    var wrapper = currentTarget && currentTarget.closest(".voice-input-wrapper");
+    if (!wrapper) return;
+    var meter = wrapper.querySelector(".recording-meter");
+    if (!meter) return;
+    var time = meter.querySelector("[data-record-time]");
+    var bar = meter.querySelector("[data-record-bar]");
+    var noteEl = meter.querySelector("[data-record-note]");
+    var denominator = recordLimitSeconds || Math.max(recordSoftSeconds, elapsedSeconds || 1);
+    var pct = Math.min(100, Math.round((elapsedSeconds / denominator) * 100));
+    if (time) {
+      time.textContent = recordLimitSeconds
+        ? formatDuration(elapsedSeconds * 1000) + " / " + formatDuration(recordLimitSeconds * 1000)
+        : formatDuration(elapsedSeconds * 1000);
+    }
+    if (bar) bar.style.width = pct + "%";
+    if (noteEl) noteEl.textContent = note || "";
+    meter.classList.toggle("near-limit", !!recordLimitSeconds && recordLimitSeconds - elapsedSeconds <= 15);
+  }
+
   function updateRecordStatus() {
     if (!recordStartedAt) return;
-    setVoiceStatus("● 正在录音 " + formatDuration(Date.now() - recordStartedAt) + "，再次点击红色录音按钮结束。");
+    var elapsedSeconds = Math.floor((Date.now() - recordStartedAt) / 1000);
+    var note = "再次点击红色录音按钮结束。";
+    if (recordLimitSeconds) {
+      var remaining = Math.max(0, recordLimitSeconds - elapsedSeconds);
+      if (remaining <= 0) {
+        autoStopNotice = true;
+        updateRecordingMeter(recordLimitSeconds, "已到 2 分钟，正在自动停止录音。");
+        stopRecord(activeRecordButton());
+        return;
+      }
+      if (remaining <= 15) {
+        note = "还剩 " + remaining + " 秒，请准备收尾。";
+      } else {
+        note = "Part 2 限时 2 分钟，到时将自动停止。";
+      }
+    }
+    updateRecordingMeter(elapsedSeconds, note);
+    setVoiceStatus("● 正在录音 " + formatDuration(elapsedSeconds * 1000) + "，" + note);
+  }
+
+  function activeRecordButton() {
+    var wrapper = currentTarget && currentTarget.closest(".voice-input-wrapper");
+    return wrapper ? wrapper.querySelector(".rec-btn") : null;
   }
 
   function setRecordingState(state) {
