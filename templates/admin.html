@@ -48,10 +48,10 @@
       {% endwith %}
 
       <section class="metric-grid">
-        <div class="metric-card"><span>用户数</span><strong>{{ users|length }}</strong></div>
-        <div class="metric-card"><span>管理员</span><strong>{{ admin_count }}</strong></div>
-        <div class="metric-card"><span>当前用户</span><strong>{{ selected_user or '未选择' }}</strong></div>
-        <a class="metric-card admin-vocab-entry" href="{{ url_for('admin_vocabulary') }}"><span>词库维护</span><strong>进入</strong><small>批量补全释义、音标和话题</small></a>
+        <div class="metric-card metric-card-level"><span class="metric-icon"><span class="svg-icon icon-admin" aria-hidden="true"></span></span><div><span>用户数</span><strong>{{ users|length }}</strong></div></div>
+        <div class="metric-card metric-card-target"><span class="metric-icon"><span class="svg-icon icon-target" aria-hidden="true"></span></span><div><span>管理员</span><strong>{{ admin_count }}</strong></div></div>
+        <div class="metric-card metric-card-calendar"><span class="metric-icon"><span class="svg-icon icon-analysis" aria-hidden="true"></span></span><div><span>当前用户</span><strong>{{ selected_user or '未选择' }}</strong></div></div>
+        <a class="metric-card metric-card-vocab admin-vocab-entry" href="{{ url_for('admin_vocabulary') }}"><span class="metric-icon"><span class="svg-icon icon-vocabulary" aria-hidden="true"></span></span><div><span>词库维护</span><strong>进入</strong><small>批量补全释义、音标和话题</small></div></a>
       </section>
 
       <section class="panel">
@@ -137,7 +137,14 @@
               {% endfor %}
             </div>
           </div>
-          <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="is_admin" value="1" {% if selected_is_admin %}checked{% endif %}> 设置为管理员</label>
+          <label class="admin-role-toggle">
+            <input type="checkbox" name="is_admin" value="1" {% if selected_is_admin %}checked{% endif %}>
+            <span class="role-switch" aria-hidden="true"></span>
+            <span class="role-copy">
+              <strong>管理员权限</strong>
+              <em>{{ '当前拥有后台管理权限' if selected_is_admin else '开启后可进入后台管理用户、记录和词库' }}</em>
+            </span>
+          </label>
           <button class="primary-btn" type="submit">保存用户资料</button>
         </form>
       </section>

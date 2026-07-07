@@ -3391,12 +3391,37 @@ def auth():
             if password != confirm_password:
                 flash("两次输入的密码不一致。", "error")
                 return redirect(url_for("auth", mode="register"))
-            if not register_user(user_id, password):
+            onboarding_profile = {
+                "listening_level": float_field("listening_level", 5.0),
+                "speaking_level": float_field("speaking_level", 5.0),
+                "reading_level": float_field("reading_level", 5.0),
+                "writing_level": float_field("writing_level", 5.0),
+                "target_score": float_field("target_score", 6.5),
+                "study_time": int_field("study_time", 10),
+                "daily_vocab_goal": clamp_int(request.form.get("daily_vocab_goal"), 30, 5, 300),
+                "exam_date": request.form.get("exam_date", "").strip(),
+                "weak_areas": request.form.getlist("weak_areas") or ["口语", "写作"],
+            }
+            if not register_user(user_id, password, onboarding_profile):
                 flash("该用户ID已存在，请直接登录。", "error")
                 return redirect(url_for("auth", mode="register"))
 
+            provider = request.form.get("provider", "tongyi")
+            provider_defaults = AI_PROVIDERS.get(provider, AI_PROVIDERS["tongyi"])
+            api_key = request.form.get("api_key", "").strip()
+            if api_key:
+                save_user_ai_config_map(
+                    user_id,
+                    provider,
+                    {provider: api_key},
+                    request.form.get("model", "").strip() or provider_defaults["model"],
+                    request.form.get("base_url", "").strip() or provider_defaults["base_url"],
+                )
             session["user_id"] = user_id
-            flash("注册成功，已自动登录。", "success")
+            if api_key:
+                flash("注册成功，学习目标和 API 已保存。", "success")
+            else:
+                flash("注册成功，已自动登录。API 可稍后在右上角用户中心 > 用户设置里填写。", "success")
             return redirect(url_for("dashboard"))
 
         if authenticate_user(user_id, password):
@@ -3407,7 +3432,13 @@ def auth():
         flash("用户不存在或密码不正确。", "error")
         return redirect(url_for("auth"))
 
-    return render_template("auth.html", mode=request.args.get("mode", "login"), streamlit_url=_legacy_streamlit_base_url())
+    return render_template(
+        "auth.html",
+        mode=request.args.get("mode", "login"),
+        streamlit_url=_legacy_streamlit_base_url(),
+        providers=AI_PROVIDERS,
+        score_options=score_options(),
+    )
 
 
 @app.route("/dashboard")

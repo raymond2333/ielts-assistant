@@ -46,6 +46,37 @@
           <span>确认密码</span>
           <input name="confirm_password" type="password" autocomplete="new-password" required>
         </label>
+        <div class="onboarding-box">
+          <div class="onboarding-head">
+            <span class="svg-icon icon-target" aria-hidden="true"></span>
+            <div>
+              <strong>新用户上手向导</strong>
+              <p>先填目标和 API，平台会立刻按你的目标组织训练；也可以跳过，之后在右上角“用户中心 > 用户设置”继续完善。</p>
+            </div>
+          </div>
+          <div class="form-row compact">
+            <label><span>目标分数</span><select name="target_score">{% for score in score_options %}<option value="{{ score }}" {% if score == 6.5 %}selected{% endif %}>{{ '%.1f'|format(score) }}</option>{% endfor %}</select></label>
+            <label><span>考试日期</span><input type="date" name="exam_date"></label>
+            <label><span>每周学习</span><input type="number" name="study_time" min="1" max="80" value="10"></label>
+            <label><span>每日背词</span><input type="number" name="daily_vocab_goal" min="5" max="300" value="30"></label>
+          </div>
+          <div class="weak-area-grid auth-weak-grid">
+            {% for area, icon in [('听力','icon-listening'),('口语','icon-speaking'),('阅读','icon-reading'),('写作','icon-writing')] %}
+              <label class="weak-area-card"><input type="checkbox" name="weak_areas" value="{{ area }}" {% if area in ['口语','写作'] %}checked{% endif %}><span class="svg-icon {{ icon }}" aria-hidden="true"></span><strong>{{ area }}</strong><em>重点</em></label>
+            {% endfor %}
+          </div>
+          <details class="onboarding-advanced">
+            <summary><span class="svg-icon icon-sparkle" aria-hidden="true"></span> 填写 AI API，可跳过</summary>
+            <div class="form-row compact">
+              <label><span>模型供应商</span><select name="provider">{% for key, provider in providers.items() %}<option value="{{ key }}" {% if key == 'tongyi' %}selected{% endif %}>{{ provider.label }}</option>{% endfor %}</select></label>
+              <label><span>API Key</span><input name="api_key" type="password" autocomplete="new-password" placeholder="可稍后在用户设置填写"></label>
+            </div>
+            <div class="form-row compact">
+              <label><span>模型名称</span><input name="model" placeholder="默认使用供应商推荐模型" autocomplete="off"></label>
+              <label><span>Base URL</span><input name="base_url" placeholder="默认可留空" autocomplete="off"></label>
+            </div>
+          </details>
+        </div>
         {% endif %}
         <button class="primary-btn" type="submit">{{ '注册并进入用户中心' if mode == 'register' else '登录用户中心' }}</button>
       </form>

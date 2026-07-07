@@ -98,6 +98,78 @@ textarea {
   align-self: center;
 }
 
+.onboarding-box {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 123, 99, 0.14);
+  background:
+    radial-gradient(circle at 92% 8%, rgba(47, 141, 247, 0.12), transparent 28%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(237, 248, 244, 0.76));
+  box-shadow: 0 16px 38px rgba(21, 45, 38, 0.08);
+}
+
+.onboarding-head {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.onboarding-head > .svg-icon {
+  width: 48px;
+  height: 48px;
+  padding: 10px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 22px rgba(15, 123, 99, 0.1);
+}
+
+.onboarding-head strong {
+  display: block;
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+
+.onboarding-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 0.9rem;
+}
+
+.onboarding-advanced {
+  border: 1px solid rgba(15, 123, 99, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0;
+  overflow: hidden;
+}
+
+.onboarding-advanced summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 13px 14px;
+  color: var(--ink);
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.onboarding-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.onboarding-advanced .form-row {
+  padding: 0 14px 14px;
+}
+
+.auth-weak-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -657,6 +729,12 @@ nav a:hover {
   flex: 1;
 }
 
+.form-row.compact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .form-row.four {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1133,6 +1211,14 @@ nav a:hover {
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
+.admin-user-card::before {
+  content: "";
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #2f8df7, #ff922e);
+  opacity: 0.68;
+}
+
 .admin-user-card:hover,
 .admin-user-card.selected {
   transform: translateY(-2px);
@@ -1153,7 +1239,7 @@ nav a:hover {
   display: grid;
   place-items: center;
   border-radius: 20px;
-  background: #edf8f4;
+  background: linear-gradient(145deg, #edf8f4, #ffffff);
   border: 1px solid rgba(15, 123, 99, 0.14);
 }
 
@@ -1192,6 +1278,74 @@ nav a:hover {
   font-size: 0.78rem;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.admin-role-toggle {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 123, 99, 0.14);
+  background: linear-gradient(145deg, #ffffff, #f5fbf8);
+  cursor: pointer;
+}
+
+.admin-role-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.role-switch {
+  width: 58px;
+  height: 34px;
+  border-radius: 999px;
+  background: #dfe8e4;
+  position: relative;
+  transition: background 0.16s ease;
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.role-switch::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+  transition: transform 0.16s ease;
+}
+
+.admin-role-toggle input:checked + .role-switch {
+  background: linear-gradient(90deg, var(--accent), #18a985);
+}
+
+.admin-role-toggle input:checked + .role-switch::after {
+  transform: translateX(24px);
+}
+
+.role-copy strong,
+.role-copy em {
+  display: block;
+}
+
+.role-copy strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.role-copy em {
+  margin-top: 3px;
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .admin-user-stats {
