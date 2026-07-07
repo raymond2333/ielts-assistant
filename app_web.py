@@ -205,6 +205,23 @@ def _html_list(items):
     return "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
 
 
+def info_card_grid_html(cards, class_name="feedback-note-grid"):
+    rendered = []
+    for title, content in cards:
+        if content in (None, "", [], {}):
+            continue
+        body = _html_list(content) if isinstance(content, list) else f"<p>{escape(content)}</p>"
+        rendered.append(
+            "<article class='feedback-note-card'>"
+            f"<strong>{escape(title)}</strong>"
+            f"{body}"
+            "</article>"
+        )
+    if not rendered:
+        return ""
+    return f"<div class='{escape(class_name)}'>{''.join(rendered)}</div>"
+
+
 def _essay_sentences(text):
     text = str(text or "").strip()
     if not text:
@@ -394,6 +411,81 @@ def speaking_score_visual_html(result_data):
     return score_visual_html(result_data.get("overall_score"), criteria)
 
 
+def speaking_feedback_overview_html(result_data):
+    if not isinstance(result_data, dict):
+        return ""
+    breakdown = result_data.get("breakdown")
+    if not isinstance(breakdown, dict):
+        return ""
+    criteria = [
+        ("fluency_coherence", "流利度与连贯性"),
+        ("lexical_resource", "词汇资源"),
+        ("grammatical_range_accuracy", "语法范围与准确性"),
+        ("pronunciation", "发音表现"),
+    ]
+    cards = []
+    valid_scores = []
+    for key, label in criteria:
+        item = breakdown.get(key)
+        if not isinstance(item, dict):
+            continue
+        score = _score_float(item.get("score"))
+        if score is not None:
+            valid_scores.append(score)
+        pct = int(round((score or 0) / 9 * 100))
+        details = []
+        for field in ["comments", "assessment", "vocabulary_analysis", "grammar_analysis", "pronunciation_analysis"]:
+            if item.get(field):
+                details.append(f"<p>{escape(item[field])}</p>")
+                break
+        for field, title in [
+            ("strengths", "优点"),
+            ("weaknesses", "待改进"),
+            ("suggestions", "建议"),
+            ("improvement_tips", "提升提示"),
+            ("suggested_words", "推荐词汇"),
+            ("common_errors", "常见错误"),
+        ]:
+            if item.get(field):
+                details.append(f"<div><strong>{title}</strong>{_html_list(item[field])}</div>")
+        score_label = f"{score:.1f}" if score is not None else "--"
+        cards.append(
+            "<article class='speaking-criterion-card'>"
+            "<div class='speaking-criterion-top'>"
+            f"<strong>{escape(label)}</strong>"
+            f"<span>{score_label}</span>"
+            "</div>"
+            "<div class='score-bar-track'>"
+            f"<span style='width:{pct}%'></span>"
+            "</div>"
+            f"<div class='speaking-criterion-detail'>{''.join(details)}</div>"
+            "</article>"
+        )
+    overall = _score_float(result_data.get("overall_score"))
+    if overall is None and valid_scores:
+        overall = round(sum(valid_scores) / len(valid_scores) * 2) / 2
+    if overall is None and not cards:
+        return ""
+    percent = int(round((overall or 0) / 9 * 100))
+    overall_label = f"{overall:.1f}" if overall is not None else "--"
+    if overall and overall >= 7.5:
+        summary = "表达已经很接近高分表现，继续保持展开深度和语言准确度。"
+    elif overall and overall >= 6.5:
+        summary = "已经达到 6.5+ 的关键区间，下一步重点打磨细节、衔接和自然度。"
+    else:
+        summary = "本次反馈已按雅思口语四项标准完成，优先补强薄弱维度会更快提分。"
+    return (
+        "<section class='speaking-feedback-overview'>"
+        "<div class='speaking-overview-score'>"
+        f"<div class='score-ring' style='--score-pct:{percent}%;'><div><strong>{overall_label}</strong><span>/ 9.0</span></div></div>"
+        "<div><p class='eyebrow'>Speaking Score</p><h3>总分与维度概览</h3>"
+        f"<p>{escape(summary)}</p></div>"
+        "</div>"
+        f"<div class='speaking-criteria-grid'>{''.join(cards)}</div>"
+        "</section>"
+    )
+
+
 def writing_score_visual_html(result_data):
     if not isinstance(result_data, dict):
         return ""
@@ -413,6 +505,68 @@ def writing_score_visual_html(result_data):
     return score_visual_html(result_data.get("overall_score"), criteria)
 
 
+def writing_feedback_overview_html(result_data):
+    if not isinstance(result_data, dict):
+        return ""
+    criteria = [
+        ("task_achievement", "任务完成度"),
+        ("task_response", "任务回应"),
+        ("coherence_cohesion", "连贯与衔接"),
+        ("lexical_resource", "词汇资源"),
+        ("grammatical_range", "语法多样性与准确性"),
+        ("grammatical_range_accuracy", "语法范围与准确性"),
+    ]
+    cards = []
+    valid_scores = []
+    for key, label in criteria:
+        item = result_data.get(key)
+        if not isinstance(item, dict):
+            continue
+        score = _score_float(item.get("score"))
+        if score is not None:
+            valid_scores.append(score)
+        pct = int(round((score or 0) / 9 * 100))
+        details = []
+        for field, title in [("comments", "评价"), ("assessment", "评价")]:
+            if item.get(field):
+                details.append(f"<p>{escape(item[field])}</p>")
+                break
+        for field, title in [("strengths", "优点"), ("improvements", "建议"), ("suggestions", "建议")]:
+            if item.get(field):
+                details.append(f"<div><strong>{title}</strong>{_html_list(item[field])}</div>")
+        score_label = f"{score:.1f}" if score is not None else "--"
+        cards.append(
+            "<article class='writing-criterion-card'>"
+            "<div class='writing-criterion-top'>"
+            f"<strong>{escape(label)}</strong>"
+            f"<span>{score_label}</span>"
+            "</div>"
+            "<div class='score-bar-track'>"
+            f"<span style='width:{pct}%'></span>"
+            "</div>"
+            f"<div class='writing-criterion-detail'>{''.join(details)}</div>"
+            "</article>"
+        )
+    overall = _score_float(result_data.get("overall_score"))
+    if overall is None and valid_scores:
+        overall = round(sum(valid_scores) / len(valid_scores) * 2) / 2
+    if overall is None and not cards:
+        return ""
+    percent = int(round((overall or 0) / 9 * 100))
+    overall_label = f"{overall:.1f}" if overall is not None else "--"
+    band_description = result_data.get("band_description") or "本次批改已按雅思写作四项标准完成。"
+    return (
+        "<section class='writing-feedback-overview'>"
+        "<div class='writing-overview-score'>"
+        f"<div class='score-ring' style='--score-pct:{percent}%;'><div><strong>{overall_label}</strong><span>/ 9.0</span></div></div>"
+        "<div><p class='eyebrow'>Writing Score</p><h3>总分与维度概览</h3>"
+        f"<p>{escape(band_description)}</p></div>"
+        "</div>"
+        f"<div class='writing-criteria-grid'>{''.join(cards)}</div>"
+        "</section>"
+    )
+
+
 def _feedback_html(feedbacks):
     if not feedbacks:
         return ""
@@ -427,48 +581,11 @@ def _feedback_html(feedbacks):
             body.append(_audio_html(feedback.get("audio_file")))
         if feedback.get("user_response"):
             body.append(f"<p><strong>当时我的回答：</strong></p><p>{escape(feedback['user_response'])}</p>")
-        visual = speaking_score_visual_html(data)
+        visual = speaking_feedback_overview_html(data)
         if visual:
             body.append(visual)
         elif data.get("overall_score") is not None:
             body.append(f"<p><strong>AI 评分：</strong>{escape(data['overall_score'])} / 9.0</p>")
-        breakdown = data.get("breakdown")
-        if isinstance(breakdown, dict):
-            labels = {
-                "fluency_coherence": "流利度与连贯性",
-                "lexical_resource": "词汇资源",
-                "grammatical_range_accuracy": "语法范围与准确性",
-                "pronunciation": "发音",
-            }
-            for key, label in labels.items():
-                item = breakdown.get(key)
-                if not isinstance(item, dict):
-                    continue
-                detail = []
-                if item.get("score") is not None:
-                    detail.append(f"<p><strong>分数：</strong>{escape(item['score'])}</p>")
-                for field, title in [
-                    ("strengths", "优点"),
-                    ("weaknesses", "待改进"),
-                    ("suggestions", "建议"),
-                    ("suggested_words", "推荐词汇"),
-                    ("common_errors", "常见错误"),
-                    ("improvement_tips", "改进提示"),
-                ]:
-                    if item.get(field):
-                        detail.append(f"<p><strong>{title}：</strong></p>{_html_list(item[field])}")
-                for field, title in [
-                    ("vocabulary_analysis", "词汇分析"),
-                    ("grammar_analysis", "语法分析"),
-                    ("pronunciation_analysis", "发音分析"),
-                ]:
-                    if item.get(field):
-                        detail.append(f"<p><strong>{title}：</strong>{escape(item[field])}</p>")
-                if detail:
-                    body.append(
-                        f"<details class='result-accordion nested-answer'><summary>{label}</summary>"
-                        f"<div class='result-body'>{''.join(detail)}</div></details>"
-                    )
         if data.get("improved_response"):
             body.append(
                 "<details class='result-accordion nested-answer'><summary>优化回答示例</summary>"
@@ -507,15 +624,7 @@ def record_result_filter(result_data, activity=""):
         and any(isinstance(result_data.get(key), dict) for key in writing_criteria)
     )
     if is_writing_feedback:
-        sections.append(writing_score_encouragement_html(result_data.get("overall_score")))
-        sections.append(writing_score_visual_html(result_data))
-        band_description = result_data.get("band_description")
-        band_html = f"<p>{escape(band_description)}</p>" if band_description else ""
-        sections.append(
-            "<details class='result-accordion' open><summary>总分与整体评价</summary>"
-            f"<div class='result-body'><p><strong>总分：</strong>{escape(result_data.get('overall_score'))} / 9.0</p>"
-            f"{band_html}</div></details>"
-        )
+        sections.append(writing_feedback_overview_html(result_data))
         essay_content = result_data.get("_essay_content") or result_data.get("essay_content")
         if essay_content:
             sections.append(
@@ -531,48 +640,7 @@ def record_result_filter(result_data, activity=""):
 
     if result_data.get("overall_score") is not None and isinstance(result_data.get("breakdown"), dict):
         sections.append(score_encouragement_html(result_data.get("overall_score")))
-        sections.append(speaking_score_visual_html(result_data))
-        sections.append(
-            "<details class='result-accordion' open><summary>总体评分</summary>"
-            f"<div class='result-body'><p><strong>总分：</strong>{escape(result_data.get('overall_score'))} / 9.0</p></div></details>"
-        )
-        breakdown_labels = {
-            "fluency_coherence": "流利度与连贯性",
-            "lexical_resource": "词汇资源",
-            "grammatical_range_accuracy": "语法范围与准确性",
-            "pronunciation": "发音",
-        }
-        feedback_labels = {
-            "score": "分数",
-            "strengths": "优点",
-            "weaknesses": "待改进",
-            "suggestions": "建议",
-            "vocabulary_analysis": "词汇分析",
-            "suggested_words": "推荐词汇",
-            "grammar_analysis": "语法分析",
-            "common_errors": "常见错误",
-            "pronunciation_analysis": "发音分析",
-            "improvement_tips": "改进建议",
-        }
-        for key, item in result_data.get("breakdown", {}).items():
-            if not isinstance(item, dict):
-                continue
-            label = breakdown_labels.get(key, key)
-            score = item.get("score", "")
-            body = []
-            for sub_key, value in item.items():
-                if value in (None, "", [], {}):
-                    continue
-                sub_label = feedback_labels.get(sub_key, sub_key)
-                if isinstance(value, list):
-                    body.append(f"<p><strong>{escape(sub_label)}：</strong></p>{_html_list(value)}")
-                else:
-                    body.append(f"<p><strong>{escape(sub_label)}：</strong>{escape(value)}</p>")
-            if body:
-                sections.append(
-                    f"<details class='result-accordion'><summary>{escape(label)}{f' · {escape(score)}' if score else ''}</summary>"
-                    f"<div class='result-body'>{''.join(body)}</div></details>"
-                )
+        sections.append(speaking_feedback_overview_html(result_data))
         if result_data.get("improved_response"):
             sections.append(
                 "<details class='result-accordion'><summary>优化回答示例</summary>"
@@ -882,36 +950,37 @@ def record_result_filter(result_data, activity=""):
         "suggestions": "建议",
         "examples": "示例",
     }
-    for key, label in criteria_labels.items():
-        item = result_data.get(key)
-        if not isinstance(item, dict):
-            continue
-        summary = label
-        if item.get("score") is not None:
-            summary = f"{label} · {escape(item['score'])}"
-        body = []
-        for sub_key, value in item.items():
-            if value in (None, "", [], {}):
+    if not is_writing_feedback:
+        for key, label in criteria_labels.items():
+            item = result_data.get(key)
+            if not isinstance(item, dict):
                 continue
-            sub_label = sub_labels.get(sub_key, sub_key)
-            if isinstance(value, list):
-                body.append(f"<p><strong>{escape(sub_label)}：</strong></p>{_html_list(value)}")
-            elif isinstance(value, dict):
-                nested = "".join(
-                    f"<li><strong>{escape(str(k))}：</strong>{escape(str(v))}</li>"
-                    for k, v in value.items()
-                    if v not in (None, "", [], {})
+            summary = label
+            if item.get("score") is not None:
+                summary = f"{label} · {escape(item['score'])}"
+            body = []
+            for sub_key, value in item.items():
+                if value in (None, "", [], {}):
+                    continue
+                sub_label = sub_labels.get(sub_key, sub_key)
+                if isinstance(value, list):
+                    body.append(f"<p><strong>{escape(sub_label)}：</strong></p>{_html_list(value)}")
+                elif isinstance(value, dict):
+                    nested = "".join(
+                        f"<li><strong>{escape(str(k))}：</strong>{escape(str(v))}</li>"
+                        for k, v in value.items()
+                        if v not in (None, "", [], {})
+                    )
+                    if nested:
+                        body.append(f"<p><strong>{escape(sub_label)}：</strong></p><ul>{nested}</ul>")
+                else:
+                    content = escape(str(value))
+                    body.append(f"<p><strong>{escape(sub_label)}：</strong>{content}</p>")
+            if body:
+                sections.append(
+                    f"<details class='result-accordion'><summary>{summary}</summary>"
+                    f"<div class='result-body'>{''.join(body)}</div></details>"
                 )
-                if nested:
-                    body.append(f"<p><strong>{escape(sub_label)}：</strong></p><ul>{nested}</ul>")
-            else:
-                content = escape(str(value))
-                body.append(f"<p><strong>{escape(sub_label)}：</strong>{content}</p>")
-        if body:
-            sections.append(
-                f"<details class='result-accordion'><summary>{summary}</summary>"
-                f"<div class='result-body'>{''.join(body)}</div></details>"
-            )
 
     list_labels = {
         "vocabulary_highlight": "高级词汇",
@@ -925,13 +994,14 @@ def record_result_filter(result_data, activity=""):
         "strengths": "优点",
         "improvements": "改进建议",
     }
+    compact_note_cards = []
     for key, label in list_labels.items():
         value = result_data.get(key)
         if value:
-            sections.append(
-                f"<details class='result-accordion'><summary>{label}</summary>"
-                f"<div class='result-body'>{_html_list(value)}</div></details>"
-            )
+            compact_note_cards.append((label, value))
+    notes_html = info_card_grid_html(compact_note_cards)
+    if notes_html:
+        sections.append(notes_html)
 
     scalar_labels = {
         "overall_score": "总分",
@@ -979,147 +1049,199 @@ def study_plan_result_filter(plan):
     if not isinstance(plan, dict):
         return Markup(f"<pre>{escape(str(plan))}</pre>")
 
-    sections = []
-    daily = plan.get("daily_schedule")
-    weekly = plan.get("weekly_schedule")
-    priority_count = len(plan.get("priority_areas") or []) if isinstance(plan.get("priority_areas"), list) else 0
-    daily_count = len(daily) if isinstance(daily, list) else 0
-    weekly_count = len(weekly) if isinstance(weekly, list) else 0
-    plan_title = escape(plan.get("title") or "个性化学习计划")
-    sections.append(
-        "<div class='plan-hero'>"
-        "<div>"
-        "<span class='plan-kicker'>Personal Plan</span>"
-        f"<h4>{plan_title}</h4>"
-        "</div>"
-        "<div class='plan-hero-stats'>"
-        f"<span><b>{daily_count or '--'}</b><em>每日任务</em></span>"
-        f"<span><b>{weekly_count or '--'}</b><em>周计划</em></span>"
-        f"<span><b>{priority_count or '--'}</b><em>重点领域</em></span>"
-        "</div>"
-        "</div>"
-    )
-    if plan.get("overall_assessment"):
-        sections.append(
-            "<details class='result-accordion' open><summary>总体评价</summary>"
-            f"<div class='result-body'><p>{escape(plan['overall_assessment'])}</p></div></details>"
-        )
-    if plan.get("priority_areas"):
-        sections.append(
-            "<details class='result-accordion'><summary>优先提升领域</summary>"
-            f"<div class='result-body'>{_html_list(plan['priority_areas'])}</div></details>"
-        )
-    diagnosis = plan.get("skill_diagnosis")
-    if isinstance(diagnosis, list):
-        cards = []
-        for item in diagnosis:
-            if not isinstance(item, dict):
+    today = date.today()
+
+    def parse_day(value):
+        if not value:
+            return None
+        text = str(value).strip()
+        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y年%m月%d日"):
+            try:
+                return datetime.strptime(text, fmt).date()
+            except ValueError:
                 continue
-            cards.append(
-                "<div class='plan-diagnosis-card'>"
-                f"<strong>{escape(item.get('skill', '能力诊断'))}</strong>"
-                f"<p><b>薄弱点：</b>{escape(item.get('weakness', ''))}</p>"
-                f"<p><b>原因：</b>{escape(item.get('reason', ''))}</p>"
-                f"<p><b>行动：</b>{escape(item.get('action', ''))}</p>"
-                "</div>"
-            )
-        if cards:
-            sections.append(
-                "<details class='result-accordion' open><summary>薄弱维度诊断</summary>"
-                f"<div class='plan-diagnosis-grid'>{''.join(cards)}</div></details>"
-            )
-    if isinstance(daily, list) and daily:
-        def day_card(item, compact=False):
-            if not isinstance(item, dict):
-                return ""
-            raw_date = str(item.get("date", ""))
-            date = escape(raw_date)
-            date_short = escape(raw_date[5:] if len(raw_date) >= 10 else raw_date)
-            day = escape(item.get("day", ""))
-            focus = escape(item.get("focus", ""))
-            tasks = item.get("tasks") if isinstance(item.get("tasks"), list) else []
-            task_html = "".join(f"<li>{escape(task)}</li>" for task in tasks[:3])
-            more = len(tasks) - 3
-            if more > 0:
-                task_html += f"<li class='muted-task'>另有 {more} 项细节任务</li>"
-            review = escape(item.get("review", ""))
-            compact_class = " compact" if compact else ""
-            return (
-                f"<div class='daily-card{compact_class}'>"
-                f"<div class='daily-card-date' title='{date}'><strong>{date_short}</strong><span>Day {day}</span></div>"
-                f"<div class='daily-card-body'><h5>{focus}</h5><ul>{task_html}</ul>"
-                f"<p><b>复盘：</b>{review}</p></div>"
-                "</div>"
+        match = re.search(r"(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})", text)
+        if match:
+            try:
+                return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+            except ValueError:
+                return None
+        return None
+
+    def fmt_day(day):
+        return day.strftime("%Y年%m月%d日") if isinstance(day, date) else ""
+
+    def clean_plan_text(value):
+        text = html.unescape(str(value or ""))
+        text = re.sub(r"</?(?:p|br|div|span|strong|em|ul|ol|li|h[1-6])[^>]*>", " ", text, flags=re.I)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text)
+        return text.strip(" \n\t。")
+
+    def list_value(value):
+        if isinstance(value, list):
+            return [clean_plan_text(item) for item in value if clean_plan_text(item)]
+        if isinstance(value, str) and value.strip():
+            cleaned = clean_plan_text(value)
+            return [cleaned] if cleaned else []
+        return []
+
+    def daily_text(item):
+        if not isinstance(item, dict):
+            return clean_plan_text(item)
+        focus = clean_plan_text(item.get("focus") or item.get("theme") or item.get("title") or "专项训练")
+        tasks = list_value(item.get("tasks"))
+        review = clean_plan_text(item.get("review") or item.get("goal") or item.get("daily_goal") or "")
+        parts = [str(focus)]
+        if tasks:
+            parts.append("；".join(tasks[:2]))
+        if review:
+            parts.append(f"复盘：{review}")
+        return "。".join(part.strip("。") for part in parts if part)
+
+    def daily_card(item, index):
+        if not isinstance(item, dict):
+            return ""
+        parsed = parse_day(item.get("date"))
+        raw_date = fmt_day(parsed) if parsed else str(item.get("date") or f"第 {index} 天")
+        date_short = parsed.strftime("%m月%d日") if parsed else raw_date
+        focus_text = clean_plan_text(item.get("focus") or item.get("theme") or "专项训练")
+        focus = escape(focus_text)
+        tasks = list_value(item.get("tasks"))
+        type_text = " ".join([focus_text, " ".join(tasks)])
+        day_icon = diagnosis_icon(type_text)
+        day_type_class = "speaking" if day_icon == "icon-speaking" else "writing" if day_icon == "icon-writing" else "vocab" if day_icon == "icon-vocabulary" else "general"
+        task_html = "".join(f"<li>{escape(task)}</li>" for task in tasks[:3])
+        if len(tasks) > 3:
+            task_html += f"<li class='muted-task'>另有 {len(tasks) - 3} 项细节任务</li>"
+        review = clean_plan_text(item.get("review") or item.get("goal") or "")
+        review_html = f"<p>{escape(review)}</p>" if review else ""
+        return (
+            f"<article class='plan-day-card {day_type_class}'>"
+            f"<div class='plan-day-date' title='{escape(raw_date)}'><strong>{escape(date_short)}</strong></div>"
+            f"<div class='plan-day-main'><h5>{focus}</h5>"
+            f"{'<ul>' + task_html + '</ul>' if task_html else ''}"
+            f"{review_html}"
+            "</div></article>"
+        )
+
+    def first_week_goal():
+        weekly = plan.get("weekly_schedule")
+        if isinstance(weekly, list):
+            for item in weekly:
+                if not isinstance(item, dict):
+                    continue
+                goal = item.get("goal") or item.get("weekly_goal")
+                focus = item.get("focus") or item.get("theme")
+                tasks = list_value(item.get("tasks"))
+                if goal:
+                    return clean_plan_text(goal)
+                if focus:
+                    return clean_plan_text(focus)
+                if tasks:
+                    return tasks[0]
+        tips = list_value(plan.get("study_tips"))
+        return tips[0] if tips else "完成一次可评分训练，并把反馈转成下一次练习前的检查清单。"
+
+    def diagnosis_icon(skill):
+        text = str(skill or "")
+        if any(word in text for word in ("口语", "speaking", "Speaking")):
+            return "icon-speaking"
+        if any(word in text for word in ("写作", "作文", "writing", "Writing")):
+            return "icon-writing"
+        if any(word in text for word in ("词汇", "单词", "vocabulary", "Vocabulary")):
+            return "icon-vocabulary"
+        return "icon-analysis"
+
+    daily = plan.get("daily_schedule") if isinstance(plan.get("daily_schedule"), list) else []
+    future_daily = []
+    for item in daily:
+        parsed = parse_day(item.get("date")) if isinstance(item, dict) else None
+        if parsed is None or parsed >= today:
+            future_daily.append(item)
+
+    today_item = next(
+        (item for item in future_daily if isinstance(item, dict) and parse_day(item.get("date")) == today),
+        future_daily[0] if future_daily else None,
+    )
+    parsed_dates = [
+        parse_day(item.get("date"))
+        for item in future_daily
+        if isinstance(item, dict) and parse_day(item.get("date"))
+    ]
+    exam_day = max(parsed_dates) if parsed_dates else None
+    countdown = (exam_day - today).days if exam_day else None
+    priority = list_value(plan.get("priority_areas"))
+    diagnosis = plan.get("skill_diagnosis") if isinstance(plan.get("skill_diagnosis"), list) else []
+    visible_days = future_daily[:6]
+    today_plan = daily_text(today_item) if today_item else clean_plan_text(plan.get("overall_assessment") or "今天建议完成一次专项训练，并复盘最近一次 AI 反馈。")
+    week_goal = escape(first_week_goal())
+    priority_text = escape("、".join(priority[:3]) if priority else "听说读写均衡推进")
+    countdown_text = f"{countdown} 天" if isinstance(countdown, int) and countdown >= 0 else "未设置"
+    plan_title = escape(plan.get("title") or "个性化学习计划")
+
+    diagnosis_cards = []
+    for item in diagnosis[:4]:
+        if not isinstance(item, dict):
+            continue
+        skill = clean_plan_text(item.get("skill") or "能力诊断")
+        action = clean_plan_text(item.get("action") or item.get("weakness") or item.get("reason") or "")
+        icon_name = diagnosis_icon(skill)
+        card_type = "speaking" if icon_name == "icon-speaking" else "writing" if icon_name == "icon-writing" else "vocab" if icon_name == "icon-vocabulary" else "general"
+        diagnosis_cards.append(
+            f"<article class='plan-diagnosis-card compact {card_type}'>"
+            f"<span class='plan-diagnosis-icon'><span class='svg-icon {icon_name}'></span></span>"
+            f"<div><strong>{escape(skill)}</strong><p>{escape(action)}</p></div>"
+            "</article>"
+        )
+
+    day_cards = "".join(daily_card(item, index + 1) for index, item in enumerate(visible_days))
+    tips = list_value(plan.get("study_tips"))
+    milestones = list_value(plan.get("milestones"))
+    note_cards = []
+    for label, values in (("学习建议", tips[:2]), ("阶段提醒", milestones[:2])):
+        if values:
+            note_cards.append(
+                "<article class='plan-note-card'>"
+                f"<strong>{escape(label)}</strong>{_html_list(values)}"
+                "</article>"
             )
 
-        preview_days = daily[:7]
-        preview_html = "".join(day_card(item) for item in preview_days)
-        rest_groups = _chunk_items(daily[7:], 7)
-        rest_html = []
-        for index, group in enumerate(rest_groups, start=2):
-            if not group:
-                continue
-            first = group[0].get("date", "") if isinstance(group[0], dict) else ""
-            last = group[-1].get("date", "") if isinstance(group[-1], dict) else ""
-            first_short = first[5:] if isinstance(first, str) and len(first) >= 10 else first
-            last_short = last[5:] if isinstance(last, str) and len(last) >= 10 else last
-            group_cards = "".join(day_card(item, compact=True) for item in group)
-            rest_html.append(
-                "<details class='result-accordion nested-answer daily-week-group'>"
-                f"<summary>第 {index} 周 · {escape(first_short)} 至 {escape(last_short)}</summary>"
-                f"<div class='daily-week-grid'>{group_cards}</div></details>"
-            )
-        daily_summary = (
-            f"<div class='daily-plan-summary'><strong>最近 7 天</strong>"
-            f"<span>共 {daily_count} 天安排，后续按周折叠展示</span></div>"
+    html_output = (
+        "<section class='study-plan-dashboard'>"
+        "<div class='study-plan-hero'>"
+        "<div class='study-plan-copy'>"
+        "<span class='plan-kicker'>Personal Plan</span>"
+        f"<h4>{plan_title}</h4>"
+        f"<p class='today-line'>今天是 {fmt_day(today)}，你的今日学习计划是：<b>{escape(today_plan)}</b></p>"
+        "<div class='plan-hero-meta'>"
+        f"<span><small>本周目标</small><strong>{week_goal}</strong></span>"
+        f"<span><small>考试倒计时</small><strong>{escape(countdown_text)}</strong></span>"
+        f"<span><small>重点突破</small><strong>{priority_text}</strong></span>"
+        "</div></div>"
+        "<div class='study-plan-art' aria-hidden='true'>"
+        "<div class='plan-art-tile primary'><span class='plan-art-icon'><span class='svg-icon icon-target'></span></span><div><strong>今日执行</strong><em>训练闭环</em></div></div>"
+        "<div class='plan-art-tile speaking'><span class='plan-art-icon'><span class='svg-icon icon-speaking'></span></span><div><strong>口语</strong><em>录音复盘</em></div></div>"
+        "<div class='plan-art-tile writing'><span class='plan-art-icon'><span class='svg-icon icon-writing'></span></span><div><strong>写作</strong><em>结构纠错</em></div></div>"
+        "</div></div>"
+    )
+    if day_cards:
+        html_output += (
+            "<div class='plan-section-head'><div><span>Upcoming</span><h5>未来安排</h5></div>"
+            f"<p>已隐藏过期日期，显示接下来 {len(visible_days)} 天。</p></div>"
+            f"<div class='plan-days-strip'>{day_cards}</div>"
         )
-        daily_body = (
-            daily_summary
-            + f"<div class='daily-card-grid'>{preview_html}</div>"
-            + ("<div class='daily-rest-groups'>" + "".join(rest_html) + "</div>" if rest_html else "")
-        )
-        sections.append(
-            "<details class='result-accordion' open><summary>每日备考安排</summary>"
-            f"<div class='daily-plan-board'>{daily_body}</div></details>"
-        )
-    if isinstance(weekly, list):
-        week_cards = []
-        for item in weekly:
-            if not isinstance(item, dict):
-                continue
-            week = escape(item.get("week", ""))
-            theme = escape(item.get("theme", ""))
-            focus = escape(item.get("focus", ""))
-            tasks = item.get("tasks") if isinstance(item.get("tasks"), list) else []
-            goal = escape(item.get("goal", ""))
-            task_items = "".join(f"<li>{escape(task)}</li>" for task in tasks[:4])
-            week_cards.append(
-                "<div class='weekly-plan-card'>"
-                f"<span>Week {week}</span>"
-                f"<h5>{theme}</h5>"
-                f"<p>{focus}</p>"
-                f"<ul>{task_items}</ul>"
-                f"<strong>{goal}</strong>"
-                "</div>"
-            )
-        if week_cards:
-            sections.append(
-                "<details class='result-accordion'><summary>周计划概览</summary>"
-                f"<div class='weekly-plan-grid'>{''.join(week_cards)}</div></details>"
-            )
-    if plan.get("study_tips"):
-        sections.append(
-            "<details class='result-accordion'><summary>学习建议</summary>"
-            f"<div class='result-body'>{_html_list(plan['study_tips'])}</div></details>"
-        )
-    if plan.get("milestones"):
-        sections.append(
-            "<details class='result-accordion'><summary>阶段检查点</summary>"
-            f"<div class='result-body'>{_html_list(plan['milestones'])}</div></details>"
-        )
-    if not sections:
-        sections.append(f"<pre>{escape(json.dumps(plan, ensure_ascii=False, indent=2))}</pre>")
-    return Markup("".join(sections))
+    if diagnosis_cards or note_cards:
+        html_output += "<div class='plan-lower-grid'>"
+        if diagnosis_cards:
+            html_output += f"<div class='plan-diagnosis-grid compact'>{''.join(diagnosis_cards)}</div>"
+        if note_cards:
+            html_output += f"<div class='plan-note-grid'>{''.join(note_cards)}</div>"
+        html_output += "</div>"
+    if not day_cards and not diagnosis_cards and not note_cards:
+        html_output += f"<div class='plan-empty'><pre>{escape(json.dumps(plan, ensure_ascii=False, indent=2))}</pre></div>"
+    html_output += "</section>"
+    return Markup(html_output)
 
 
 @app.template_filter("simple_list")

@@ -1912,5 +1912,1041 @@
       "software license"
     ],
     "essay_use": "In many countries, individuals must obtain a driver's license before they are allowed to operate a vehicle on public roads."
+  },
+  "alignment": {
+    "meaning": "一致，对齐",
+    "phonetic": "/əˈlaɪnmənt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "political alignment",
+      "alignment of interests",
+      "alignment with standards",
+      "alignment of goals",
+      "alignment of values"
+    ],
+    "essay_use": "The government's policies need to be in alignment with the cultural values of the society to ensure public support."
+  },
+  "alike": {
+    "meaning": "相似的；同样地",
+    "phonetic": "/əˈlaɪk/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "look alike",
+      "be alike",
+      "as alike as two peas in a pod",
+      "alike in many ways",
+      "alike in appearance"
+    ],
+    "essay_use": "Although the twins are genetically different, they are alike in many ways, which often makes it difficult for people to tell them apart."
+  },
+  "allergic": {
+    "meaning": "对...过敏的",
+    "phonetic": "/ˈælədʒɪk/",
+    "topic": "健康",
+    "phrases": [
+      "be allergic to something",
+      "allergic reaction",
+      "allergy test",
+      "suffer from allergies",
+      "allergic to pollen"
+    ],
+    "essay_use": "Many people suffer from allergies, especially during the spring when pollen levels are high."
+  },
+  "allergy": {
+    "meaning": "过敏",
+    "phonetic": "/ˈælədʒi/",
+    "topic": "健康",
+    "phrases": [
+      "allergy to",
+      "suffer from an allergy",
+      "have an allergy",
+      "allergy test",
+      "allergy symptoms"
+    ],
+    "essay_use": "Many people suffer from an allergy to pollen, which can cause sneezing and a runny nose during spring."
+  },
+  "alliance": {
+    "meaning": "联盟；联合；结盟",
+    "phonetic": "/ˈælaɪəns/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "political alliance",
+      "economic alliance",
+      "military alliance",
+      "alliance with",
+      "form an alliance"
+    ],
+    "essay_use": "In order to address global challenges, countries often form political alliances to cooperate on issues such as climate change and trade."
+  },
+  "allocate": {
+    "meaning": "分配，拨出",
+    "phonetic": "/ˈæləkeɪt/",
+    "topic": "教育",
+    "phrases": [
+      "allocate time",
+      "allocate resources",
+      "allocate budget",
+      "allocate attention",
+      "allocate space"
+    ],
+    "essay_use": "It is important to allocate sufficient time for revision before the exam."
+  },
+  "allot": {
+    "meaning": "分配",
+    "phonetic": "/ˈælət/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "allocate funds",
+      "allocate time",
+      "allocate resources",
+      "allocate space",
+      "allocate responsibilities"
+    ],
+    "essay_use": "The government needs to allot sufficient resources to improve public education and healthcare systems."
+  },
+  "allowance": {
+    "meaning": "津贴；拨款；允许",
+    "phonetic": "/əˈlaʊəns/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "allowance for",
+      "monthly allowance",
+      "child allowance",
+      "travel allowance",
+      "educational allowance"
+    ],
+    "essay_use": "The government provides an allowance to students to help cover their living expenses while studying."
+  },
+  "alloy": {
+    "meaning": "合金",
+    "phonetic": "/ˈælɔɪ/",
+    "topic": "科技",
+    "phrases": [
+      "metal alloy",
+      "alloy steel",
+      "alloy composition",
+      "alloy element",
+      "alloying process"
+    ],
+    "essay_use": "The development of new alloy materials has significantly improved the performance of modern aircraft engines."
+  },
+  "ally": {
+    "meaning": "盟友/支持者",
+    "phonetic": "/ˈælaɪ/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "close ally",
+      "natural ally",
+      "political ally",
+      "military ally",
+      "economic ally"
+    ],
+    "essay_use": "In international relations, countries often form close allies to strengthen their political and economic cooperation."
+  },
+  "alone": {
+    "meaning": "单独",
+    "phonetic": "/əˈləʊn/",
+    "topic": "家庭 / 个人",
+    "phrases": [
+      "live alone",
+      "study alone",
+      "work alone",
+      "be alone",
+      "stay alone"
+    ],
+    "essay_use": "Many people prefer to live alone in order to have more privacy and independence."
+  },
+  "along": {
+    "meaning": "沿着，顺着",
+    "phonetic": "/əˈlɒŋ/",
+    "topic": "城市 / 交通",
+    "phrases": [
+      "along the road",
+      "along the river",
+      "along the line",
+      "along with",
+      "along the way"
+    ],
+    "essay_use": "Many people prefer to live along the river because of the beautiful scenery and peaceful environment."
+  },
+  "alongside": {
+    "meaning": "与...并列/在...旁边",
+    "phonetic": "/əˈlɒŋsaɪd/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "alongside the road",
+      "alongside other factors",
+      "alongside technology",
+      "alongside traditional methods",
+      "alongside economic growth"
+    ],
+    "essay_use": "In modern society, digital media often exists alongside traditional forms of communication such as newspapers and television."
+  },
+  "alter": {
+    "meaning": "改变，修改；中文释义",
+    "phonetic": "/ˈɔːltə(r)/",
+    "topic": "教育",
+    "phrases": [
+      "alter the plan",
+      "alter the course",
+      "alter the situation",
+      "alter one's opinion",
+      "alter the design"
+    ],
+    "essay_use": "The government may need to alter the education policy to meet the changing demands of the job market."
+  },
+  "alternate": {
+    "meaning": "交替的；轮流的",
+    "phonetic": "/ˈɔːltnət/",
+    "topic": "教育",
+    "phrases": [
+      "alternate between",
+      "alternate days",
+      "alternate plan",
+      "alternate option",
+      "alternate between two choices"
+    ],
+    "essay_use": "Students are often required to alternate between different learning methods to improve their understanding of the subject."
+  },
+  "alternation": {
+    "meaning": "交替，轮换",
+    "phonetic": "/ˌɔl.təˈneɪ.ʃn/",
+    "topic": "教育",
+    "phrases": [
+      "alternation between",
+      "alternation of",
+      "daily alternation",
+      "alternation in",
+      "alternation process"
+    ],
+    "essay_use": "The alternation between online and traditional classroom teaching has become a common practice in modern education systems."
+  },
+  "alternative": {
+    "meaning": "替代方案",
+    "phonetic": "/ˈɔːltənətɪv/",
+    "topic": "教育",
+    "phrases": [
+      "alternative solution",
+      "alternative method",
+      "alternative option",
+      "alternative approach",
+      "alternative energy"
+    ],
+    "essay_use": "In education, it is important to consider alternative methods to meet the diverse needs of students."
+  },
+  "altitude": {
+    "meaning": "海拔",
+    "phonetic": "/ˈæltɪtjuːd/",
+    "topic": "环境",
+    "phrases": [
+      "high altitude",
+      "altitude sickness",
+      "change in altitude",
+      "altitude of the mountain",
+      "aircraft altitude"
+    ],
+    "essay_use": "The altitude of the mountain makes it difficult for climbers to breathe properly."
+  },
+  "aluminum": {
+    "meaning": "铝",
+    "phonetic": "/ˈæljuːmɪn/",
+    "topic": "科技",
+    "phrases": [
+      "aluminum foil",
+      "aluminum alloy",
+      "aluminum can",
+      "aluminum sheet",
+      "aluminum production"
+    ],
+    "essay_use": "Aluminum is widely used in the manufacturing industry due to its lightweight and corrosion-resistant properties."
+  },
+  "amateur": {
+    "meaning": "业余爱好者",
+    "phonetic": "/ˈæmətə(r)/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "amateur photographer",
+      "amateur radio operator",
+      "amateur musician",
+      "amateur sports",
+      "amateur hour"
+    ],
+    "essay_use": "Amateur photographers often lack the technical skills of professionals, but they can still capture unique and emotional moments."
+  },
+  "amaze": {
+    "meaning": "使惊讶",
+    "phonetic": "/əˈmeɪz/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "amaze someone",
+      "be amazed at",
+      "amaze the public",
+      "amaze everyone",
+      "amaze with"
+    ],
+    "essay_use": "The discovery of ancient artifacts amazed the public and sparked a renewed interest in historical culture."
+  },
+  "amazement": {
+    "meaning": "惊讶，惊奇",
+    "phonetic": "/əˈmæz.mənt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "express amazement",
+      "look in amazement",
+      "feel amazement",
+      "show amazement",
+      "a look of amazement"
+    ],
+    "essay_use": "The audience was filled with amazement at the incredible performance by the young artist."
+  },
+  "ambassador": {
+    "meaning": "大使",
+    "phonetic": "/ˈæmbəsədə(r)/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "ambassador of goodwill",
+      "cultural ambassador",
+      "ambassador for a cause",
+      "ambassador of a country",
+      "ambassador of peace"
+    ],
+    "essay_use": "The government appointed a well-known actor as an ambassador of goodwill to promote international understanding."
+  },
+  "ambiguity": {
+    "meaning": "含糊不清，歧义",
+    "phonetic": "/ˌæmbɪˈɡjuːəti/",
+    "topic": "写作",
+    "phrases": [
+      "semantic ambiguity",
+      "ambiguity in language",
+      "source of ambiguity",
+      "ambiguity resolution",
+      "logical ambiguity"
+    ],
+    "essay_use": "The ambiguity in the question made it difficult for test-takers to determine the exact requirements of the essay."
+  },
+  "ambiguous": {
+    "meaning": "含糊的；不明确的",
+    "phonetic": "/əˈmɪɡjuəs/",
+    "topic": "写作",
+    "phrases": [
+      "ambiguous statement",
+      "ambiguous language",
+      "ambiguous meaning",
+      "ambiguous reference",
+      "ambiguous instruction"
+    ],
+    "essay_use": "The instructions provided were so ambiguous that it was difficult to determine the exact requirements of the task."
+  },
+  "ambition": {
+    "meaning": "抱负，雄心",
+    "phonetic": "/ˌæmbɪˈʃn/",
+    "topic": "工作 / 经济",
+    "phrases": [
+      "have ambition",
+      "ambition for success",
+      "career ambition",
+      "ambition to achieve",
+      "lack of ambition"
+    ],
+    "essay_use": "Many young people have the ambition to start their own businesses and create job opportunities in their communities."
+  },
+  "ambitious": {
+    "meaning": "有抱负的；雄心勃勃的",
+    "phonetic": "/əˈmæbɪəs/",
+    "topic": "教育",
+    "phrases": [
+      "ambitious goals",
+      "an ambitious student",
+      "ambitious career plans",
+      "ambitious project",
+      "ambitious leader"
+    ],
+    "essay_use": "Many students have ambitious goals of studying abroad to achieve better career opportunities."
+  },
+  "ambulance": {
+    "meaning": "救护车",
+    "phonetic": "/ˈæmbjʊləns/",
+    "topic": "健康",
+    "phrases": [
+      "ambulance service",
+      "emergency ambulance",
+      "ambulance driver",
+      "ambulance crew",
+      "ambulance van"
+    ],
+    "essay_use": "In many countries, the ambulance service plays a crucial role in providing timely medical assistance to those in need."
+  },
+  "amend": {
+    "meaning": "修改，修订",
+    "phonetic": "/əˈmend/",
+    "topic": "写作",
+    "phrases": [
+      "amend a document",
+      "amend the law",
+      "amend a mistake"
+    ],
+    "essay_use": "It is important to amend any errors in your essay before submitting it to ensure clarity and accuracy."
+  },
+  "amendment": {
+    "meaning": "修正，修改",
+    "phonetic": "/əˈmendmənt/",
+    "topic": "写作",
+    "phrases": [
+      "amendment to a law",
+      "amendment proposal",
+      "amendment request",
+      "amendment process",
+      "amendment clause"
+    ],
+    "essay_use": "The government introduced an amendment to the existing law to address the loopholes in the legal system."
+  },
+  "amends": {
+    "meaning": "赔偿，弥补",
+    "phonetic": "/əˈmɛndz/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "make amends",
+      "set things right",
+      "compensate for",
+      "repair the damage",
+      "take responsibility"
+    ],
+    "essay_use": "The company has taken steps to make amends for the harm caused by its environmental negligence."
+  },
+  "amiable": {
+    "meaning": "友好的",
+    "phonetic": "/ˈeɪməbəl/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "be amiable towards someone",
+      "amiable personality",
+      "an amiable character",
+      "show an amiable attitude",
+      "amiable manner"
+    ],
+    "essay_use": "The teacher's amiable nature made the students feel comfortable and willing to participate in class discussions."
+  },
+  "amicable": {
+    "meaning": "友好的",
+    "phonetic": "/ˈæmɪkəbəl/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "amicable relations",
+      "amicable agreement",
+      "amicable conversation",
+      "amicable settlement",
+      "amicable tone"
+    ],
+    "essay_use": "The two countries reached an amicable agreement after weeks of negotiation, demonstrating their commitment to peaceful dialogue."
+  },
+  "amid": {
+    "meaning": "在...之中；在...期间",
+    "phonetic": "/əˈmɪd/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "amid the controversy",
+      "amid the crowd",
+      "amidst the noise",
+      "amid the discussions",
+      "amid the celebrations"
+    ],
+    "essay_use": "Amid the growing concerns about social media's impact on mental health, many experts call for stricter regulations."
+  },
+  "ammunition": {
+    "meaning": "弹药",
+    "phonetic": "/ˌæməˈnɪʃən/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "ammunition for debate",
+      "supply of ammunition",
+      "military ammunition",
+      "ammunition belt",
+      "ammunition dump"
+    ],
+    "essay_use": "The speaker provided ample ammunition for the debate, offering strong evidence to support his argument."
+  },
+  "amount": {
+    "meaning": "数量",
+    "phonetic": "/əˈmaʊnt/",
+    "topic": "工作 / 经济",
+    "phrases": [
+      "a large amount of",
+      "the amount of",
+      "an amount of",
+      "amount to",
+      "in amount"
+    ],
+    "essay_use": "The government has allocated a significant amount of funding to improve public transportation in the city."
+  },
+  "ample": {
+    "meaning": "充足的",
+    "phonetic": "/ˈæmpl/",
+    "topic": "教育",
+    "phrases": [
+      "ample evidence",
+      "ample time",
+      "ample resources",
+      "ample support",
+      "ample space"
+    ],
+    "essay_use": "The government should provide ample resources to ensure all students have equal opportunities to succeed."
+  },
+  "amplification": {
+    "meaning": "放大；增强",
+    "phonetic": "/ˌæmplɪfɪˈkeɪʃn/",
+    "topic": "写作",
+    "phrases": [
+      "amplification of evidence",
+      "amplification in writing",
+      "amplification technique",
+      "amplify the argument",
+      "amplification of details"
+    ],
+    "essay_use": "In academic writing, amplification is often used to provide more detailed explanations and support for a central idea."
+  },
+  "amplify": {
+    "meaning": "放大，增强",
+    "phonetic": "/ˈæmplɪfaɪ/",
+    "topic": "科技",
+    "phrases": [
+      "amplify sound",
+      "amplify the effect",
+      "amplify the message",
+      "amplify the problem",
+      "amplify the impact"
+    ],
+    "essay_use": "Technological advancements can amplify the efficiency of production and reduce waste in manufacturing processes."
+  },
+  "amuse": {
+    "meaning": "使娱乐，逗乐",
+    "phonetic": "/əˈmjuːz/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "amuse oneself",
+      "amuse a crowd",
+      "amuse the audience",
+      "amuse children",
+      "amuse someone with a joke"
+    ],
+    "essay_use": "The comedian managed to amuse the entire audience with his clever wordplay and humor."
+  },
+  "analogy": {
+    "meaning": "类比",
+    "phonetic": "/ˈænələdʒ/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "make an analogy",
+      "draw an analogy",
+      "analogy to",
+      "analogous to",
+      "use analogy in reasoning"
+    ],
+    "essay_use": "The author uses an analogy to explain the complex relationship between technology and society."
+  },
+  "analytical": {
+    "meaning": "分析的",
+    "phonetic": "/əˈnælɪtɪk/",
+    "topic": "写作",
+    "phrases": [
+      "analytical skills",
+      "analytical thinking",
+      "analytical approach",
+      "analytical essay",
+      "analytical reasoning"
+    ],
+    "essay_use": "In academic writing, developing strong analytical skills is essential to critically evaluate arguments and evidence."
+  },
+  "analyze": {
+    "meaning": "分析",
+    "phonetic": "/ˈænəlaɪz/",
+    "topic": "写作",
+    "phrases": [
+      "analyze a question",
+      "analyze data",
+      "analyze the causes",
+      "analyze the effects",
+      "analyze the argument"
+    ],
+    "essay_use": "In order to write a strong essay, it is essential to analyze the question carefully and identify the key points that need to be addressed."
+  },
+  "ancestor": {
+    "meaning": "祖先",
+    "phonetic": "/ˈænsəsə(r)/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "ancient ancestor",
+      "family ancestor",
+      "cultural ancestor",
+      "lineage of ancestors",
+      "ancestral heritage"
+    ],
+    "essay_use": "The cultural traditions of a society are often shaped by the values and beliefs of its ancestors."
+  },
+  "anchor": {
+    "meaning": "锚；核心",
+    "phonetic": "/ˈæŋkə(r)/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "anchor point",
+      "anchor text",
+      "anchor brand",
+      "anchor in the market",
+      "anchor of the team"
+    ],
+    "essay_use": "In marketing, a strong brand can act as an anchor, providing stability and recognition in a competitive market."
+  },
+  "anecdote": {
+    "meaning": "轶事 / 小故事",
+    "phonetic": "/ˈænɪkdoʊt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "personal anecdote",
+      "anecdote from history",
+      "share an anecdote",
+      "anecdotal evidence",
+      "a famous anecdote"
+    ],
+    "essay_use": "The author used a personal anecdote to illustrate the importance of perseverance in overcoming life's challenges."
+  },
+  "angular": {
+    "meaning": "尖的；角度的",
+    "phonetic": "/ˈæŋɡjʊlə/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "angular shape",
+      "angular face",
+      "angular design",
+      "sharp and angular",
+      "angular structure"
+    ],
+    "essay_use": "The artist's use of angular lines gave the sculpture a modern and dynamic appearance."
+  },
+  "animate": {
+    "meaning": "使生动；赋予生命",
+    "phonetic": "/ˈænɪmeɪt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "animate a scene",
+      "animate a story",
+      "animate the characters",
+      "animate the atmosphere",
+      "animate the imagination"
+    ],
+    "essay_use": "The director used vivid animations to animate the fantasy world and engage the audience."
+  },
+  "animation": {
+    "meaning": "动画",
+    "phonetic": "/ˌænɪˈmeɪʃən/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "animated film",
+      "animation studio",
+      "2D animation",
+      "stop-motion animation",
+      "animation industry"
+    ],
+    "essay_use": "Animation has become an important part of modern entertainment, attracting audiences of all ages around the world."
+  },
+  "ankle": {
+    "meaning": "脚踝",
+    "phonetic": "/ˈæŋkəl/",
+    "topic": "健康",
+    "phrases": [
+      "sprain an ankle",
+      "ankle injury",
+      "ankle brace",
+      "ankle pain",
+      "ankle support"
+    ],
+    "essay_use": "A common injury among athletes is a sprained ankle, which can significantly affect their performance and recovery time."
+  },
+  "annex": {
+    "meaning": "附件；附加物",
+    "phonetic": "/ˈænɛks/",
+    "topic": "写作",
+    "phrases": [
+      "add an annex",
+      "annex a document",
+      "annex to the report",
+      "include an annex",
+      "refer to the annex"
+    ],
+    "essay_use": "The research paper includes an annex with detailed statistical data to support the main findings."
+  },
+  "anniversary": {
+    "meaning": "周年纪念日",
+    "phonetic": "/ˌænɪˈvɜːsəri/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "anniversary celebration",
+      "anniversary event",
+      "anniversary year",
+      "anniversary gift",
+      "anniversary date"
+    ],
+    "essay_use": "The company is celebrating its 50th anniversary with a special event that highlights its history and achievements."
+  },
+  "announce": {
+    "meaning": "宣布",
+    "phonetic": "/əˈnaʊns/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "announce a decision",
+      "announce the results",
+      "announce a new policy",
+      "announce a launch",
+      "announce a winner"
+    ],
+    "essay_use": "The government announced a new policy to reduce carbon emissions in urban areas."
+  },
+  "announcement": {
+    "meaning": "公告",
+    "phonetic": "/ˌænəˈsaɪmənt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "public announcement",
+      "official announcement",
+      "news announcement",
+      "job announcement",
+      "event announcement"
+    ],
+    "essay_use": "The government made an official announcement about the new policy to improve public transportation."
+  },
+  "announcer": {
+    "meaning": "播音员；解说员",
+    "phonetic": "/ˈænəˌnaɪzə(r)/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "radio announcer",
+      "news announcer",
+      "sports announcer",
+      "television announcer",
+      "voice announcer"
+    ],
+    "essay_use": "The announcer provided clear and professional commentary during the live broadcast of the international sports event."
+  },
+  "annoy": {
+    "meaning": "使恼怒，打扰",
+    "phonetic": "/əˈnɔɪ/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "annoy someone",
+      "annoying problem",
+      "annoyed with",
+      "annoy the public",
+      "annoy the authorities"
+    ],
+    "essay_use": "The government's failure to address the issue has annoyed many citizens, leading to increased public dissatisfaction."
+  },
+  "annual": {
+    "meaning": "每年的",
+    "phonetic": "/ˈænjuəl/",
+    "topic": "教育",
+    "phrases": [
+      "annual report",
+      "annual fee",
+      "annual meeting",
+      "annual event",
+      "annual income"
+    ],
+    "essay_use": "The university requires students to pay an annual fee at the beginning of each academic year."
+  },
+  "annually": {
+    "meaning": "每年",
+    "phonetic": "/ˈænjʊəli/",
+    "topic": "教育",
+    "phrases": [
+      "annually increase",
+      "annually report",
+      "annually budget",
+      "annually review",
+      "annually published"
+    ],
+    "essay_use": "The government annually allocates funds to support educational institutions across the country."
+  },
+  "antagonism": {
+    "meaning": "敌意",
+    "phonetic": "/ˈæntəɡənɪzəm/",
+    "topic": "政府 / 社会",
+    "phrases": [
+      "mutual antagonism",
+      "political antagonism",
+      "interpersonal antagonism",
+      "antagonism between groups",
+      "antagonism in society"
+    ],
+    "essay_use": "There is a growing antagonism between different social groups in modern society, which hinders effective communication and cooperation."
+  },
+  "antagonist": {
+    "meaning": "对手；反派",
+    "phonetic": "/ˈæntəɡənɪst/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "main antagonist",
+      "antagonist in a story",
+      "enemy and antagonist",
+      "villain as antagonist",
+      "antagonist character"
+    ],
+    "essay_use": "In literature, the antagonist often serves as the main obstacle to the protagonist's goals."
+  },
+  "antarctic": {
+    "meaning": "南极的",
+    "phonetic": "/ˈæntɑːktɪk/",
+    "topic": "环境",
+    "phrases": [
+      "Antarctic region",
+      "Antarctic ice",
+      "Antarctic research"
+    ],
+    "essay_use": "The Antarctic environment is one of the most fragile ecosystems on Earth, facing increasing threats from climate change."
+  },
+  "antibiotic": {
+    "meaning": "抗生素",
+    "phonetic": "/ˈæntɪbaɪət/",
+    "topic": "健康",
+    "phrases": [
+      "take antibiotics",
+      "use antibiotics",
+      "antibiotic resistance",
+      "prescribe antibiotics",
+      "antibiotic treatment"
+    ],
+    "essay_use": "It is important to use antibiotics responsibly to avoid the development of antibiotic resistance."
+  },
+  "anticipate": {
+    "meaning": "预期，预料",
+    "phonetic": "/ənˈtɪsɪpeɪt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "anticipate change",
+      "anticipate the future",
+      "anticipate a response",
+      "anticipate success",
+      "anticipate difficulties"
+    ],
+    "essay_use": "The government should anticipate the social impact of new policies before implementing them."
+  },
+  "anticipation": {
+    "meaning": "期待，预期；（情绪上的） anticipation",
+    "phonetic": "/ˌæntɪˈsɪpeɪʃn/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "sense of anticipation",
+      "look forward to something with anticipation",
+      "feel a sense of anticipation",
+      "anticipation of success",
+      "build up anticipation"
+    ],
+    "essay_use": "The audience felt a strong sense of anticipation as the final act of the performance approached."
+  },
+  "antique": {
+    "meaning": "古董",
+    "phonetic": "/ˈæntɪk/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "antique furniture",
+      "antique car",
+      "antique shop",
+      "antique collection",
+      "antique item"
+    ],
+    "essay_use": "Museums often display antique artifacts to preserve the cultural heritage of a country."
+  },
+  "antonym": {
+    "meaning": "反义词",
+    "phonetic": "/ˈæntənɪm/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "antonym of",
+      "synonym and antonym",
+      "antonym pairs",
+      "opposite word",
+      "antonym in English"
+    ],
+    "essay_use": "In writing, it is important to understand the relationship between synonyms and antonyms to enhance the clarity and variety of language."
+  },
+  "anxiety": {
+    "meaning": "焦虑",
+    "phonetic": "/ˌæŋˈzaɪəti/",
+    "topic": "健康",
+    "phrases": [
+      "test anxiety",
+      "generalized anxiety",
+      "anxiety disorder",
+      "social anxiety",
+      "performance anxiety"
+    ],
+    "essay_use": "Many students experience test anxiety, which can significantly affect their academic performance."
+  },
+  "anxious": {
+    "meaning": "焦虑的",
+    "phonetic": "/ˈæŋkʃəs/",
+    "topic": "健康",
+    "phrases": [
+      "feel anxious",
+      "anxious about",
+      "anxious for",
+      "anxious to do something",
+      "anxious mind"
+    ],
+    "essay_use": "Many students feel anxious before important exams, which can affect their performance and mental well-being."
+  },
+  "anyhow": {
+    "meaning": "无论如何",
+    "phonetic": "/ˈɑːnɪˌhaʊ/",
+    "topic": "家庭 / 个人",
+    "phrases": [
+      "anyhow you look at it",
+      "anyhow and anyway",
+      "anyhow it's better than nothing",
+      "anyhow I think...",
+      "anyhow it's not my problem"
+    ],
+    "essay_use": "Anyway, I think the government should take more responsibility in solving this issue."
+  },
+  "apart": {
+    "meaning": "除了...之外；分开",
+    "phonetic": "/əˈpɑːt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "apart from",
+      "apart from that",
+      "apart from the fact that",
+      "apart from the price",
+      "apart from that,"
+    ],
+    "essay_use": "Apart from its cultural significance, the festival also plays an important role in promoting tourism in the region."
+  },
+  "ape": {
+    "meaning": "模仿",
+    "phonetic": "/eɪp/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "ape someone's behavior",
+      "ape a style",
+      "ape the mannerisms",
+      "ape the way of speaking",
+      "ape the trend"
+    ],
+    "essay_use": "In modern society, people often ape the behavior of celebrities, which can influence their own values and lifestyle choices."
+  },
+  "apologize": {
+    "meaning": "道歉",
+    "phonetic": "/ˈæpəlaɪz/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "apologize for something",
+      "apologize to someone",
+      "make an apology",
+      "apologize sincerely",
+      "apologize in writing"
+    ],
+    "essay_use": "The company decided to apologize publicly for the mistake they made in their advertisement."
+  },
+  "apology": {
+    "meaning": "道歉",
+    "phonetic": "/əˈpɒlədʒɪ/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "make an apology",
+      "offer an apology",
+      "accept an apology",
+      "apology letter",
+      "public apology"
+    ],
+    "essay_use": "The company issued a public apology for the mistake in their advertising campaign."
+  },
+  "apparatus": {
+    "meaning": "装置；仪器；机制",
+    "phonetic": "/ˈæpərətəs/",
+    "topic": "科技",
+    "phrases": [
+      "scientific apparatus",
+      "medical apparatus",
+      "training apparatus",
+      "government apparatus",
+      "educational apparatus"
+    ],
+    "essay_use": "The government has invested in new scientific apparatus to improve the accuracy of environmental monitoring."
+  },
+  "apparent": {
+    "meaning": "显然的；明显的",
+    "phonetic": "/əˈpærənt/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "apparent difference",
+      "apparent contradiction",
+      "apparent solution",
+      "apparent cause",
+      "apparent effect"
+    ],
+    "essay_use": "The apparent conflict between tradition and modernity has become a central theme in many cultural discussions."
+  },
+  "appeal": {
+    "meaning": "吸引；申诉；上诉",
+    "phonetic": "/əˈpiːl/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "make an appeal",
+      "appeal to the public",
+      "appeal for help",
+      "appeal to reason",
+      "appeal to emotion"
+    ],
+    "essay_use": "The government made an appeal to citizens to reduce energy consumption in order to protect the environment."
+  },
+  "appealing": {
+    "meaning": "有吸引力的",
+    "phonetic": "/əˈpɛlɪŋ/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "appealing to the public",
+      "an appealing idea",
+      "appealing design",
+      "appealing story",
+      "appealing feature"
+    ],
+    "essay_use": "The documentary's appealing storyline and vivid visuals made it a popular choice among viewers."
+  },
+  "appendix": {
+    "meaning": "附录",
+    "phonetic": "/ˈæpən dɪks/",
+    "topic": "写作",
+    "phrases": [
+      "appendix to a report",
+      "appendix in a book",
+      "include an appendix",
+      "appendix section",
+      "reference appendix"
+    ],
+    "essay_use": "The research paper includes an appendix with detailed data and charts to support the main findings."
+  },
+  "appetite": {
+    "meaning": "食欲；兴趣",
+    "phonetic": "/ˈæpɪtɪt/",
+    "topic": "健康",
+    "phrases": [
+      "loss of appetite",
+      "have an appetite for",
+      "appetite for knowledge",
+      "increase appetite",
+      "appetite suppression"
+    ],
+    "essay_use": "Many people experience a loss of appetite during periods of stress or illness."
+  },
+  "applaud": {
+    "meaning": "鼓掌，称赞",
+    "phonetic": "/əˈplɔːd/",
+    "topic": "文化 / 媒体",
+    "phrases": [
+      "applaud for",
+      "applaud the decision",
+      "applaud the performance",
+      "applaud a speech",
+      "applaud someone's effort"
+    ],
+    "essay_use": "The audience applauded the speaker's insightful analysis of the social issues."
   }
 }

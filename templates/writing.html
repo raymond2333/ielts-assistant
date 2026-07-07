@@ -172,7 +172,7 @@
                   </details>
                 {% endif %}
                 {% if _active_task1 and _active_task1.key_features %}
-                  <details class="result-accordion nested-answer"><summary><span class="svg-icon icon-analysis" aria-hidden="true"></span> 关键特征</summary><div class="result-body"><ul>{% for f in _active_task1.key_features %}<li>{{ f }}</li>{% endfor %}</ul></div></details>
+                  <div class="quick-info-card"><strong>关键特征</strong><ul>{% for f in _active_task1.key_features %}<li>{{ f }}</li>{% endfor %}</ul></div>
                 {% endif %}
                 {% if _task1_model_answer %}
                   <details class="result-accordion nested-answer">
@@ -245,11 +245,11 @@
                   </div>
                   <a class="ghost-btn small" href="{{ url_for('clear_writing_topic', mode='task2') }}">清除题目</a>
                 </div>
-                {% if _active_task2 and _active_task2.key_points %}
-                  <details class="result-accordion nested-answer"><summary>关键论点</summary><div class="result-body"><ul>{% for pt in _active_task2.key_points %}<li>{{ pt }}</li>{% endfor %}</ul></div></details>
-                {% endif %}
-                {% if _active_task2 and _active_task2.suggested_structure %}
-                  <details class="result-accordion nested-answer"><summary>建议结构</summary><div class="result-body"><p>{{ _active_task2.suggested_structure }}</p></div></details>
+                {% if _active_task2 and (_active_task2.key_points or _active_task2.suggested_structure) %}
+                  <div class="quick-info-grid">
+                    {% if _active_task2.key_points %}<article class="quick-info-card"><strong>关键论点</strong><ul>{% for pt in _active_task2.key_points %}<li>{{ pt }}</li>{% endfor %}</ul></article>{% endif %}
+                    {% if _active_task2.suggested_structure %}<article class="quick-info-card"><strong>建议结构</strong><p>{{ _active_task2.suggested_structure }}</p></article>{% endif %}
+                  </div>
                 {% endif %}
                 {% if _task2_model_answer %}
                   <details class="result-accordion nested-answer">

@@ -69,26 +69,29 @@
       {% endwith %}
 
       <section class="metric-grid">
-        <div class="metric-card">
-          <span>综合水平</span>
-          <strong>{{ '%.1f' | format(profile.current_level) }}</strong>
+        <div class="metric-card metric-card-level">
+          <span class="metric-icon"><span class="svg-icon icon-analysis" aria-hidden="true"></span></span>
+          <div><span>综合水平</span><strong>{{ '%.1f' | format(profile.current_level) }}</strong></div>
         </div>
-        <div class="metric-card">
-          <span>目标分数</span>
-          <strong>{{ '%.1f' | format(profile.target_score) }}</strong>
+        <div class="metric-card metric-card-target">
+          <span class="metric-icon"><span class="svg-icon icon-target" aria-hidden="true"></span></span>
+          <div><span>目标分数</span><strong>{{ '%.1f' | format(profile.target_score) }}</strong></div>
         </div>
-        <div class="metric-card">
-          <span>考试日期</span>
-          {% if exam_countdown %}
-            <strong>{{ exam_countdown.days }} 天</strong>
-            <small>倒计时 · {{ exam_countdown.date }}</small>
-          {% else %}
-            <strong>未设置</strong>
-          {% endif %}
+        <div class="metric-card metric-card-calendar">
+          <span class="metric-icon"><span class="svg-icon icon-calendar" aria-hidden="true"></span></span>
+          <div>
+            <span>考试日期</span>
+            {% if exam_countdown %}
+              <strong>{{ exam_countdown.days }} 天</strong>
+              <small>倒计时 · {{ exam_countdown.date }}</small>
+            {% else %}
+              <strong>未设置</strong>
+            {% endif %}
+          </div>
         </div>
-        <div class="metric-card">
-          <span>每周学习</span>
-          <strong>{{ profile.study_time }}h</strong>
+        <div class="metric-card metric-card-study">
+          <span class="metric-icon"><span class="svg-icon icon-practice" aria-hidden="true"></span></span>
+          <div><span>每周学习</span><strong>{{ profile.study_time }}h</strong></div>
         </div>
       </section>
 

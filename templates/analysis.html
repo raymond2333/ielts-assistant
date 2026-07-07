@@ -20,13 +20,13 @@
     <main class="main-panel">
       <header class="topbar"><div><p class="eyebrow">Analysis</p><h1>学习分析</h1></div><div class="user-menu"><a class="nav-link-external" href="{{ streamlit_cross_url }}" target="_blank" rel="noreferrer" title="免登录打开稳定版">稳定版</a><form method="post" action="{{ url_for('update_active_ai_provider') }}" class="model-switcher"><select name="provider" onchange="this.form.submit()" title="选择生成模型">{% for key, provider in providers.items() %}<option value="{{ key }}" {% if ai_config.provider == key %}selected{% endif %}>{{ provider.label }}{{ '' if provider_status[key] else '（未配置）' }}</option>{% endfor %}</select></form><details class="user-dropdown"><summary><span class="user-chip">用户中心 · {{ user_id }}</span></summary><div class="drop-menu" onclick="event.stopPropagation()"><a href="{{ url_for('dashboard') }}">学习总览</a><a href="{{ url_for('settings_page') }}">用户设置</a><a href="{{ url_for('admin_panel') }}">管理员后台</a><div class="drop-divider"></div><form method="post" action="{{ url_for('logout') }}" style="margin:0"><button type="submit">退出登录</button></form></div></details></div></header>
       <section class="metric-grid">
-        <div class="metric-card"><span>综合水平</span><strong>{{ '%.1f'|format(profile.current_level) }}</strong></div>
-        <div class="metric-card"><span>目标分数</span><strong>{{ '%.1f'|format(profile.target_score) }}</strong></div>
+        <div class="metric-card metric-card-level"><span class="metric-icon"><span class="svg-icon icon-analysis" aria-hidden="true"></span></span><div><span>综合水平</span><strong>{{ '%.1f'|format(profile.current_level) }}</strong></div></div>
+        <div class="metric-card metric-card-target"><span class="metric-icon"><span class="svg-icon icon-target" aria-hidden="true"></span></span><div><span>目标分数</span><strong>{{ '%.1f'|format(profile.target_score) }}</strong></div></div>
         {% if exam_countdown %}
-        <div class="metric-card"><span>考试倒计时</span><strong>{{ exam_countdown.days }} 天</strong><small>{{ exam_countdown.date }}</small></div>
+        <div class="metric-card metric-card-calendar"><span class="metric-icon"><span class="svg-icon icon-calendar" aria-hidden="true"></span></span><div><span>考试倒计时</span><strong>{{ exam_countdown.days }} 天</strong><small>{{ exam_countdown.date }}</small></div></div>
         {% endif %}
-        <div class="metric-card"><span>学习记录</span><strong>{{ total_records }}</strong></div>
-        <div class="metric-card"><span>生词本</span><strong>{{ user_words|length }}</strong></div>
+        <div class="metric-card metric-card-study"><span class="metric-icon"><span class="svg-icon icon-practice" aria-hidden="true"></span></span><div><span>学习记录</span><strong>{{ total_records }}</strong></div></div>
+        <div class="metric-card metric-card-vocab"><span class="metric-icon"><span class="svg-icon icon-vocabulary" aria-hidden="true"></span></span><div><span>生词本</span><strong>{{ user_words|length }}</strong></div></div>
       </section>
       <section class="panel">
         <div class="panel-heading"><div><p class="eyebrow">Score Tracking</p><h2>四项分数追踪</h2></div></div>

@@ -149,16 +149,16 @@
                 </summary>
                 <div class="result-body">
                   {% if item.keywords %}
-                  <details class="result-accordion nested-answer">
-                    <summary>🔑 关键词提示</summary>
-                    <div class="result-body"><div class="phrase-list">{% for word in item.keywords %}<span>{{ word }}</span>{% endfor %}</div></div>
-                  </details>
+                  <div class="quick-info-card">
+                    <strong>关键词提示</strong>
+                    <div class="phrase-list">{% for word in item.keywords %}<span>{{ word }}</span>{% endfor %}</div>
+                  </div>
                   {% endif %}
                   {% if item.tips %}
-                  <details class="result-accordion nested-answer">
-                    <summary>💡 回答技巧</summary>
-                    <div class="result-body"><ul>{% for tip in item.tips %}<li>{{ tip }}</li>{% endfor %}</ul></div>
-                  </details>
+                  <div class="quick-info-card">
+                    <strong>回答技巧</strong>
+                    <ul>{% for tip in item.tips %}<li>{{ tip }}</li>{% endfor %}</ul>
+                  </div>
                   {% endif %}
 
 
@@ -448,9 +448,13 @@
               </div>
             </details>
 
-            {% if result_data.vocabulary_highlight %}<details class="result-accordion"><summary>高级词汇</summary><div class="result-body"><div class="phrase-list">{% for word in result_data.vocabulary_highlight %}<span>{{ word }}</span>{% endfor %}</div></div></details>{% endif %}
-            {% if result_data.grammar_structures %}<details class="result-accordion"><summary>语法结构</summary><div class="result-body"><ul>{% for item in result_data.grammar_structures %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
-            {% if result_data.fluency_tips %}<details class="result-accordion"><summary>流利度建议</summary><div class="result-body"><ul>{% for item in result_data.fluency_tips %}<li>{{ item }}</li>{% endfor %}</ul></div></details>{% endif %}
+            {% if result_data.vocabulary_highlight or result_data.grammar_structures or result_data.fluency_tips %}
+            <div class="quick-info-grid">
+              {% if result_data.vocabulary_highlight %}<article class="quick-info-card"><strong>高级词汇</strong><div class="phrase-list">{% for word in result_data.vocabulary_highlight %}<span>{{ word }}</span>{% endfor %}</div></article>{% endif %}
+              {% if result_data.grammar_structures %}<article class="quick-info-card"><strong>语法结构</strong><ul>{% for item in result_data.grammar_structures %}<li>{{ item }}</li>{% endfor %}</ul></article>{% endif %}
+              {% if result_data.fluency_tips %}<article class="quick-info-card"><strong>流利度建议</strong><ul>{% for item in result_data.fluency_tips %}<li>{{ item }}</li>{% endfor %}</ul></article>{% endif %}
+            </div>
+            {% endif %}
           
           {% elif result_data and mode == 'part3' and result_data.discussion_questions %}
             {% for item in result_data.discussion_questions %}
